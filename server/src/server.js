@@ -22,7 +22,12 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || env.CLIENT_ORIGINS.includes(origin)) {
+      if (
+        !origin ||
+        env.CLIENT_ORIGINS.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost')
+      ) {
         callback(null, true);
         return;
       }
@@ -56,6 +61,26 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication requests. Try again shortly.' },
+});
+
+let seedPromise = null;
+
+// Ensure database connection for both traditional server and serverless (Vercel) environments
+app.use(async (_req, _res, next) => {
+  try {
+    if (!getDbStatus().connected) {
+      await connectDB({ throwOnError: false });
+      if (getDbStatus().connected && !seedPromise) {
+        seedPromise = seedSuperAdmin().catch((err) => {
+          console.error('[SEED ERROR]', err);
+          seedPromise = null;
+        });
+      }
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ── Health check / root ──────────────────────────────────────────────────────
