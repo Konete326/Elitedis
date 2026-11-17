@@ -1,0 +1,279 @@
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Check, Plus } from 'lucide-react';
+import apiClient from '../../services/apiClient';
+import { useShell } from '../../context/ShellContext';
+import { TouchKeypadModal } from '../../components/global';
+import PageHeader from '../../components/shared/PageHeader';
+import MovementLineRow from './MovementLineRow';
+import { extractListPayload } from '../../utils/formatters';
+
+const MOVEMENT_TYPES = [
+  { id: 'PURCHASE', label: 'Purchase Intake' },
+  { id: 'TRANSFER', label: 'Inter-Warehouse Transfer' },
+  { id: 'SAME_TRANSFER', label: 'Same-Warehouse Transfer' },
+  { id: 'ADJUSTMENT', label: 'Stock Adjustment / Count' },
+  { id: 'EXPIRY_DAMAGE_BACK', label: 'Expiry & Damage Return' },
+];
+
+export default function CreateMovementPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { addToast } = useShell();
+
+  const [movementType, setMovementType] = useState('PURCHASE');
+  const [taskName, setTaskName] = useState('');
+  const [fromWarehouseId, setFromWarehouseId] = useState('');
+  const [toWarehouseId, setToWarehouseId] = useState('');
+  const [supplierCompanyId, setSupplierCompanyId] = useState('');
+  const [status, setStatus] = useState('COMPLETED');
+  const [items, setItems] = useState([]);
+  const [keypadTarget, setKeypadTarget] = useState(null);
+
+  const warehousesQuery = useQuery({
+    queryKey: ['warehouses-options'],
+    queryFn: async () => extractListPayload(await apiClient.get('/warehouses', { params: { limit: 100 } })).data,
+  });
+  const productsQuery = useQuery({
+    queryKey: ['products-options'],
+    queryFn: async () => extractListPayload(await apiClient.get('/inventory/products', { params: { limit: 100 } })).data,
+  });
+  const companiesQuery = useQuery({
+    queryKey: ['companies-options'],
+    queryFn: async () => extractListPayload(await apiClient.get('/inventory/companies', { params: { limit: 100 } })).data,
+  });
+  const batchesQuery = useQuery({
+    queryKey: ['stock-batches-options', fromWarehouseId],
+    queryFn: async () =>
+      extractListPayload(
+        await apiClient.get('/stocks/batches', {
+          params: { limit: 100, warehouseId: fromWarehouseId || undefined },
+        })
+      ).data,
+    enabled: movementType !== 'PURCHASE',
+  });
+
+  const destZones = useMemo(() => {
+    const targetWhId = movementType === 'SAME_TRANSFER' ? fromWarehouseId : toWarehouseId;
+    const wh = (warehousesQuery.data || []).find((w) => String(w._id) === String(targetWhId));
+    return wh?.zones || [];
+  }, [warehousesQuery.data, movementType, fromWarehouseId, toWarehouseId]);
+
+  const mutation = useMutation({
+    mutationFn: (payload) => apiClient.post('/stocks/movements', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-batches'] });
+      addToast({ type: 'success', message: 'Stock movement saved.' });
+      navigate('/stock/movements');
+    },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Movement failed.' });
+    },
+  });
+
+  const addLineItem = () => {
+    const firstProd = productsQuery.data?.[0];
+    const firstBatch = batchesQuery.data?.[0];
+    const firstZone = destZones[0];
+    const firstArea = firstZone?.areas?.[0];
+
+    if (movementType === 'PURCHASE') {
+      if (!firstProd) {
+        addToast({ type: 'warning', message: 'Create a product first before recording a purchase.' });
+        return;
+      }
+      setItems((prev) => [
+        ...prev,
+        {
+          productId: firstProd._id,
+          batchNo: `B-${Date.now().toString().slice(-4)}`,
+          toZoneId: firstZone?._id || '',
+          toAreaId: firstArea?._id || '',
+          unitName: firstProd.baseUnit?.unitName || 'Piece',
+          movedBaseQty: 24,
+          lineDecision: 'ACCEPT',
+        },
+      ]);
+      return;
+    }
+
+    if (!firstBatch) {
+      addToast({ type: 'warning', message: 'No batches available in selected source warehouse.' });
+      return;
+    }
+
+    setItems((prev) => [
+      ...prev,
+      {
+        productId: firstBatch.productId?._id || firstBatch.productId,
+        batchId: firstBatch._id,
+        batchNo: firstBatch.batchNo,
+        fromZoneId: firstBatch.zoneId,
+        fromAreaId: firstBatch.areaId,
+        toZoneId: firstZone?._id || firstBatch.zoneId,
+        toAreaId: firstArea?._id || firstBatch.areaId,
+        unitName: firstBatch.productId?.baseUnit?.unitName || 'Piece',
+        previousErpBaseQty: firstBatch.currentBaseQty || 0,
+        physicalCountBaseQty: firstBatch.currentBaseQty || 0,
+        movedBaseQty: 1,
+        lineDecision: 'ACCEPT',
+      },
+    ]);
+  };
+
+  const updateLine = (idx, key, val) => {
+    setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, [key]: val } : row)));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (items.length === 0) {
+      addToast({ type: 'warning', message: 'Add at least one item line.' });
+      return;
+    }
+    mutation.mutate({
+      movementType,
+      taskName: taskName || `${movementType} Movement`,
+      fromWarehouseId: fromWarehouseId || null,
+      toWarehouseId: toWarehouseId || null,
+      supplierCompanyId: supplierCompanyId || null,
+      status,
+      items,
+    });
+  };
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
+      <PageHeader
+        title="Create Stock Movement"
+        subtitle="Execute purchase intake, warehouse transfers, physical adjustments, or damage returns"
+        actions={
+          <button type="button" onClick={() => navigate('/stock/movements')} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Movements</span>
+          </button>
+        }
+        tabs={MOVEMENT_TYPES.map((t) => ({
+          id: t.id,
+          label: t.label,
+          active: movementType === t.id,
+          onClick: () => {
+            setMovementType(t.id);
+            setItems([]);
+          },
+        }))}
+      />
+
+      <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+        <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Task / Reference Name</label>
+            <input value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder={`New ${movementType.toLowerCase()} batch`} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
+          </div>
+
+          {movementType !== 'PURCHASE' && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">From Warehouse</label>
+              <select required value={fromWarehouseId} onChange={(e) => setFromWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+                <option value="">Select source...</option>
+                {(warehousesQuery.data || []).map((w) => (
+                  <option key={w._id} value={w._id}>
+                    {w.warehouseName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {(movementType === 'PURCHASE' || movementType === 'TRANSFER') && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Destination Warehouse</label>
+              <select required value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+                <option value="">Select destination...</option>
+                {(warehousesQuery.data || []).map((w) => (
+                  <option key={w._id} value={w._id}>
+                    {w.warehouseName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {(movementType === 'PURCHASE' || movementType === 'EXPIRY_DAMAGE_BACK') && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company</label>
+              <select value={supplierCompanyId} onChange={(e) => setSupplierCompanyId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+                <option value="">Optional...</option>
+                {(companiesQuery.data || []).map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.companyName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Commit Mode</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="COMPLETED">Approve &amp; Post Stock Immediately</option>
+              <option value="PENDING">Save as Pending Verification</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col rounded-xl border bg-[var(--bg-surface)] overflow-hidden">
+          <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b bg-[var(--bg-elevated)]">
+            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Movement Line Items ({items.length})</span>
+            <button type="button" onClick={addLineItem} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Item</span>
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-auto p-3 space-y-2.5">
+            {items.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
+                Select warehouses above and click "+ Add Item" to configure batches and quantities.
+              </div>
+            ) : (
+              items.map((row, idx) => (
+                <MovementLineRow
+                  key={idx}
+                  row={row}
+                  idx={idx}
+                  movementType={movementType}
+                  products={productsQuery.data || []}
+                  batches={batchesQuery.data || []}
+                  destZones={destZones}
+                  updateLine={updateLine}
+                  onOpenKeypad={(i, field) => setKeypadTarget({ idx: i, field, val: items[i][field] })}
+                  onRemove={(i) => setItems((prev) => prev.filter((_, n) => n !== i))}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="shrink-0 flex justify-end gap-2 px-4 py-3 border-t bg-[var(--bg-elevated)]">
+            <button type="submit" disabled={mutation.isPending} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
+              <Check className="w-4 h-4" />
+              <span>{mutation.isPending ? 'Submitting...' : 'Submit Movement'}</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <TouchKeypadModal
+        isOpen={Boolean(keypadTarget)}
+        onClose={() => setKeypadTarget(null)}
+        initialValue={keypadTarget?.val ?? 0}
+        title="Enter Base Unit Quantity"
+        onConfirm={(val) => {
+          if (keypadTarget) updateLine(keypadTarget.idx, keypadTarget.field, val);
+        }}
+      />
+    </div>
+  );
+}
