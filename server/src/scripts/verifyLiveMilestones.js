@@ -92,13 +92,15 @@ async function run() {
       assert.equal((await api('DELETE', `/upload/image?publicId=${encodeURIComponent(up.json.data.publicId)}`, null, tok)).status, 200);
     });
 
-    const inv = await step('M2 Inventory Master, multi-unit math, bulk rules, tenant guard & dashboard', async () => {
+    const inv = await step('M2 Inventory Master, prerequisites, multi-unit math, bulk rules, tenant guard & dashboard', async () => {
+      assert.equal((await api('POST', '/inventory/brands', { brandName: 'No Co Brand' }, tok)).status, 400);
       const cmp = await api('POST', '/inventory/companies', { companyName: 'Green Chemicals Verify', shortName: 'GCV' }, tok);
       assert.equal(cmp.status, 201);
       assert.equal((await api('GET', `/inventory/companies/${cmp.json.data._id}`, null, superTokens.accessToken)).status, 404);
       const brd = await api('POST', '/inventory/brands', { brandName: 'SURAJ VERIFY', companyId: cmp.json.data._id }, tok);
       const cat = await api('POST', '/inventory/categories', { name: 'Detergent', companyId: cmp.json.data._id, linkedBrandIds: [brd.json.data._id] }, tok);
       const sub = await api('POST', '/inventory/sub-categories', { name: 'Powder', parentCategoryId: cat.json.data._id, companyId: cmp.json.data._id }, tok);
+      assert.equal((await api('POST', '/inventory/products', { productName: 'No Cat Product', companyId: cmp.json.data._id, brandId: brd.json.data._id }, tok)).status, 400);
       const prod = await api('POST', '/inventory/products', {
         productName: 'Suraj 500g Verify',
         companyId: cmp.json.data._id,
@@ -145,7 +147,10 @@ async function run() {
       return { warehouse: w.json.data, zone: z.json.data, area1: a1.json.data, area2: a2.json.data, batch: batches.json.data[0] };
     });
 
-    const staff = await step('M4 Employee RBAC 403, Territory/Route, Customer & BeatPlan duplication', async () => {
+    const staff = await step('M4 Employee RBAC & SUPER_ADMIN isolation, Territory/Route, Customer & BeatPlan', async () => {
+      assert.equal((await api('POST', '/hrm/employees', { fullName: 'Illegal SA', email: `sa.${Date.now()}@elitedist.test`, phone: '03000000000', password: 'Password123!', primaryRole: 'SUPER_ADMIN' }, tok)).status, 403);
+      assert.equal((await api('GET', '/hrm/employees?primaryRole=SUPER_ADMIN', null, tok)).json.data.length, 0);
+      assert.equal((await api('POST', '/crm/beats', { beatName: 'No Booker Beat', beatDay: 'MONDAY' }, tok)).status, 400);
       const emp = await api('POST', '/hrm/employees', {
         fullName: 'Verify Booker', email: `booker.${Date.now()}@elitedist.test`, phone: '03112223344', password: 'BookerPass@2026',
         primaryRole: 'BOOKER', workParts: { orderBooker: true, salesman: true, posStore: true }, basicSalaryPkr: 30000, commissionPct: 2,
@@ -181,6 +186,7 @@ async function run() {
       }, tok);
       assert.equal(prev.json.data.lineItems[1].isFreeSchemeRow, true);
       assert.equal(prev.json.data.lineItems[0].itemDiscountAmount, 1500);
+      assert.equal((await api('POST', '/orders', { lineItems: [] }, tok)).status, 400);
       const ord = await api('POST', '/orders', {
         customerId: staff.customer._id,
         lineItems: [{ productId: inv.product._id, batchId: wh.batch._id, productName: inv.product.productName, unitName: 'Packet', conversionQty: 1, unitWeightKg: 0.5, baseRate: 110, quantity: 10 }],
@@ -203,7 +209,12 @@ async function run() {
       assert.equal((await api('PATCH', `/tasks/${dispTask._id}/dispatch`, { complete: true }, tok)).status, 200);
       assert.equal((await api('POST', '/portals/booker/orders', { customerId: staff.customer._id, lineItems: [{ productId: inv.product._id, unitName: 'Packet', conversionQty: 1, baseRate: 110, quantity: 2 }] }, staff.bookerToken)).status, 201);
       assert.equal((await api('POST', '/portals/pos/checkout', { walkInCustomerName: 'Walk-in Verify', lineItems: [{ productId: inv.product._id, batchId: wh.batch._id, unitName: 'Packet', conversionQty: 1, baseRate: 120, quantity: 2 }] }, staff.bookerToken)).status, 201);
-      assert.equal((await api('POST', '/portals/salesman/deal', { saleInvoiceId: orderFlow.plan.invoices[0]._id, dispatchSheetId: orderFlow.plan.dispatchSheet._id, payment: { paymentMode: 'CASH', cashAmountPkr: 500 }, tripExpenses: [{ category: 'GAS_PETROL', amountPkr: 100, remark: 'Fuel' }] }, staff.bookerToken)).status, 200);
+      const sDeal = await api('POST', '/portals/salesman/deal', { saleInvoiceId: orderFlow.plan.invoices[0]._id, dispatchSheetId: orderFlow.plan.dispatchSheet._id, payment: { paymentMode: 'CASH', cashAmountPkr: 500 }, tripExpenses: [{ category: 'GAS_PETROL', amountPkr: 100, remark: 'Fuel' }] }, staff.bookerToken);
+      assert.equal(sDeal.status, 200);
+      const tAfter = await api('GET', '/tasks/my-tasks?all=true&status=FRESH', null, tok);
+      if (tAfter.json.data?.length > 0) {
+        assert.equal((await api('PATCH', `/tasks/${tAfter.json.data[0]._id}/cancel`, { reason: 'Verify cancel' }, tok)).status, 200);
+      }
     });
 
     await step('M9 HRM, Procurement, Cheque Lifecycle & Balanced Accounting Statements', async () => {

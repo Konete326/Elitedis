@@ -78,25 +78,37 @@ export default function BookerPortalPage() {
     });
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([
+      beatsQuery.refetch(),
+      catalogQuery.refetch(),
+      customersQuery.refetch(),
+      ...(tab === 'history' ? [historyQuery.refetch()] : []),
+    ]);
+    addToast({ type: 'success', message: 'Booker portal refreshed.' });
+  };
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
         title="Order Booker Portal"
-        subtitle="Mobile-ready Beat schedule, visited shop list, and 1-tap touch keypad order booking"
+        subtitle="Pick a visited shop, tap products to enter quantities, and submit orders"
+        onRefresh={handleRefresh}
+        isRefreshing={beatsQuery.isFetching || catalogQuery.isFetching || customersQuery.isFetching || historyQuery.isFetching}
         tabs={[
           { id: 'booking', label: 'Today Booking', active: tab === 'booking', onClick: () => setTab('booking') },
-          { id: 'beats', label: 'Beat & Brand Setup', count: beatsQuery.data?.length || 0, active: tab === 'beats', onClick: () => setTab('beats') },
+          { id: 'beats', label: 'My Beat Plans', count: beatsQuery.data?.length || 0, active: tab === 'beats', onClick: () => setTab('beats') },
           { id: 'history', label: 'Booking History', active: tab === 'history', onClick: () => setTab('history') },
         ]}
       />
 
       {tab === 'booking' && (
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3 overflow-hidden">
-          <div className="rounded-xl border bg-[var(--bg-surface)] flex flex-col overflow-hidden min-h-0">
+        <div className="lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3 lg:overflow-hidden">
+          <div className="rounded-xl border bg-[var(--bg-surface)] flex flex-col lg:overflow-hidden lg:min-h-0">
             <div className="shrink-0 px-3.5 py-2.5 border-b bg-[var(--bg-elevated)] text-xs font-bold uppercase text-[var(--text-secondary)]">
-              1. Visited Customers ({customersQuery.data?.length || 0})
+              1. Pick a Shop ({customersQuery.data?.length || 0})
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2">
+            <div className="max-h-[42vh] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto p-2.5 space-y-2">
               {(customersQuery.data || []).map((c) => {
                 const active = selectedCustomer?._id === c._id;
                 return (
@@ -121,8 +133,8 @@ export default function BookerPortalPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-2 rounded-xl border bg-[var(--bg-surface)] flex flex-col overflow-hidden min-h-0">
-            <div className="shrink-0 flex items-center justify-between px-3.5 py-2.5 border-b bg-[var(--bg-elevated)]">
+          <div className="lg:col-span-2 rounded-xl border bg-[var(--bg-surface)] flex flex-col lg:overflow-hidden lg:min-h-0">
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b bg-[var(--bg-elevated)]">
               <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">
                 2. Tap Product to Enter Qty ({selectedCustomer ? selectedCustomer.shopName : 'Select customer first'})
               </span>
@@ -131,7 +143,7 @@ export default function BookerPortalPage() {
               </span>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
+            <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
               {(catalogQuery.data || []).map((prod) => {
                 const inCart = cart.find((x) => x.productId === prod._id);
                 const rate = prod.packingUnits?.[0]?.wholesaleSaleRate || prod.baseUnit?.wholesaleSaleRate || 0;
@@ -184,7 +196,7 @@ export default function BookerPortalPage() {
       )}
 
       {tab === 'beats' && (
-        <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
+        <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
           {(beatsQuery.data || []).length === 0 ? (
             <div className="col-span-full rounded-xl border bg-[var(--bg-surface)] p-8 text-center text-sm text-[var(--text-muted)]">
               <MapPin className="w-6 h-6 mx-auto mb-2 text-[var(--accent-primary)]" />
@@ -208,7 +220,7 @@ export default function BookerPortalPage() {
       )}
 
       {tab === 'history' && (
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-[var(--bg-surface)] divide-y">
+        <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto rounded-xl border bg-[var(--bg-surface)] divide-y">
           {(historyQuery.data || []).map((o) => (
             <div key={o._id} className="flex items-center justify-between px-4 py-3 text-xs">
               <div>

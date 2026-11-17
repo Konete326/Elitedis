@@ -1,4 +1,5 @@
 import { Calculator, Trash2 } from 'lucide-react';
+import { suggestCode } from '../../utils/validation';
 
 export default function MovementLineRow({
   row,
@@ -15,12 +16,16 @@ export default function MovementLineRow({
   const areasList = selectedZone?.areas || [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-6 gap-2.5 items-end rounded-xl border p-3 bg-[var(--bg-canvas)]">
+    <div className="rounded-xl border border-[var(--border-subtle)] p-3.5 bg-[var(--bg-canvas)] space-y-3 md:space-y-0 md:grid md:grid-cols-6 md:gap-2.5 md:items-end animate-fade-in">
       {movementType === 'PURCHASE' ? (
         <>
           <div className="md:col-span-2">
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Product</label>
-            <select value={row.productId} onChange={(e) => updateLine(idx, 'productId', e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs">
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Product</label>
+            <select
+              value={row.productId}
+              onChange={(e) => updateLine(idx, 'productId', e.target.value)}
+              className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm"
+            >
               {products.map((p) => (
                 <option key={p._id} value={p._id}>
                   {p.skuCode} — {p.productName}
@@ -29,13 +34,26 @@ export default function MovementLineRow({
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Batch No</label>
-            <input value={row.batchNo} onChange={(e) => updateLine(idx, 'batchNo', e.target.value.toUpperCase())} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-mono" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-[var(--text-secondary)]">Batch No</label>
+              <button
+                type="button"
+                onClick={() => updateLine(idx, 'batchNo', suggestCode('BAT', idx))}
+                className="text-[10px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Batch
+              </button>
+            </div>
+            <input
+              value={row.batchNo}
+              onChange={(e) => updateLine(idx, 'batchNo', e.target.value.toUpperCase())}
+              className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm font-mono"
+            />
           </div>
         </>
       ) : (
         <div className="md:col-span-3">
-          <label className="block text-[11px] text-[var(--text-muted)] mb-1">Source Batch</label>
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Source Batch</label>
           <select
             value={row.batchId}
             onChange={(e) => {
@@ -47,7 +65,7 @@ export default function MovementLineRow({
                 updateLine(idx, 'previousErpBaseQty', b.currentBaseQty || 0);
               }
             }}
-            className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
+            className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm"
           >
             {batches.map((b) => (
               <option key={b._id} value={b._id}>
@@ -59,21 +77,29 @@ export default function MovementLineRow({
       )}
 
       <div>
-        <label className="block text-[11px] text-[var(--text-muted)] mb-1">Target Area</label>
-        <select value={row.toAreaId} onChange={(e) => updateLine(idx, 'toAreaId', e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs">
-          {areasList.map((a) => (
-            <option key={a._id} value={a._id}>
-              {a.areaCode} — {a.areaName}
-            </option>
-          ))}
+        <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Target Floor / Rack</label>
+        <select
+          value={row.toAreaId}
+          onChange={(e) => updateLine(idx, 'toAreaId', e.target.value)}
+          className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm"
+        >
+          {areasList.length === 0 ? (
+            <option value="">Create a Zone &amp; Area first</option>
+          ) : (
+            areasList.map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.areaCode} — {a.areaName}
+              </option>
+            ))
+          )}
         </select>
       </div>
 
       <div>
-        <label className="block text-[11px] text-[var(--text-muted)] mb-1">
+        <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
           {movementType === 'ADJUSTMENT' ? 'Physical Base Qty' : 'Moved Base Qty'}
         </label>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           <input
             type="number"
             min="0"
@@ -81,21 +107,27 @@ export default function MovementLineRow({
             onChange={(e) =>
               updateLine(idx, movementType === 'ADJUSTMENT' ? 'physicalCountBaseQty' : 'movedBaseQty', Number(e.target.value))
             }
-            className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums"
+            className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm tabular-nums"
           />
           <button
             type="button"
             onClick={() => onOpenKeypad(idx, movementType === 'ADJUSTMENT' ? 'physicalCountBaseQty' : 'movedBaseQty')}
-            className="w-9 h-9 shrink-0 rounded-lg border bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center"
+            aria-label="Open numeric keypad"
+            className="w-11 min-h-[42px] md:w-9 md:h-9 shrink-0 rounded-lg border bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center"
           >
             <Calculator className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => onRemove(idx)} className="h-9 px-3 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs">
+      <div className="flex justify-end pt-1 md:pt-0">
+        <button
+          type="button"
+          onClick={() => onRemove(idx)}
+          className="w-full md:w-auto min-h-[44px] md:min-h-[36px] md:h-9 px-3 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 text-xs font-medium inline-flex items-center justify-center gap-1.5"
+        >
           <Trash2 className="w-3.5 h-3.5" />
+          <span className="md:hidden">Remove Row</span>
         </button>
       </div>
     </div>

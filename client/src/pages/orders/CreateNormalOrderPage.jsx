@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Calculator, Plus, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { PrintPreviewModal, TouchKeypadModal } from '../../components/global';
+import { ConfirmModal, PrintPreviewModal, TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
+import OrderLineItemCard from './OrderLineItemCard';
 import OrderSummaryPanel from './OrderSummaryPanel';
 import { calculateLiveOrderSummary } from '../../utils/invoiceMath';
 import { extractListPayload, formatCurrency, formatWeight } from '../../utils/formatters';
@@ -31,6 +33,9 @@ export default function CreateNormalOrderPage() {
   const [lineItems, setLineItems] = useState([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [keypadIdx, setKeypadIdx] = useState(null);
+  const [removeIdx, setRemoveIdx] = useState(null);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const customersQuery = useQuery({
     queryKey: ['customers-options'],
@@ -70,10 +75,12 @@ export default function CreateNormalOrderPage() {
     mutationFn: (payload) => apiClient.post('/orders', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setSubmitConfirmOpen(false);
       addToast({ type: 'success', message: 'Normal order submitted for approval.' });
       navigate('/orders/master');
     },
     onError: (err) => {
+      setSubmitConfirmOpen(false);
       addToast({ type: 'error', message: err?.response?.data?.message || 'Could not create order.' });
     },
   });
@@ -81,7 +88,7 @@ export default function CreateNormalOrderPage() {
   const addProductRow = () => {
     const prod = productsQuery.data?.[0];
     if (!prod) {
-      addToast({ type: 'warning', message: 'Create a product first in Product Master.' });
+      addToast({ type: 'warning', message: 'Add at least one product in Products Master first.' });
       return;
     }
     const pack = prod.packingUnits?.[0];
@@ -108,13 +115,17 @@ export default function CreateNormalOrderPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!customerId) {
-      addToast({ type: 'warning', message: 'Select a customer before submitting.' });
+      addToast({ type: 'warning', message: 'Please pick a customer shop before submitting.' });
       return;
     }
     if (lineItems.length === 0) {
-      addToast({ type: 'warning', message: 'Add at least one product row.' });
+      addToast({ type: 'warning', message: 'Please add at least one product to the order.' });
       return;
     }
+    setSubmitConfirmOpen(true);
+  };
+
+  const confirmSubmitOrder = () => {
     submitMutation.mutate({
       orderMode: 'NORMAL',
       orderType,
@@ -128,34 +139,50 @@ export default function CreateNormalOrderPage() {
     });
   };
 
+  const customers = customersQuery.data || [];
   const products = productsQuery.data || [];
+  const prereqReady = !customersQuery.isLoading && !productsQuery.isLoading;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Normal Order Workbench (2-Level Engine)"
-        subtitle="Level 1 item rates, reverse sale rate discount, free schemes -> Level 2 grand rules"
+        title="New Normal Order"
+        subtitle="Pick a customer, add products, adjust custom prices or discounts, and submit for approval"
         actions={
           <>
-            <button type="button" onClick={() => navigate('/orders/master')} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => (lineItems.length > 0 ? setCancelConfirmOpen(true) : navigate('/orders/master'))}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium"
+            >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Orders Master</span>
             </button>
-            <button type="button" onClick={() => setPrintOpen(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
+            <button type="button" onClick={() => setPrintOpen(true)} className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
               <Printer className="w-3.5 h-3.5" />
-              <span>Preview Invoice</span>
+              <span>Preview Bill</span>
             </button>
           </>
         }
       />
 
-      <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Add at least one Customer Shop and one Product before creating an order."
+          steps={[
+            { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
+            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+          ]}
+        />
+      )}
+
+      <form onSubmit={handleSubmit} className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 lg:overflow-hidden">
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3.5 grid grid-cols-1 lg:grid-cols-4 gap-3 items-center">
           <div className="lg:col-span-2">
             <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Customer Shop</label>
-            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Select customer...</option>
-              {(customersQuery.data || []).map((c) => (
+            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-10 sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="">Choose customer shop...</option>
+              {customers.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.customerCode} — {c.shopName} ({c.locationHierarchy?.areaName || c.locationHierarchy?.city || 'City'})
                 </option>
@@ -163,34 +190,39 @@ export default function CreateNormalOrderPage() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Order Type</label>
-            <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Order Priority</label>
+            <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className="w-full h-10 sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="REGULAR">Regular</option>
               <option value="URGENT">Urgent</option>
               <option value="SPECIAL">Special</option>
               <option value="CUSTOM_SALE">Custom Sale</option>
             </select>
           </div>
-          <div className="flex flex-wrap gap-2 pt-4 lg:pt-0">
+          <div className="flex flex-wrap gap-2 pt-1 lg:pt-0">
             {selectedCustomer ? (
               <>
                 <StatusBadge status={selectedCustomer.financialTerms?.paymentCondition} />
                 <span className="text-xs font-mono tabular-nums text-[var(--text-secondary)]">
-                  Bal: {formatCurrency(selectedCustomer.financialTerms?.outstandingBalancePkr || 0)}
+                  Balance: {formatCurrency(selectedCustomer.financialTerms?.outstandingBalancePkr || 0)}
                 </span>
               </>
             ) : (
-              <span className="text-xs text-[var(--text-muted)]">Select customer for credit terms</span>
+              <span className="text-xs text-[var(--text-muted)]">Select a customer to see credit terms</span>
             )}
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-4 gap-3 overflow-hidden">
-          <div className="xl:col-span-3 flex flex-col rounded-xl border bg-[var(--bg-surface)] overflow-hidden min-h-0">
+        <div className="lg:flex-1 lg:min-h-0 grid grid-cols-1 xl:grid-cols-4 gap-3 lg:overflow-hidden">
+          <div className="xl:col-span-3 flex flex-col rounded-xl border bg-[var(--bg-surface)] lg:overflow-hidden lg:min-h-0">
             <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b bg-[var(--bg-elevated)]">
               <div className="flex flex-wrap items-center gap-3 text-xs">
-                <span className="font-bold uppercase text-[var(--text-secondary)]">Level 1 Items</span>
-                {['discountAllow', 'taxAllow', 'schemeAllow', 'chargesAllow'].map((flag) => (
+                <span className="font-bold uppercase text-[var(--text-secondary)]">Order Items</span>
+                {[
+                  ['discountAllow', 'Discounts'],
+                  ['taxAllow', 'Tax'],
+                  ['schemeAllow', 'Free Offers'],
+                  ['chargesAllow', 'Charges'],
+                ].map(([flag, label]) => (
                   <label key={flag} className="inline-flex items-center gap-1 cursor-pointer">
                     <input
                       type="checkbox"
@@ -198,81 +230,39 @@ export default function CreateNormalOrderPage() {
                       onChange={(e) => setInvoiceRules((p) => ({ ...p, [flag]: e.target.checked }))}
                       className="rounded accent-[var(--accent-primary)]"
                     />
-                    <span>{flag.replace('Allow', '')}</span>
+                    <span>{label}</span>
                   </label>
                 ))}
               </div>
-              <button type="button" onClick={addProductRow} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
+              <button
+                type="button"
+                onClick={addProductRow}
+                disabled={products.length === 0}
+                className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold disabled:opacity-50"
+              >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Product</span>
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-auto p-3 space-y-2">
+            <div className="lg:flex-1 lg:min-h-0 lg:overflow-auto p-3 space-y-2">
               {liveCalc.lineItems.length === 0 ? (
-                <div className="py-12 text-center text-sm text-[var(--text-muted)]">
-                  Click "+ Add Product" to add items and test reverse sale rates, schemes, and discounts.
+                <div className="py-10 text-center text-sm text-[var(--text-muted)]">
+                  Click &quot;Add Product&quot; above to add items and calculate prices, discounts, and free offers.
                 </div>
               ) : (
                 liveCalc.lineItems.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-end rounded-xl border p-2.5 bg-[var(--bg-canvas)]">
-                    <div className="sm:col-span-2">
-                      <label className="block text-[10px] text-[var(--text-muted)] mb-1">Product</label>
-                      <select
-                        value={row.productId}
-                        onChange={(e) => {
-                          const p = products.find((x) => x._id === e.target.value);
-                          if (!p) return;
-                          const pack = p.packingUnits?.[0];
-                          updateRow(idx, {
-                            productId: p._id,
-                            productName: p.productName,
-                            skuCode: p.skuCode,
-                            unitName: pack?.unitName || p.baseUnit?.unitName || 'Piece',
-                            conversionQty: pack?.conversionQty || 1,
-                            unitWeightKg: pack?.packingWeightKg || p.baseUnit?.weightInKg || 0,
-                            baseRate: pack?.wholesaleSaleRate || p.baseUnit?.wholesaleSaleRate || 0,
-                            customSaleRate: '',
-                          });
-                        }}
-                        className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs"
-                      >
-                        {products.map((p) => (
-                          <option key={p._id} value={p._id}>
-                            {p.skuCode} — {p.productName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-[var(--text-muted)] mb-1">Qty ({row.unitName})</label>
-                      <div className="flex gap-1">
-                        <input type="number" min="1" value={row.quantity} onChange={(e) => updateRow(idx, { quantity: Number(e.target.value) })} className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums" />
-                        <button type="button" onClick={() => setKeypadIdx(idx)} className="w-8 h-8 shrink-0 rounded-lg border bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center">
-                          <Calculator className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-[var(--text-muted)] mb-1">Base Rate</label>
-                      <input type="number" value={row.baseRate} onChange={(e) => updateRow(idx, { baseRate: Number(e.target.value) })} className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-[var(--text-muted)] mb-1">Custom Sale Rate</label>
-                      <input type="number" placeholder={String(row.baseRate)} value={lineItems[idx].customSaleRate} onChange={(e) => updateRow(idx, { customSaleRate: e.target.value })} className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-[var(--text-muted)] mb-1">Net / Disc {row.effectiveDiscountPct}%</label>
-                      <p className="h-8 flex items-center font-mono font-bold text-xs tabular-nums text-[var(--accent-primary)]">
-                        {formatCurrency(row.netLineAmount)}
-                      </p>
-                    </div>
-                    <div className="flex justify-end">
-                      <button type="button" onClick={() => setLineItems((prev) => prev.filter((_, i) => i !== idx))} className="h-8 px-2.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                  <OrderLineItemCard
+                    key={`${row.productId}-${idx}`}
+                    row={row}
+                    rawCustomRate={lineItems[idx]?.customSaleRate ?? ''}
+                    idx={idx}
+                    products={products}
+                    onProductChange={updateRow}
+                    onUpdateRow={updateRow}
+                    onOpenKeypad={setKeypadIdx}
+                    onRequestRemove={setRemoveIdx}
+                  />
                 ))
               )}
             </div>
@@ -290,6 +280,7 @@ export default function CreateNormalOrderPage() {
             setGrandSchemeRuleId={setGrandSchemeRuleId}
             grandSummary={liveCalc.grandSummary}
             isSubmitting={submitMutation.isPending}
+            onCancelClick={() => (lineItems.length > 0 ? setCancelConfirmOpen(true) : navigate('/orders/master'))}
           />
         </div>
       </form>
@@ -300,11 +291,8 @@ export default function CreateNormalOrderPage() {
         initialValue={keypadIdx !== null ? lineItems[keypadIdx]?.quantity : 1}
         min={1}
         title="Enter Order Quantity"
-        onConfirm={(val) => {
-          if (keypadIdx !== null) updateRow(keypadIdx, { quantity: val });
-        }}
+        onConfirm={(val) => { if (keypadIdx !== null) updateRow(keypadIdx, { quantity: val }); }}
       />
-
       <PrintPreviewModal
         isOpen={printOpen}
         onClose={() => setPrintOpen(false)}
@@ -322,6 +310,35 @@ export default function CreateNormalOrderPage() {
           { label: 'Total Weight', value: formatWeight(liveCalc.grandSummary.totalWeightKg) },
           { label: 'Net Payable', value: formatCurrency(liveCalc.grandSummary.netPayableAmount) },
         ]}
+      />
+
+      <ConfirmModal
+        isOpen={removeIdx !== null}
+        onClose={() => setRemoveIdx(null)}
+        onConfirm={() => { setLineItems((prev) => prev.filter((_, i) => i !== removeIdx)); setRemoveIdx(null); }}
+        variant="danger"
+        title="Remove product from order?"
+        message={`Remove ${lineItems[removeIdx]?.productName || 'this item'} from the order?`}
+        confirmLabel="Remove Item"
+      />
+      <ConfirmModal
+        isOpen={submitConfirmOpen}
+        onClose={() => setSubmitConfirmOpen(false)}
+        onConfirm={confirmSubmitOrder}
+        isLoading={submitMutation.isPending}
+        variant="primary"
+        title="Submit this order?"
+        message={`Create normal order for ${selectedCustomer?.shopName || 'selected customer'} totaling ${formatCurrency(liveCalc.grandSummary.netPayableAmount)} (${liveCalc.lineItems.length} items)?`}
+        confirmLabel="Submit Order"
+      />
+      <ConfirmModal
+        isOpen={cancelConfirmOpen}
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={() => navigate('/orders/master')}
+        variant="warning"
+        title="Discard draft order?"
+        message="You have unsaved items in this order. Leave without saving?"
+        confirmLabel="Discard & Exit"
       />
     </div>
   );

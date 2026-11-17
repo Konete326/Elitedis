@@ -1,4 +1,15 @@
-export function PageHeader({ title, subtitle, badge, actions, tabs, className = '' }) {
+import { RefreshCw } from 'lucide-react';
+
+export function PageHeader({
+  title,
+  subtitle,
+  badge,
+  actions,
+  tabs,
+  onRefresh,
+  isRefreshing = false,
+  className = '',
+}) {
   return (
     <div className={`shrink-0 flex flex-col gap-2.5 ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
@@ -14,14 +25,25 @@ export function PageHeader({ title, subtitle, badge, actions, tabs, className = 
             )}
           </div>
           {subtitle && (
-            <p className="mt-0.5 text-xs sm:text-sm text-[var(--text-secondary)] truncate">
+            <p className="mt-0.5 text-xs sm:text-sm text-[var(--text-secondary)]">
               {subtitle}
             </p>
           )}
         </div>
 
-        {actions && (
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {(actions || onRefresh) && (
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto [&>button]:w-full [&>button]:sm:w-auto [&>a]:w-full [&>a]:sm:w-auto [&>button]:min-h-[40px] [&>button]:sm:min-h-[36px] [&>button]:justify-center">
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] disabled:opacity-60 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+                <span>Refresh</span>
+              </button>
+            )}
             {actions}
           </div>
         )}

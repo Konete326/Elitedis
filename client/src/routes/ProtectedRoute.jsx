@@ -13,12 +13,13 @@ export default function ProtectedRoute({
   const { addToast } = useShell();
   const lastDeniedPathRef = useRef('');
 
+  const isSuperAdmin = hasRole('SUPER_ADMIN');
+  const hasRequirements = allowedRoles.length > 0 || Boolean(requiredWorkPart);
   const roleAllowed = hasRole(...allowedRoles);
   const workPartAllowed = requiredWorkPart ? hasWorkPart(requiredWorkPart) : false;
-  const isAdmin = hasRole('SUPER_ADMIN', 'ADMIN');
   const isAuthorized =
     isAuthenticated &&
-    (isAdmin || (requiredWorkPart ? roleAllowed || workPartAllowed : roleAllowed));
+    (!hasRequirements || isSuperAdmin || (requiredWorkPart ? roleAllowed || workPartAllowed : roleAllowed));
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !isAuthorized) {

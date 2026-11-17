@@ -103,7 +103,7 @@ export function MetricCard({
             {displayTitle}
           </p>
           {loading ? (
-            <div className="mt-2 h-7 w-24 rounded-md bg-[var(--bg-elevated)] animate-pulse" />
+            <div className="mt-2 h-7 w-24 rounded-md skeleton-shimmer" />
           ) : (
             <p className="mt-1 text-xl sm:text-2xl font-bold text-[var(--text-primary)] tabular-nums truncate">
               {value ?? '0'}

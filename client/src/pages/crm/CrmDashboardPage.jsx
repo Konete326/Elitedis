@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Compass, MapPin, ShieldAlert, Users } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { MetricCard, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import MiniBarChart from '../../components/shared/MiniBarChart';
@@ -12,9 +13,10 @@ import { extractListPayload, formatCurrency, formatNumber } from '../../utils/fo
 export default function CrmDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useShell();
   const distributorId = user?.distributorId || 'default';
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['crm-dashboard', distributorId],
     queryFn: async () => {
       const [custRes, terRes, beatRes] = await Promise.all([
@@ -35,6 +37,11 @@ export default function CrmDashboardPage() {
       };
     },
   });
+
+  const handleRefresh = async () => {
+    await refetch();
+    addToast({ type: 'success', message: 'Customer & route overview refreshed.' });
+  };
 
   const customers = data?.customers || [];
   const territories = data?.territories || [];
@@ -61,16 +68,18 @@ export default function CrmDashboardPage() {
   }));
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="CRM & Beat Coverage Dashboard"
-        subtitle="Wholesalers, retailers, credit exposure, territories, and weekly beat coverage"
+        title="Customer &amp; Market Coverage"
+        subtitle="See your registered shops, sales territories, and weekly route plans at a glance"
+        onRefresh={handleRefresh}
+        isRefreshing={isFetching}
         actions={
           <>
             <button
               type="button"
               onClick={() => navigate('/crm/beats')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Beat Plans</span>
@@ -78,10 +87,10 @@ export default function CrmDashboardPage() {
             <button
               type="button"
               onClick={() => navigate('/crm/customers')}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Customer Master</span>
+              <span>Customer List</span>
             </button>
           </>
         }

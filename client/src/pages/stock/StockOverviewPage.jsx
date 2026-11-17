@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeftRight, Boxes, Layers, Warehouse } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { MetricCard, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import MiniBarChart from '../../components/shared/MiniBarChart';
@@ -12,9 +13,10 @@ import { formatCurrency, formatDate, formatNumber, formatWeight } from '../../ut
 export default function StockOverviewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useShell();
   const distributorId = user?.distributorId || 'default';
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['stock-overview', distributorId],
     queryFn: async () => {
       const [valRes, dashRes] = await Promise.allSettled([
@@ -47,16 +49,21 @@ export default function StockOverviewPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Stock & Warehouse Overview"
         subtitle="Batch valuation, warehouse capacity, low-stock warnings, and near-expiry batches"
+        onRefresh={async () => {
+          await refetch();
+          addToast({ type: 'info', message: 'Stock overview refreshed.' });
+        }}
+        isRefreshing={isFetching}
         actions={
           <>
             <button
               type="button"
               onClick={() => navigate('/stock/list')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <Layers className="w-3.5 h-3.5" />
               <span>All Stock Batches</span>
@@ -64,7 +71,7 @@ export default function StockOverviewPage() {
             <button
               type="button"
               onClick={() => navigate('/stock/movements/create')}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span>Create Movement</span>

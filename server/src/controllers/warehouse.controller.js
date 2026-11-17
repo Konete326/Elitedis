@@ -114,7 +114,7 @@ export const listAllZones = asyncHandler(async (req, res) => {
 
 export const addZone = asyncHandler(async (req, res) => {
   const warehouse = await Warehouse.findOne({ _id: req.params.warehouseId, distributorId: req.distributorId });
-  if (!warehouse) throw new AppError('Warehouse not found.', 404, 'WAREHOUSE_NOT_FOUND');
+  if (!warehouse) throw new AppError('Please create a Warehouse first before adding a Zone.', 404, 'PREREQUISITE_WAREHOUSE_NOT_FOUND');
 
   warehouse.zones.push({
     ...req.body,
@@ -126,10 +126,10 @@ export const addZone = asyncHandler(async (req, res) => {
 
 export const updateZone = asyncHandler(async (req, res) => {
   const warehouse = await Warehouse.findOne({ _id: req.params.warehouseId, distributorId: req.distributorId });
-  if (!warehouse) throw new AppError('Warehouse not found.', 404, 'WAREHOUSE_NOT_FOUND');
+  if (!warehouse) throw new AppError('Warehouse not found. Please create a Warehouse first.', 404, 'PREREQUISITE_WAREHOUSE_NOT_FOUND');
 
   const zone = warehouse.zones.id(req.params.zoneId);
-  if (!zone) throw new AppError('Zone not found.', 404, 'ZONE_NOT_FOUND');
+  if (!zone) throw new AppError('Zone not found. Please create a Zone first.', 404, 'PREREQUISITE_ZONE_NOT_FOUND');
   Object.assign(zone, req.body);
   await warehouse.save();
   res.status(200).json({ success: true, data: zone });
@@ -189,10 +189,10 @@ export const listAllAreas = asyncHandler(async (req, res) => {
 
 export const addArea = asyncHandler(async (req, res) => {
   const warehouse = await Warehouse.findOne({ _id: req.params.warehouseId, distributorId: req.distributorId });
-  if (!warehouse) throw new AppError('Warehouse not found.', 404, 'WAREHOUSE_NOT_FOUND');
+  if (!warehouse) throw new AppError('Please create a Warehouse first before adding a Floor/Rack Area.', 404, 'PREREQUISITE_WAREHOUSE_NOT_FOUND');
 
   const zone = warehouse.zones.id(req.params.zoneId);
-  if (!zone) throw new AppError('Zone not found.', 404, 'ZONE_NOT_FOUND');
+  if (!zone) throw new AppError('Please create a Zone inside this warehouse first before adding an Area.', 404, 'PREREQUISITE_ZONE_NOT_FOUND');
 
   zone.areas.push({
     ...req.body,

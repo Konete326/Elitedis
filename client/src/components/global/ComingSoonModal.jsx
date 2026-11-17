@@ -55,13 +55,13 @@ export function ComingSoonModal({
       aria-modal="true"
       aria-labelledby="coming-soon-title"
       onClick={handleClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-overlay)] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden transition-colors duration-200"
+        className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden transition-colors duration-200 animate-scale-in"
       >
-        <div className="flex items-start justify-between gap-3 p-5 border-b border-[var(--border-subtle)]">
+        <div className="flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 shrink-0 rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center">
               <Clock className="w-5 h-5" strokeWidth={1.75} />
@@ -90,21 +90,21 @@ export function ComingSoonModal({
             type="button"
             onClick={handleClose}
             aria-label="Close modal"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
           >
             <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
 
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{description}</p>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60">
+        <div className="flex items-center justify-end gap-2 px-4 sm:px-5 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60">
           <button
             type="button"
             onClick={handleClose}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-semibold transition"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-semibold transition"
           >
             <span>Continue Working</span>
             <ArrowRight className="w-4 h-4" strokeWidth={2} />

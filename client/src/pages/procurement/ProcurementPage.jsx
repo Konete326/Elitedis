@@ -5,10 +5,11 @@ import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { FilterToolbar, MetricCard, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, MetricCard, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
-import StatusBadge from '../../components/shared/StatusBadge';
-import { extractListPayload, formatCurrency, formatDateTime } from '../../utils/formatters';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
+import { extractListPayload, formatCurrency } from '../../utils/formatters';
+import { ORDER_COLUMNS, PAYMENT_COLUMNS } from './procurementColumns';
 import { CreatePoModal, PaySupplierModal, ReceiveGoodsModal } from './ProcurementModals';
 
 export default function ProcurementPage() {
@@ -19,6 +20,7 @@ export default function ProcurementPage() {
   const [activeTab, setActiveTab] = useState('orders');
   const [createOpen, setCreateOpen] = useState(false);
   const [receiveTarget, setReceiveTarget] = useState(null);
+  const [approvePoTarget, setApprovePoTarget] = useState(null);
   const [payModalState, setPayModalState] = useState({ open: false, target: null });
 
   const table = useServerTable({
@@ -75,10 +77,12 @@ export default function ProcurementPage() {
     mutationFn: (id) => apiClient.patch(`/procurement/orders/${id}/convert`, {}),
     onSuccess: () => {
       invalidateProcurement();
-      addToast({ type: 'success', message: 'Purchase Request approved as Supplier PO.' });
+      addToast({ type: 'success', message: 'Purchase request approved as Purchase Order.' });
+      setApprovePoTarget(null);
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err?.response?.data?.message || 'Conversion failed.' });
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not approve purchase order.' });
+      setApprovePoTarget(null);
     },
   });
 
@@ -111,45 +115,23 @@ export default function ProcurementPage() {
 
   const summary = summaryQuery.data || {};
   const openAndDrafts = Number(summary.draftRequestsCount || 0) + Number(summary.openOrdersCount || 0);
-
-  const orderColumns = [
-    { key: 'code', header: 'PO / Ref', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.movementCode || '—'}</span> },
-    { key: 'supplier', header: 'Supplier', mobilePrimary: true, accessor: (r) => r.supplierCompanyId?.companyName || 'Unassigned Supplier' },
-    { key: 'warehouse', header: 'Warehouse', accessor: (r) => r.toWarehouseId?.warehouseName || '—' },
-    { key: 'taskName', header: 'Reference', accessor: (r) => r.taskName || 'Purchase Order' },
-    {
-      key: 'value',
-      header: 'Value',
-      numeric: true,
-      align: 'right',
-      accessor: (r) =>
-        formatCurrency(
-          r.totalAmountPkr ?? (r.items || []).reduce((s, i) => s + (Number(i.totalValuePkr) || 0), 0)
-        ),
-    },
-    { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'createdAt', header: 'Created', accessor: (r) => formatDateTime(r.createdAt) },
-  ];
-
-  const paymentColumns = [
-    { key: 'voucherNo', header: 'Voucher', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.voucherNo}</span> },
-    { key: 'narration', header: 'Description', mobilePrimary: true, accessor: (r) => r.narration || 'Supplier AP Payment' },
-    { key: 'debitPkr', header: 'Paid Amount', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.debitPkr || 0) },
-    { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status || 'APPROVED'} /> },
-    { key: 'transactionDate', header: 'Posted', accessor: (r) => formatDateTime(r.transactionDate || r.createdAt) },
-  ];
+  const companies = companiesQuery.data || [];
+  const products = productsQuery.data || [];
+  const prereqReady = !companiesQuery.isLoading && !productsQuery.isLoading;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Procurement & Supplier Purchase Orders"
-        subtitle="Manage Purchase Requests, Purchase Orders, Warehouse Put-Away Receiving, and Supplier AP Payments"
+        title="Supplier Purchases &amp; Payments"
+        subtitle="Create supplier purchase orders, receive stock into warehouse racks, and record supplier payments"
+        onRefresh={activeTab === 'orders' ? table.refresh : paymentsTable.refresh}
+        isRefreshing={activeTab === 'orders' ? table.isFetching : paymentsTable.isFetching}
         actions={
           <>
             <button
               type="button"
               onClick={() => setPayModalState({ open: true, target: null })}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold hover:bg-[var(--bg-elevated)]"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold hover:bg-[var(--bg-elevated)]"
             >
               <CreditCard className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
               <span>Record Payment</span>
@@ -157,7 +139,7 @@ export default function ProcurementPage() {
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>New Purchase Order</span>
@@ -165,6 +147,16 @@ export default function ProcurementPage() {
           </>
         }
       />
+
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Add at least one Supplier Company and one Product before creating supplier purchase orders."
+          steps={[
+            { label: 'Add at least 1 Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Add Company' },
+            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+          ]}
+        />
+      )}
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard
@@ -212,17 +204,19 @@ export default function ProcurementPage() {
             searchValue={table.search}
             onSearchChange={table.setSearch}
             onResetPage={() => table.setPage(1)}
-            searchPlaceholder="Search PO code or reference..."
+            searchPlaceholder="Search by PO number or note..."
             viewMode={table.viewMode}
             onViewModeChange={table.setViewMode}
             onResetFilters={table.resetFilters}
+            onRefresh={table.refresh}
+            isRefreshing={table.isFetching}
             filters={[
               {
                 key: 'supplierCompanyId',
                 label: 'Supplier',
                 value: table.filters.supplierCompanyId,
                 onChange: (val) => table.setFilter('supplierCompanyId', val),
-                options: (companiesQuery.data || []).map((c) => ({ value: c._id, label: c.companyName })),
+                options: companies.map((c) => ({ value: c._id, label: c.companyName })),
               },
               {
                 key: 'status',
@@ -235,15 +229,15 @@ export default function ProcurementPage() {
           />
 
           <SmartDataTable
-            columns={orderColumns}
+            columns={ORDER_COLUMNS}
             data={table.rows}
             loading={table.isLoading}
             viewMode={table.viewMode}
             pagination={table.pagination}
             onPageChange={table.setPage}
             onPageSizeChange={table.setLimit}
-            emptyTitle="No purchase orders found"
-            emptyDescription="Create a Supplier Purchase Order or run a low-stock automation sweep to draft requirements."
+            emptyTitle="No purchase orders yet"
+            emptyDescription="Create a Supplier Purchase Order or run a low-stock check to generate purchase drafts."
             emptyActionLabel="New Purchase Order"
             onEmptyAction={() => setCreateOpen(true)}
             renderActions={(row) => (
@@ -251,7 +245,7 @@ export default function ProcurementPage() {
                 {row.status === 'DRAFT' && (
                   <button
                     type="button"
-                    onClick={() => convertMutation.mutate(row._id)}
+                    onClick={() => setApprovePoTarget(row)}
                     disabled={convertMutation.isPending}
                     className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1"
                   >
@@ -284,7 +278,7 @@ export default function ProcurementPage() {
         </>
       ) : (
         <SmartDataTable
-          columns={paymentColumns}
+          columns={PAYMENT_COLUMNS}
           data={paymentsTable.rows}
           loading={paymentsTable.isLoading}
           pagination={paymentsTable.pagination}
@@ -318,10 +312,21 @@ export default function ProcurementPage() {
       <PaySupplierModal
         isOpen={payModalState.open}
         target={payModalState.target}
-        companies={companiesQuery.data || []}
+        companies={companies}
         onClose={() => setPayModalState({ open: false, target: null })}
         onSubmit={(payload) => payMutation.mutate(payload)}
         isSubmitting={payMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(approvePoTarget)}
+        onClose={() => setApprovePoTarget(null)}
+        onConfirm={() => convertMutation.mutate(approvePoTarget._id)}
+        isLoading={convertMutation.isPending}
+        variant="primary"
+        title="Approve purchase request?"
+        message={`Convert draft ${approvePoTarget?.movementCode || ''} into an approved Supplier Purchase Order?`}
+        confirmLabel="Approve PO"
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Order, CommercialRule, Customer, DispatchSheet, SaleInvoice, PendingTask } from '../models/index.js';
+import { Order, CommercialRule, Customer, Product, DispatchSheet, SaleInvoice, PendingTask } from '../models/index.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { calculateTwoLevelInvoice } from '../services/invoiceCalc.service.js';
@@ -65,10 +65,22 @@ export const calculateOrderPreview = asyncHandler(async (req, res) => {
 
 export const createOrder = asyncHandler(async (req, res) => {
   const distributorId = req.distributorId;
+  if (!req.body.customerId) {
+    throw new AppError('Please create and select a Customer first before creating an Order.', 400, 'PREREQUISITE_CUSTOMER_REQUIRED');
+  }
   const customer = await Customer.findOne({ _id: req.body.customerId, distributorId }).lean();
-  if (!customer) throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
+  if (!customer) throw new AppError('Selected Customer was not found. Please create a Customer first.', 400, 'PREREQUISITE_CUSTOMER_NOT_FOUND');
   if (customer.status === 'BLOCKED' && !req.body.overrideBlocked) {
     throw new AppError('Customer account is BLOCKED. Admin override required.', 400, 'CUSTOMER_BLOCKED');
+  }
+  const items = Array.isArray(req.body.lineItems) ? req.body.lineItems : [];
+  if (items.length === 0) {
+    throw new AppError('Please add at least one Product to the order before submitting.', 400, 'PREREQUISITE_PRODUCTS_REQUIRED');
+  }
+  const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean).map(String))];
+  const existingCount = await Product.countDocuments({ _id: { $in: productIds }, distributorId });
+  if (existingCount !== productIds.length) {
+    throw new AppError('One or more selected Products were not found. Please create a Product first.', 400, 'PREREQUISITE_PRODUCT_NOT_FOUND');
   }
 
   const ruleMap = await loadRuleMap(distributorId, req.body);
@@ -189,7 +201,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
 export const createDeliveryPlan = asyncHandler(async (req, res) => {
   const { orderIds = [], recoveryInvoiceIds = [], salesmanId, storekeeperId = null, recoveryPersonId = null, vehicleInfo = {}, extraDispatchItems = [] } = req.body;
   if (!salesmanId || orderIds.length === 0) {
-    throw new AppError('salesmanId and at least one approved orderId are required.', 400, 'INVALID_DELIVERY_PLAN');
+    throw new AppError('Please select a Salesman and at least one Approved Order before creating a Delivery Plan.', 400, 'INVALID_DELIVERY_PLAN');
   }
 
   const result = await runWithTransaction(async (session) => {

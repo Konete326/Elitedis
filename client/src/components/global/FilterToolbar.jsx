@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   SlidersHorizontal,
   RotateCcw,
+  RefreshCw,
   Check,
 } from 'lucide-react';
 
@@ -18,7 +19,8 @@ function isColumnVisible(visibleColumns, key) {
 }
 
 /**
- * Multi-criterion FilterToolbar with 300ms debounced search, View Switcher, and Column Popover.
+ * Multi-criterion FilterToolbar with 300ms debounced search, Refresh button,
+ * responsive mobile filter grid, and desktop-only View Switcher & Column Popover.
  */
 export function FilterToolbar({
   searchValue = '',
@@ -35,6 +37,8 @@ export function FilterToolbar({
   onResetColumns,
   onResetFilters,
   onReset,
+  onRefresh,
+  isRefreshing = false,
   actions,
   selectedCount = 0,
   className = '',
@@ -57,9 +61,7 @@ export function FilterToolbar({
   useEffect(() => {
     if (!columnsOpen) return undefined;
     const handleOutside = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
-        setColumnsOpen(false);
-      }
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) setColumnsOpen(false);
     };
     const handleEsc = (e) => {
       if (e.key === 'Escape') setColumnsOpen(false);
@@ -90,15 +92,16 @@ export function FilterToolbar({
   };
 
   const handleResetAll = onResetFilters || onReset;
+  const hasFilters = (Array.isArray(filters) && filters.length > 0) || Boolean(children);
 
   return (
     <div
       className={`shrink-0 flex flex-col gap-2.5 p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] transition-colors duration-200 ${className}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 flex-1 min-w-0">
           {onSearchChange && (
-            <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+            <div className="relative w-full md:w-64 lg:max-w-xs shrink-0">
               <Search
                 className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 strokeWidth={1.75}
@@ -109,7 +112,7 @@ export function FilterToolbar({
                 onChange={handleInputChange}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                className="w-full h-9 pl-9 pr-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] transition-colors duration-200"
+                className="w-full min-h-[42px] sm:h-9 sm:min-h-0 pl-9 pr-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] transition-colors duration-200"
               />
               {localSearch && (
                 <button
@@ -124,35 +127,38 @@ export function FilterToolbar({
             </div>
           )}
 
-          {Array.isArray(filters) &&
-            filters.map((filter) => (
-              <select
-                key={filter.key}
-                aria-label={filter.label}
-                value={filter.value ?? ''}
-                onChange={(e) => {
-                  onResetPage?.();
-                  filter.onChange?.(e.target.value);
-                }}
-                className="h-9 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs sm:text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-              >
-                <option value="">{filter.placeholder || `All ${filter.label}`}</option>
-                {(filter.options || []).map((opt) => {
-                  const val = typeof opt === 'object' ? opt.value : opt;
-                  const lbl = typeof opt === 'object' ? opt.label : opt;
-                  return (
-                    <option key={val} value={val}>
-                      {lbl}
-                    </option>
-                  );
-                })}
-              </select>
-            ))}
-
-          {children}
+          {hasFilters && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-wrap gap-2 w-full md:w-auto [&_select]:w-full [&_select]:md:w-auto [&_select]:min-h-[40px] [&_select]:sm:h-9 [&_select]:sm:min-h-0">
+              {Array.isArray(filters) &&
+                filters.map((filter) => (
+                  <select
+                    key={filter.key}
+                    aria-label={filter.label}
+                    value={filter.value ?? ''}
+                    onChange={(e) => {
+                      onResetPage?.();
+                      filter.onChange?.(e.target.value);
+                    }}
+                    className="w-full md:w-auto min-h-[40px] sm:h-9 sm:min-h-0 px-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs sm:text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  >
+                    <option value="">{filter.placeholder || `All ${filter.label}`}</option>
+                    {(filter.options || []).map((opt) => {
+                      const val = typeof opt === 'object' ? opt.value : opt;
+                      const lbl = typeof opt === 'object' ? opt.label : opt;
+                      return (
+                        <option key={val} value={val}>
+                          {lbl}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ))}
+              {children}
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {selectedCount > 0 && (
             <span className="px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums bg-[var(--accent-soft)] text-[var(--accent-primary)]">
               {selectedCount} selected
@@ -163,7 +169,7 @@ export function FilterToolbar({
             <div
               role="group"
               aria-label="Data view mode"
-              className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-0.5"
+              className="hidden lg:inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-0.5"
             >
               <button
                 type="button"
@@ -176,7 +182,7 @@ export function FilterToolbar({
                 }`}
               >
                 <List className="w-3.5 h-3.5" strokeWidth={1.75} />
-                <span className="hidden sm:inline">Table List</span>
+                <span>Table List</span>
               </button>
               <button
                 type="button"
@@ -189,13 +195,13 @@ export function FilterToolbar({
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.75} />
-                <span className="hidden sm:inline">Card View</span>
+                <span>Card View</span>
               </button>
             </div>
           )}
 
           {columns.length > 0 && onToggleColumn && (
-            <div ref={popoverRef} className="relative">
+            <div ref={popoverRef} className="hidden lg:block relative">
               <button
                 type="button"
                 onClick={() => setColumnsOpen((prev) => !prev)}
@@ -206,11 +212,9 @@ export function FilterToolbar({
               </button>
 
               {columnsOpen && (
-                <div className="absolute right-0 mt-1.5 w-60 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-xl z-40 p-2">
+                <div className="animate-scale-in absolute right-0 mt-1.5 w-60 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-xl z-40 p-2">
                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--border-subtle)] mb-1">
-                    <span className="text-xs font-semibold text-[var(--text-primary)]">
-                      Show / Reset Columns
-                    </span>
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">Show / Reset Columns</span>
                     {onResetColumns && (
                       <button
                         type="button"
@@ -251,6 +255,18 @@ export function FilterToolbar({
             </div>
           )}
 
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1.5 min-h-[40px] sm:h-9 sm:min-h-0 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] disabled:opacity-60 transition-colors duration-200"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+              <span>Refresh</span>
+            </button>
+          )}
+
           {handleResetAll && (
             <button
               type="button"
@@ -259,7 +275,7 @@ export function FilterToolbar({
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 handleResetAll();
               }}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-secondary)] transition-colors duration-200"
+              className="inline-flex items-center gap-1.5 min-h-[40px] sm:h-9 sm:min-h-0 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-secondary)] transition-colors duration-200"
             >
               <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
               <span>Reset</span>

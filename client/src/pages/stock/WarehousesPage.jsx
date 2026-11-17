@@ -9,6 +9,7 @@ import { ConfirmModal, FilterToolbar, FormModal, MetricCard, SmartDataTable } fr
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { formatCurrency } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const INITIAL_FORM = {
   warehouseCode: '',
@@ -33,8 +34,12 @@ export default function WarehousesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [guardError, setGuardError] = useState('');
+
+  const codeError = touched.warehouseCode ? validateField('code', form.warehouseCode, { required: true, label: 'Warehouse Code' }) : '';
+  const nameError = touched.warehouseName ? validateField('required', form.warehouseName, { required: true, minLength: 2, label: 'Warehouse Name' }) : '';
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -66,6 +71,7 @@ export default function WarehousesPage() {
 
   const openEdit = (row) => {
     setEditingId(row._id);
+    setTouched({});
     setForm({
       ...INITIAL_FORM,
       ...row,
@@ -85,7 +91,7 @@ export default function WarehousesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Warehouses Master"
         subtitle="Main plots, shop sub-stores, utilization capacity, and zones"
@@ -94,7 +100,7 @@ export default function WarehousesPage() {
             <button
               type="button"
               onClick={() => navigate('/stock/zones')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <MapPin className="w-3.5 h-3.5" />
               <span>Manage Zones</span>
@@ -103,10 +109,11 @@ export default function WarehousesPage() {
               type="button"
               onClick={() => {
                 setEditingId(null);
+                setTouched({});
                 setForm(INITIAL_FORM);
                 setModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Add Warehouse</span>
@@ -130,6 +137,8 @@ export default function WarehousesPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'warehouseType',
@@ -190,20 +199,43 @@ export default function WarehousesPage() {
         title={editingId ? 'Edit Warehouse' : 'New Warehouse'}
         onSubmit={(e) => {
           e.preventDefault();
+          setTouched({ warehouseCode: true, warehouseName: true });
+          if (
+            validateField('code', form.warehouseCode, { required: true, label: 'Warehouse Code' }) ||
+            validateField('required', form.warehouseName, { required: true, minLength: 2, label: 'Warehouse Name' })
+          ) {
+            return;
+          }
           saveMutation.mutate(form);
         }}
         isSubmitting={saveMutation.isPending}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse Code</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Warehouse Code</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({
+                    ...p,
+                    warehouseCode: suggestCode('WH', table.pagination.totalRecords, table.rows.map((r) => r.warehouseCode)),
+                  }))
+                }
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
             <input
               required
               value={form.warehouseCode}
               onChange={(e) => setForm((p) => ({ ...p, warehouseCode: e.target.value.toUpperCase() }))}
-              placeholder="ORANGI-001"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+              onBlur={() => setTouched((p) => ({ ...p, warehouseCode: true }))}
+              placeholder="WH-001"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${codeError ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse Name</label>
@@ -211,9 +243,11 @@ export default function WarehousesPage() {
               required
               value={form.warehouseName}
               onChange={(e) => setForm((p) => ({ ...p, warehouseName: e.target.value }))}
-              placeholder="Plot No 01"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+              onBlur={() => setTouched((p) => ({ ...p, warehouseName: true }))}
+              placeholder="Main Godown Plot 01"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Type</label>

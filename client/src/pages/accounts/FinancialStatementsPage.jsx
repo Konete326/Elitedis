@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { MetricCard, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import { formatCurrency } from '../../utils/formatters';
@@ -16,13 +17,21 @@ const TABS = [
 
 export default function FinancialStatementsPage() {
   const { user } = useAuth();
+  const { addToast } = useShell();
   const [tab, setTab] = useState('trial-balance');
   const [printOpen, setPrintOpen] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const statementQuery = useQuery({
     queryKey: ['financial-statement', user?.distributorId, tab],
     queryFn: async () => (await apiClient.get(`/accounts/${tab}`)).data?.data || {},
   });
+
+  const { data, isLoading, isFetching, refetch } = statementQuery;
+
+  const handleRefresh = async () => {
+    await refetch();
+    addToast({ type: 'success', message: 'Financial statement refreshed.' });
+  };
 
   const rows =
     tab === 'trial-balance'
@@ -56,10 +65,12 @@ export default function FinancialStatementsPage() {
           ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Financial Statements"
-        subtitle="Real-time double-entry Trial Balance, Income Statement (P&L), Balance Sheet, and Cash Flow"
+        title="Financial Reports &amp; Statements"
+        subtitle="Check your Trial Balance, Profit &amp; Loss, Balance Sheet, and Cash Flow in real time"
+        onRefresh={handleRefresh}
+        isRefreshing={isFetching}
         tabs={TABS.map((t) => ({
           id: t.id,
           label: t.label,
@@ -70,7 +81,7 @@ export default function FinancialStatementsPage() {
           <button
             type="button"
             onClick={() => setPrintOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Statement</span>

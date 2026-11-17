@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FormModal } from '../../components/global';
+import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyArea(wh = null) {
   return {
@@ -19,12 +20,18 @@ export default function AreaFormModal({
   onClose,
   initialValue,
   isEditing,
+  existingCount = 0,
+  existingCodes = [],
   warehouses = [],
   products = [],
   onSave,
   isSubmitting,
 }) {
   const [form, setForm] = useState(() => initialValue || buildEmptyArea(warehouses[0]));
+  const [touched, setTouched] = useState({});
+
+  const codeError = touched.areaCode ? validateField('code', form.areaCode, { required: true, label: 'Area Code' }) : '';
+  const nameError = touched.areaName ? validateField('required', form.areaName, { required: true, minLength: 2, label: 'Area Name' }) : '';
 
   const availableZones = useMemo(() => {
     const wh = warehouses.find((w) => String(w._id) === String(form.warehouseId));
@@ -48,6 +55,13 @@ export default function AreaFormModal({
       size="lg"
       onSubmit={(e) => {
         e.preventDefault();
+        setTouched({ areaCode: true, areaName: true });
+        if (
+          validateField('code', form.areaCode, { required: true, label: 'Area Code' }) ||
+          validateField('required', form.areaName, { required: true, minLength: 2, label: 'Area Name' })
+        ) {
+          return;
+        }
         onSave(form);
       }}
       isSubmitting={isSubmitting}
@@ -81,12 +95,39 @@ export default function AreaFormModal({
             </>
           )}
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Code</label>
-            <input required value={form.areaCode} onChange={(e) => setForm((p) => ({ ...p, areaCode: e.target.value.toUpperCase() }))} placeholder="SDH-Rs10" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Area Code</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({ ...p, areaCode: suggestCode('AR', existingCount, existingCodes) }))
+                }
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
+            <input
+              required
+              value={form.areaCode}
+              onChange={(e) => setForm((p) => ({ ...p, areaCode: e.target.value.toUpperCase() }))}
+              onBlur={() => setTouched((p) => ({ ...p, areaCode: true }))}
+              placeholder="AR-001"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${codeError ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name</label>
-            <input required value={form.areaName} onChange={(e) => setForm((p) => ({ ...p, areaName: e.target.value }))} placeholder="1st Floor / Rack A1" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
+            <input
+              required
+              value={form.areaName}
+              onChange={(e) => setForm((p) => ({ ...p, areaName: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, areaName: true }))}
+              placeholder="1st Floor / Rack A1"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Type</label>

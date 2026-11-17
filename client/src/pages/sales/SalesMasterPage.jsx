@@ -60,15 +60,15 @@ export default function SalesMasterPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Sales Master & DSR Ledger"
-        subtitle="Issued invoices, POS receipts, outstanding balances, and direct payments"
+        title="Sales &amp; Invoices"
+        subtitle="View customer bills, POS receipts, unpaid credit balances, and record payments"
         actions={
           <button
             type="button"
             onClick={() => navigate('/recovery/assign')}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Receipt className="w-4 h-4" />
             <span>Assign Recovery</span>
@@ -77,7 +77,7 @@ export default function SalesMasterPage() {
       />
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard title="Total Sales Invoices" value={table.pagination.totalRecords} icon={Receipt} status="primary" />
+        <MetricCard title="Total Sales Bills" value={table.pagination.totalRecords} icon={Receipt} status="primary" />
         <MetricCard
           title="Page Total Value"
           value={formatCurrency(table.rows.reduce((s, r) => s + (r.grandSummary?.netPayableAmount || 0), 0))}
@@ -89,7 +89,7 @@ export default function SalesMasterPage() {
           status="success"
         />
         <MetricCard
-          title="Page Outstanding"
+          title="Page Unpaid Balance"
           value={formatCurrency(table.rows.reduce((s, r) => s + (r.balanceDuePkr || 0), 0))}
           status="warning"
         />
@@ -99,10 +99,12 @@ export default function SalesMasterPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search invoice no or walk-in..."
+        searchPlaceholder="Search by invoice number or customer..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'paymentStatus',

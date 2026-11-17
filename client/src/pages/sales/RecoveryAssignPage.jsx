@@ -4,7 +4,7 @@ import { CheckCircle2, Receipt } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload, formatCurrency } from '../../utils/formatters';
@@ -27,21 +27,27 @@ export default function RecoveryAssignPage() {
   const [assignedToId, setAssignedToId] = useState('');
   const [title, setTitle] = useState('Payment Recovery Sheet');
   const [priority, setPriority] = useState('NORMAL');
+  const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  const [assignedRows, setAssignedRows] = useState([]);
   const [printSheetOpen, setPrintSheetOpen] = useState(false);
 
   const assignMutation = useMutation({
     mutationFn: (payload) => apiClient.post('/sales-recovery/recovery-assign', payload),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['pending-tasks'] });
+      const snapshot = table.rows.filter((r) => table.selectedKeys.includes(r._id));
+      setAssignedRows(snapshot);
       addToast({
         type: 'success',
-        message: `Assigned ${res.data?.data?.assignedInvoicesCount || 0} bills as recovery task.`,
+        message: `Assigned ${res.data?.data?.assignedInvoicesCount || 0} unpaid bill(s) as a recovery task.`,
       });
+      setAssignConfirmOpen(false);
       setPrintSheetOpen(true);
       table.setSelectedKeys([]);
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Recovery assignment failed.' });
+      setAssignConfirmOpen(false);
     },
   });
 
@@ -54,17 +60,17 @@ export default function RecoveryAssignPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Recovery Assignment Center"
-        subtitle="Select unpaid credit bills and assign recovery sheets to Bookers or Salesmen"
+        title="Assign Payment Recovery"
+        subtitle="Pick unpaid credit bills and assign a collection task to a Booker or Salesman"
       />
 
-      <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3 grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
+      <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 items-end">
         <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign To Staff</label>
-          <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
-            <option value="">Select booker or salesman...</option>
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign to Staff Member</label>
+          <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
+            <option value="">Choose booker or salesman...</option>
             {(staffQuery.data || []).map((u) => (
               <option key={u._id} value={u._id}>
                 {u.fullName} ({u.primaryRole})
@@ -73,12 +79,12 @@ export default function RecoveryAssignPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Task Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Collection Sheet Title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Friday Market Collection" className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
         </div>
         <div>
           <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Priority</label>
-          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
             <option value="NORMAL">Normal</option>
             <option value="URGENT">Urgent</option>
           </select>
@@ -86,18 +92,11 @@ export default function RecoveryAssignPage() {
         <button
           type="button"
           disabled={!assignedToId || table.selectedKeys.length === 0 || assignMutation.isPending}
-          onClick={() =>
-            assignMutation.mutate({
-              saleInvoiceIds: table.selectedKeys,
-              assignedToId,
-              title,
-              priority,
-            })
-          }
-          className="h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+          onClick={() => setAssignConfirmOpen(true)}
+          className="min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
         >
           <CheckCircle2 className="w-4 h-4" />
-          <span>Assign ({table.selectedKeys.length})</span>
+          <span>Assign Selected ({table.selectedKeys.length})</span>
         </button>
       </div>
 
@@ -105,8 +104,12 @@ export default function RecoveryAssignPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search credit invoice..."
+        searchPlaceholder="Search by invoice number..."
+        viewMode={table.viewMode}
+        onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         selectedCount={table.selectedKeys.length}
         filters={[
           {
@@ -123,6 +126,7 @@ export default function RecoveryAssignPage() {
         columns={columns}
         data={table.rows}
         loading={table.isLoading}
+        viewMode={table.viewMode}
         selectable
         selectedKeys={table.selectedKeys}
         onSelectionChange={table.setSelectedKeys}
@@ -130,8 +134,8 @@ export default function RecoveryAssignPage() {
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={Receipt}
-        emptyTitle="No unpaid credit invoices"
-        emptyDescription="Credit and partially paid invoices appear here for recovery task assignment."
+        emptyTitle="No unpaid credit bills"
+        emptyDescription="Unpaid or partially paid customer bills appear here so you can assign them for collection."
       />
 
       <PrintPreviewModal
@@ -144,7 +148,25 @@ export default function RecoveryAssignPage() {
           { key: 'customer', header: 'Customer', accessor: (r) => r.customerId?.shopName || '—' },
           { key: 'balanceDuePkr', header: 'Due Amount', numeric: true },
         ]}
-        rows={table.rows.filter((r) => table.selectedKeys.includes(r._id))}
+        rows={assignedRows}
+      />
+
+      <ConfirmModal
+        isOpen={assignConfirmOpen}
+        onClose={() => setAssignConfirmOpen(false)}
+        onConfirm={() =>
+          assignMutation.mutate({
+            saleInvoiceIds: table.selectedKeys,
+            assignedToId,
+            title,
+            priority,
+          })
+        }
+        isLoading={assignMutation.isPending}
+        variant="primary"
+        title="Assign payment recovery task?"
+        message={`Assign ${table.selectedKeys.length} unpaid bill(s) to the selected staff member and create a recovery task?`}
+        confirmLabel="Assign Recovery"
       />
     </div>
   );

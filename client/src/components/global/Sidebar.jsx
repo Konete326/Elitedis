@@ -1,106 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, Package, Building2, Tag, Layers, Warehouse,
-  ArrowLeftRight, Users, MapPin, Compass, ShoppingCart, Receipt,
-  SlidersHorizontal, Printer, ClipboardList, Smartphone, UserCheck,
-  Landmark, BarChart3, ChevronDown, ChevronRight, X, LogOut, Share2,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, X, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
-
-const ADM = ['SUPER_ADMIN', 'ADMIN'];
-const WH = [...ADM, 'WAREHOUSE_MANAGER', 'STOREKEEPER'];
-
-const NAV_GROUPS = [
-  {
-    key: 'Inventory & Stock',
-    items: [
-      { to: '/inventory/products', label: 'Product Master', icon: Package, roles: WH },
-      { to: '/inventory/companies', label: 'Companies', icon: Building2, roles: ADM },
-      { to: '/inventory/brands', label: 'Brands', icon: Tag, roles: ADM },
-      { to: '/inventory/categories', label: 'Categories', icon: Layers, roles: ADM },
-      { to: '/inventory/sub-categories', label: 'Sub-Categories', icon: Layers, roles: ADM },
-      { to: '/stock/overview', label: 'Stock Dashboard', icon: LayoutDashboard, roles: WH, workPart: 'warehouseManager' },
-      { to: '/stock/list', label: 'Stock Batches', icon: Package, roles: WH, workPart: 'warehouseManager' },
-      { to: '/stock/warehouses', label: 'Warehouses', icon: Warehouse, roles: [...ADM, 'WAREHOUSE_MANAGER'], workPart: 'warehouseManager' },
-      { to: '/stock/zones', label: 'Zones', icon: Warehouse, roles: [...ADM, 'WAREHOUSE_MANAGER'], workPart: 'warehouseManager' },
-      { to: '/stock/areas', label: 'Floor & Rack Areas', icon: MapPin, roles: WH, workPart: 'warehouseManager' },
-      { to: '/stock/movements', label: 'Stock Movements', icon: ArrowLeftRight, roles: WH, workPart: 'warehouseManager' },
-    ],
-  },
-  {
-    key: 'CRM & Beats',
-    items: [
-      { to: '/crm/dashboard', label: 'CRM Dashboard', icon: LayoutDashboard, roles: [...ADM, 'BOOKER'] },
-      { to: '/crm/customers', label: 'Customer Master', icon: Users, roles: [...ADM, 'BOOKER', 'SALESMAN', 'ACCOUNTANT'] },
-      { to: '/crm/areas-routes', label: 'Areas & Routes', icon: MapPin, roles: [...ADM, 'BOOKER'] },
-      { to: '/crm/territories', label: 'Territories', icon: Compass, roles: ADM },
-      { to: '/crm/beats', label: 'Beat Plans', icon: ClipboardList, roles: [...ADM, 'BOOKER'], workPart: 'orderBooker' },
-    ],
-  },
-  {
-    key: 'Order & Sales',
-    items: [
-      { to: '/orders/master', label: 'Order Master', icon: ShoppingCart, roles: [...ADM, 'BOOKER', 'WAREHOUSE_MANAGER'] },
-      { to: '/orders/create-normal', label: 'Normal Order', icon: ShoppingCart, roles: [...ADM, 'BOOKER'], workPart: 'normalInvoice' },
-      { to: '/orders/create-advance', label: 'Advance Order', icon: ShoppingCart, roles: ADM, workPart: 'advanceInvoice' },
-      { to: '/orders/operations', label: 'Approval & Dispatch', icon: ClipboardList, roles: [...ADM, 'WAREHOUSE_MANAGER'] },
-      { to: '/sales/master', label: 'Sales Master', icon: Receipt, roles: [...ADM, 'ACCOUNTANT', 'POS_OPERATOR', 'SALESMAN'] },
-      { to: '/sales/dsr', label: 'Daily Sales Report', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT', 'SALESMAN', 'BOOKER'] },
-      { to: '/recovery/assign', label: 'Recovery Assign', icon: Receipt, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/recovery/ledger', label: 'Recovery Ledger', icon: Receipt, roles: [...ADM, 'ACCOUNTANT', 'SALESMAN', 'BOOKER'] },
-    ],
-  },
-  {
-    key: 'Master Rules & Templates',
-    items: [
-      { to: '/settings/rules', label: 'Tax, Discount & Schemes', icon: SlidersHorizontal, roles: ADM },
-      { to: '/settings/templates', label: 'Print Templates', icon: Printer, roles: ADM },
-      { to: '/settings/automation', label: 'Automation Rules', icon: SlidersHorizontal, roles: ADM },
-    ],
-  },
-  {
-    key: 'Pending Tasks',
-    items: [
-      { to: '/tasks/pending', label: 'My Task Queue', icon: ClipboardList, roles: [...WH, 'SALESMAN', 'BOOKER'] },
-    ],
-  },
-  {
-    key: 'Field Portals',
-    items: [
-      { to: '/portal/booker', label: 'Booker Portal', icon: Smartphone, roles: [...ADM, 'BOOKER'], workPart: 'orderBooker' },
-      { to: '/portal/pos', label: 'POS Store Counter', icon: Smartphone, roles: [...ADM, 'POS_OPERATOR'], workPart: 'posStore' },
-      { to: '/portal/salesman', label: 'Salesman Portal', icon: Smartphone, roles: [...ADM, 'SALESMAN'], workPart: 'salesman' },
-    ],
-  },
-  {
-    key: 'HRM',
-    items: [
-      { to: '/hrm/employees', label: 'Employees & Work Parts', icon: UserCheck, roles: ADM },
-      { to: '/hrm/attendance', label: 'Attendance & Leave', icon: UserCheck, roles: ADM },
-      { to: '/hrm/payroll', label: 'Payroll & Commission', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/hrm/reports', label: 'Employee Performance', icon: BarChart3, roles: ADM },
-    ],
-  },
-  {
-    key: 'ERP Accounts',
-    items: [
-      { to: '/accounts/movements', label: 'Account Movements', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/accounts/ledgers', label: 'Ledgers & Day Book', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/accounts/statements', label: 'Financial Statements', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/procurement', label: 'Procurement & PO', icon: Package, roles: [...ADM, 'ACCOUNTANT', 'WAREHOUSE_MANAGER'] },
-    ],
-  },
-  {
-    key: 'Reports & Dashboards',
-    items: [
-      { to: '/dashboard', label: 'Executive Dashboard', icon: LayoutDashboard, roles: [...ADM, 'WAREHOUSE_MANAGER', 'ACCOUNTANT'] },
-      { to: '/reports/center', label: 'Report Center (19+)', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT', 'WAREHOUSE_MANAGER'] },
-      { to: '/reports/company-share', label: 'Company Info Share', icon: Share2, roles: [...ADM, 'BOOKER'] },
-    ],
-  },
-];
+import ConfirmModal from './ConfirmModal';
+import { NAV_GROUPS, canAccessNavItem } from './navConfig';
 
 function BrandLogo() {
   return (
@@ -118,7 +22,8 @@ function BrandLogo() {
 }
 
 /**
- * Role-isolated collapsible Sidebar with desktop collapse (z-30) and mobile drawer (z-40).
+ * Role-isolated collapsible Sidebar with desktop collapse (z-30), mobile drawer (z-40),
+ * strict panel isolation, and ConfirmModal before logout.
  */
 export function Sidebar() {
   const navigate = useNavigate();
@@ -131,6 +36,7 @@ export function Sidebar() {
     toggleNavGroup,
     openComingSoon,
   } = useShell();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!isMobileDrawerOpen) return undefined;
@@ -139,19 +45,15 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isMobileDrawerOpen, closeMobileDrawer]);
 
-  const canSeeItem = (item) =>
-    hasRole('SUPER_ADMIN', 'ADMIN') ||
-    (item.workPart && hasWorkPart(item.workPart)) ||
-    hasRole(...(item.roles || []));
-
-  const visibleGroups = NAV_GROUPS.map((g) => ({
-    ...g,
-    items: g.items.filter(canSeeItem),
-  })).filter((g) => g.items.length > 0);
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessNavItem(item, hasRole, hasWorkPart)),
+  })).filter((group) => group.items.length > 0);
 
   const roleLabel = (user?.primaryRole || 'STAFF').replace(/_/g, ' ');
 
-  const handleLogout = async () => {
+  const confirmLogout = async () => {
+    setLogoutConfirmOpen(false);
     await logout();
     navigate('/auth/login', { replace: true });
   };
@@ -208,11 +110,7 @@ export function Sidebar() {
                           type="button"
                           onClick={() => {
                             if (isMobile) closeMobileDrawer();
-                            openComingSoon({
-                              title: item.label,
-                              phase: item.phase,
-                              description: `${item.label} is scheduled in ${item.phase} of the ELITE DIST rollout.`,
-                            });
+                            openComingSoon({ title: item.label, phase: item.phase, description: `${item.label} is scheduled in ${item.phase}.` });
                           }}
                           className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
                         >
@@ -260,7 +158,7 @@ export function Sidebar() {
         </div>
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setLogoutConfirmOpen(true)}
           title="Sign out"
           aria-label="Sign out"
           className="shrink-0 w-9 h-9 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger)]/10 transition-colors"
@@ -284,12 +182,22 @@ export function Sidebar() {
 
       {isMobileDrawerOpen && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div aria-hidden="true" onClick={closeMobileDrawer} className="fixed inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" />
-          <aside aria-label="Mobile navigation drawer" className="relative z-40 h-full max-w-[85vw]">
+          <div aria-hidden="true" onClick={closeMobileDrawer} className="fixed inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in" />
+          <aside aria-label="Mobile navigation drawer" className="relative z-40 h-full max-w-[85vw] animate-drawer-left">
             {renderBody(true)}
           </aside>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+        title="Sign Out of ELITE DIST?"
+        message="You will be logged out of your active session and need to sign in again."
+        confirmLabel="Sign Out"
+        variant="warning"
+      />
     </>
   );
 }

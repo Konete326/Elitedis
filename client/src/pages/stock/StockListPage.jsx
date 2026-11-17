@@ -89,7 +89,7 @@ export default function StockListPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Batch-Wise Stock Ledger"
         subtitle="Track MFG/EXP batches, reservations, dual units, condition, and availability status"
@@ -98,7 +98,7 @@ export default function StockListPage() {
             <button
               type="button"
               onClick={() => setPrintOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Stock Report</span>
@@ -106,7 +106,7 @@ export default function StockListPage() {
             <button
               type="button"
               onClick={() => navigate('/stock/movements/create')}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span>New Movement</span>
@@ -146,6 +146,8 @@ export default function StockListPage() {
         onToggleColumn={(k) => table.toggleColumn(k, columns)}
         onResetColumns={table.resetColumns}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         selectedCount={table.selectedKeys.length}
         filters={[
           {

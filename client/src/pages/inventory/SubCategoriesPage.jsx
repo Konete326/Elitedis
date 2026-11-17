@@ -7,8 +7,10 @@ import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, ImageDropzone, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const INITIAL_FORM = {
   code: '',
@@ -39,7 +41,11 @@ export default function SubCategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const codeError = touched.code ? validateField('code', form.code, { required: true, label: 'Sub-Category Code' }) : '';
+  const nameError = touched.name ? validateField('required', form.name, { required: true, minLength: 2, label: 'Sub-Category Name' }) : '';
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -71,6 +77,7 @@ export default function SubCategoriesPage() {
 
   const openEdit = (row) => {
     setEditingId(row._id);
+    setTouched({});
     setForm({
       ...INITIAL_FORM,
       ...row,
@@ -80,6 +87,8 @@ export default function SubCategoriesPage() {
     setModalOpen(true);
   };
 
+  const categories = categoriesQuery.data || [];
+
   const columns = [
     { key: 'code', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.code}</span> },
     { key: 'name', header: 'Sub-Category Name', mobilePrimary: true, accessor: 'name' },
@@ -88,7 +97,7 @@ export default function SubCategoriesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Sub-Categories Master"
         subtitle="Manage product variants under each parent category"
@@ -97,7 +106,7 @@ export default function SubCategoriesPage() {
             <button
               type="button"
               onClick={() => navigate('/inventory/categories')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Categories</span>
@@ -106,10 +115,11 @@ export default function SubCategoriesPage() {
               type="button"
               onClick={() => {
                 setEditingId(null);
+                setTouched({});
                 setForm(INITIAL_FORM);
                 setModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Add Sub-Category</span>
@@ -117,6 +127,13 @@ export default function SubCategoriesPage() {
           </>
         }
       />
+
+      {!categoriesQuery.isLoading && categories.length === 0 && (
+        <SetupGuideBanner
+          missingMessage="Create at least one Parent Category before adding Sub-Categories."
+          steps={[{ label: 'Create Category', done: false, to: '/inventory/categories', actionLabel: 'Go to Categories' }]}
+        />
+      )}
 
       <FilterToolbar
         searchValue={table.search}
@@ -126,6 +143,8 @@ export default function SubCategoriesPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'parentCategoryId',
@@ -173,6 +192,13 @@ export default function SubCategoriesPage() {
         title={editingId ? 'Edit Sub-Category' : 'New Sub-Category'}
         onSubmit={(e) => {
           e.preventDefault();
+          setTouched({ code: true, name: true });
+          if (
+            validateField('code', form.code, { required: true, label: 'Sub-Category Code' }) ||
+            validateField('required', form.name, { required: true, minLength: 2, label: 'Sub-Category Name' })
+          ) {
+            return;
+          }
           saveMutation.mutate(form);
         }}
         isSubmitting={saveMutation.isPending}
@@ -180,14 +206,30 @@ export default function SubCategoriesPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Code</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Code</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      code: suggestCode('SUB', table.pagination.totalRecords, table.rows.map((r) => r.code)),
+                    }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
               <input
                 required
                 value={form.code}
                 onChange={(e) => setForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))}
-                placeholder="F-01"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                onBlur={() => setTouched((p) => ({ ...p, code: true }))}
+                placeholder="SUB-001"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${codeError ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category Name</label>
@@ -195,9 +237,11 @@ export default function SubCategoriesPage() {
                 required
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, name: true }))}
                 placeholder="Fresh"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Category</label>

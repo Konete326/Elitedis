@@ -1,24 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, Layers, Plus, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { ConfirmModal, FilterToolbar, FormModal, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
+import ZoneFormModal, { buildEmptyZone } from './ZoneFormModal';
 import { extractListPayload } from '../../utils/formatters';
-
-const INITIAL_FORM = {
-  warehouseId: '',
-  zoneCode: '',
-  zoneName: '',
-  zoneType: 'NORMAL',
-  storageType: 'NORMAL',
-  condition: 'NORMAL',
-  dimensions: { sizeUnit: 'Feet', width: 0, length: 0, height: 0 },
-};
 
 export default function ZonesPage() {
   const navigate = useNavigate();
@@ -36,33 +28,19 @@ export default function ZonesPage() {
     queryFn: async () => extractListPayload(await apiClient.get('/warehouses', { params: { limit: 100 } })).data,
   });
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [modalState, setModalState] = useState({ open: false, editing: null, initial: null, key: 0 });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [guardError, setGuardError] = useState('');
 
-  const dimTotals = useMemo(() => {
-    const w = Number(form.dimensions?.width) || 0;
-    const l = Number(form.dimensions?.length) || 0;
-    const h = Number(form.dimensions?.height) || 0;
-    return { totalArea: Number((w * l).toFixed(2)), totalVolume: Number((w * l * h).toFixed(2)) };
-  }, [form.dimensions]);
-
   const saveMutation = useMutation({
-    mutationFn: (payload) => {
-      const body = {
-        ...payload,
-        dimensions: { ...payload.dimensions, ...dimTotals },
-      };
-      return editing
-        ? apiClient.put(`/warehouses/${editing.warehouseId}/zones/${editing._id}`, body)
-        : apiClient.post(`/warehouses/${payload.warehouseId}/zones`, body);
-    },
+    mutationFn: (body) =>
+      modalState.editing
+        ? apiClient.put(`/warehouses/${modalState.editing.warehouseId}/zones/${modalState.editing._id}`, body)
+        : apiClient.post(`/warehouses/${body.warehouseId}/zones`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-zones'] });
-      addToast({ type: 'success', message: editing ? 'Zone updated.' : 'Zone created.' });
-      setModalOpen(false);
+      addToast({ type: 'success', message: modalState.editing ? 'Zone updated.' : 'Zone created.' });
+      setModalState({ open: false, editing: null, initial: null, key: 0 });
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Failed to save zone.' });
@@ -84,6 +62,12 @@ export default function ZonesPage() {
     },
   });
 
+  const warehouses = warehousesQuery.data || [];
+  const openCreate = () =>
+    setModalState((p) => ({ open: true, editing: null, initial: buildEmptyZone(warehouses[0]?._id || ''), key: p.key + 1 }));
+  const openEdit = (row) =>
+    setModalState((p) => ({ open: true, editing: row, initial: { ...buildEmptyZone(), ...row }, key: p.key + 1 }));
+
   const columns = [
     { key: 'zoneCode', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.zoneCode}</span> },
     { key: 'zoneName', header: 'Zone Name', mobilePrimary: true, accessor: 'zoneName' },
@@ -94,28 +78,28 @@ export default function ZonesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Warehouse Zones & Sections"
         subtitle="Configure Normal, Damage, Expiry, and Temperature zones per warehouse"
         actions={
           <button
             type="button"
-            onClick={() => {
-              setEditing(null);
-              setForm({
-                ...INITIAL_FORM,
-                warehouseId: warehousesQuery.data?.[0]?._id || '',
-              });
-              setModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add Zone</span>
           </button>
         }
       />
+
+      {!warehousesQuery.isLoading && warehouses.length === 0 && (
+        <SetupGuideBanner
+          missingMessage="Create a Warehouse before adding Zones or storage sections."
+          steps={[{ label: 'Create Warehouse', done: false, to: '/stock/warehouses', actionLabel: 'Go to Warehouses' }]}
+        />
+      )}
 
       <FilterToolbar
         searchValue={table.search}
@@ -125,13 +109,15 @@ export default function ZonesPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'warehouseId',
             label: 'Warehouse',
             value: table.filters.warehouseId,
             onChange: (val) => table.setFilter('warehouseId', val),
-            options: (warehousesQuery.data || []).map((w) => ({ value: w._id, label: w.warehouseName })),
+            options: warehouses.map((w) => ({ value: w._id, label: w.warehouseName })),
           },
         ]}
       />
@@ -148,20 +134,12 @@ export default function ZonesPage() {
         emptyTitle="No warehouse zones defined"
         emptyDescription="Add sections like Main Plot, Damage Zone, or Cold Store inside a warehouse."
         emptyActionLabel="Add Zone"
-        onEmptyAction={() => {
-          setEditing(null);
-          setForm({ ...INITIAL_FORM, warehouseId: warehousesQuery.data?.[0]?._id || '' });
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
             <button
               type="button"
-              onClick={() => {
-                setEditing(row);
-                setForm({ ...INITIAL_FORM, ...row });
-                setModalOpen(true);
-              }}
+              onClick={() => openEdit(row)}
               className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1"
             >
               <Edit className="w-3.5 h-3.5" />
@@ -181,115 +159,20 @@ export default function ZonesPage() {
         )}
       />
 
-      <FormModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editing ? 'Edit Zone' : 'New Warehouse Zone'}
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMutation.mutate(form);
-        }}
-        isSubmitting={saveMutation.isPending}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {!editing && (
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse</label>
-              <select
-                required
-                value={form.warehouseId}
-                onChange={(e) => setForm((p) => ({ ...p, warehouseId: e.target.value }))}
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-              >
-                <option value="">Select warehouse...</option>
-                {(warehousesQuery.data || []).map((w) => (
-                  <option key={w._id} value={w._id}>
-                    {w.warehouseName} ({w.warehouseCode})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Code</label>
-            <input
-              required
-              value={form.zoneCode}
-              onChange={(e) => setForm((p) => ({ ...p, zoneCode: e.target.value.toUpperCase() }))}
-              placeholder="S-01"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Name</label>
-            <input
-              required
-              value={form.zoneName}
-              onChange={(e) => setForm((p) => ({ ...p, zoneName: e.target.value }))}
-              placeholder="Main Plot"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Type</label>
-            <select
-              value={form.zoneType}
-              onChange={(e) => setForm((p) => ({ ...p, zoneType: e.target.value }))}
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            >
-              <option value="NORMAL">Normal</option>
-              <option value="MIX">Mix</option>
-              <option value="TEMPERATURE">Temperature</option>
-              <option value="COLD_STORE">Cold Store</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Storage Purpose</label>
-            <select
-              value={form.storageType}
-              onChange={(e) => setForm((p) => ({ ...p, storageType: e.target.value }))}
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            >
-              <option value="NORMAL">Normal</option>
-              <option value="DAMAGE">Damage</option>
-              <option value="MIX">Mix</option>
-              <option value="EXPIRY">Expiry</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2 grid grid-cols-3 gap-2 pt-1">
-            <div>
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1">Width (Ft)</label>
-              <input
-                type="number"
-                value={form.dimensions?.width || 0}
-                onChange={(e) => setForm((p) => ({ ...p, dimensions: { ...p.dimensions, width: Number(e.target.value) } }))}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1">Length (Ft)</label>
-              <input
-                type="number"
-                value={form.dimensions?.length || 0}
-                onChange={(e) => setForm((p) => ({ ...p, dimensions: { ...p.dimensions, length: Number(e.target.value) } }))}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1">Height (Ft)</label>
-              <input
-                type="number"
-                value={form.dimensions?.height || 0}
-                onChange={(e) => setForm((p) => ({ ...p, dimensions: { ...p.dimensions, height: Number(e.target.value) } }))}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
-            </div>
-          </div>
-          <p className="sm:col-span-2 text-xs font-mono tabular-nums text-[var(--text-muted)]">
-            Computed Area: {dimTotals.totalArea} sq ft · Volume: {dimTotals.totalVolume} cu ft
-          </p>
-        </div>
-      </FormModal>
+      {modalState.open && (
+        <ZoneFormModal
+          key={modalState.key}
+          isOpen={modalState.open}
+          onClose={() => setModalState((p) => ({ ...p, open: false }))}
+          initialValue={modalState.initial}
+          isEditing={Boolean(modalState.editing)}
+          warehouses={warehouses}
+          existingCount={table.pagination.totalRecords}
+          existingCodes={table.rows.map((r) => r.zoneCode)}
+          onSave={(payload) => saveMutation.mutate(payload)}
+          isSubmitting={saveMutation.isPending}
+        />
+      )}
 
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}

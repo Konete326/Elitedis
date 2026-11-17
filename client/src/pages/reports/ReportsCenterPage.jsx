@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart3, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import { extractListPayload, formatCurrency, formatDate } from '../../utils/formatters';
@@ -31,6 +32,7 @@ const REPORT_CATALOG = [
 
 export default function ReportsCenterPage() {
   const { user } = useAuth();
+  const { addToast } = useShell();
   const [reportSlug, setReportSlug] = useState('daily-sales');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -51,6 +53,11 @@ export default function ReportsCenterPage() {
         })
       ),
   });
+
+  const handleRefresh = async () => {
+    await reportQuery.refetch();
+    addToast({ type: 'success', message: 'Report refreshed.' });
+  };
 
   const activeLabel = REPORT_CATALOG.find((r) => r.slug === reportSlug)?.label || reportSlug;
   const rows = reportQuery.data?.data || [];
@@ -106,23 +113,27 @@ export default function ReportsCenterPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Business Reporting Center (19+ Reports)"
-        subtitle="Transaction-linked operational, inventory, recovery, and financial reports"
+        title="Business Reports Center"
+        subtitle="Pick any sales, stock, customer, supplier, or expense report to view and print"
+        onRefresh={handleRefresh}
+        isRefreshing={reportQuery.isFetching}
         actions={
           <button
             type="button"
             onClick={() => setPrintOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print / Export Report</span>
+            <span>Print / Export</span>
           </button>
         }
       />
 
       <FilterToolbar
+        onRefresh={handleRefresh}
+        isRefreshing={reportQuery.isFetching}
         onResetFilters={() => {
           setStartDate('');
           setEndDate('');
@@ -130,12 +141,13 @@ export default function ReportsCenterPage() {
         }}
       >
         <select
+          aria-label="Report Type"
           value={reportSlug}
           onChange={(e) => {
             setReportSlug(e.target.value);
             setPage(1);
           }}
-          className="h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-xs sm:text-sm font-semibold min-w-[220px]"
+          className="w-full md:w-auto min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-xs sm:text-sm font-semibold md:min-w-[220px]"
         >
           {REPORT_CATALOG.map((rep) => (
             <option key={rep.slug} value={rep.slug}>
@@ -151,7 +163,7 @@ export default function ReportsCenterPage() {
             setStartDate(e.target.value);
             setPage(1);
           }}
-          className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
+          className="w-full md:w-auto min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
         />
         <input
           type="date"
@@ -161,7 +173,7 @@ export default function ReportsCenterPage() {
             setEndDate(e.target.value);
             setPage(1);
           }}
-          className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
+          className="w-full md:w-auto min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
         />
       </FilterToolbar>
 

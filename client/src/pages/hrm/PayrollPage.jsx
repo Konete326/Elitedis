@@ -4,7 +4,7 @@ import { CheckCircle2, Landmark, Plus, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { formatCurrency } from '../../utils/formatters';
@@ -15,6 +15,8 @@ export default function PayrollPage() {
 
   const [monthYear, setMonthYear] = useState(new Date().toISOString().slice(0, 7));
   const [payslipTarget, setPayslipTarget] = useState(null);
+  const [payTarget, setPayTarget] = useState(null);
+  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
 
   const table = useServerTable({
     queryKey: 'hrm-payroll',
@@ -27,9 +29,11 @@ export default function PayrollPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-payroll'] });
       addToast({ type: 'success', message: `Payroll generated for ${monthYear}.` });
+      setGenerateConfirmOpen(false);
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Payroll generation failed.' });
+      setGenerateConfirmOpen(false);
     },
   });
 
@@ -37,37 +41,43 @@ export default function PayrollPage() {
     mutationFn: (id) => apiClient.patch(`/hrm/payroll/${id}/pay`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-payroll'] });
-      addToast({ type: 'success', message: 'Salary paid & posted to accounting ledger.' });
+      addToast({ type: 'success', message: 'Salary marked paid & posted to accounts ledger.' });
+      setPayTarget(null);
+    },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Salary payment failed.' });
+      setPayTarget(null);
     },
   });
 
   const columns = [
     { key: 'employee', header: 'Employee', mobilePrimary: true, accessor: (r) => r.employeeId?.fullName || '—' },
     { key: 'monthYear', header: 'Month', numeric: true, accessor: 'monthYear' },
-    { key: 'basicSalaryPkr', header: 'Basic', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.basicSalaryPkr) },
+    { key: 'basicSalaryPkr', header: 'Basic Salary', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.basicSalaryPkr) },
     { key: 'commissionPkr', header: 'Commission', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.commissionPkr) },
-    { key: 'netPayablePkr', header: 'Net Payable', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.netPayablePkr) },
+    { key: 'netPayablePkr', header: 'Net Salary', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.netPayablePkr) },
     { key: 'paymentStatus', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.paymentStatus} /> },
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Payroll & Commission Engine"
-        subtitle="Generate monthly salaries with automated sales commission and accounting sync"
+        title="Staff Payroll &amp; Commissions"
+        subtitle="Create monthly salary sheets with automatic sales commissions and ledger posting"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="month"
+              aria-label="Payroll Month"
               value={monthYear}
               onChange={(e) => setMonthYear(e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-mono"
+              className="min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-mono"
             />
             <button
               type="button"
-              onClick={() => generateMutation.mutate()}
+              onClick={() => setGenerateConfirmOpen(true)}
               disabled={generateMutation.isPending}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Generate Payroll</span>
@@ -77,7 +87,11 @@ export default function PayrollPage() {
       />
 
       <FilterToolbar
+        viewMode={table.viewMode}
+        onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'paymentStatus',
@@ -93,26 +107,28 @@ export default function PayrollPage() {
         columns={columns}
         data={table.rows}
         loading={table.isLoading}
+        viewMode={table.viewMode}
         pagination={table.pagination}
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={Landmark}
-        emptyTitle="No payroll sheets generated yet"
-        emptyDescription="Select a month above and click Generate Payroll to compute salary and commissions."
+        emptyTitle="No salary sheets created yet"
+        emptyDescription="Pick a month above and click Generate Payroll to calculate salaries and sales commissions."
         renderActions={(row) => (
           <>
             {row.paymentStatus !== 'PAID' && (
               <button
                 type="button"
-                onClick={() => payMutation.mutate(row._id)}
+                onClick={() => setPayTarget(row)}
                 className="px-2.5 py-1.5 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold inline-flex items-center gap-1"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Pay</span>
               </button>
             )}
-            <button type="button" onClick={() => setPayslipTarget(row)} className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]">
+            <button type="button" onClick={() => setPayslipTarget(row)} className="px-2.5 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1" title="Print Payslip">
               <Printer className="w-3.5 h-3.5" />
+              <span className="lg:hidden">Payslip</span>
             </button>
           </>
         )}
@@ -131,6 +147,28 @@ export default function PayrollPage() {
           { label: 'Deductions', value: formatCurrency(payslipTarget?.deductionsPkr) },
           { label: 'Net Payable', value: formatCurrency(payslipTarget?.netPayablePkr) },
         ]}
+      />
+
+      <ConfirmModal
+        isOpen={generateConfirmOpen}
+        onClose={() => setGenerateConfirmOpen(false)}
+        onConfirm={() => generateMutation.mutate()}
+        isLoading={generateMutation.isPending}
+        variant="primary"
+        title="Generate monthly payroll?"
+        message={`Calculate salaries and sales commissions for all active employees for ${monthYear}?`}
+        confirmLabel="Generate Payroll"
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(payTarget)}
+        onClose={() => setPayTarget(null)}
+        onConfirm={() => payMutation.mutate(payTarget._id)}
+        isLoading={payMutation.isPending}
+        variant="primary"
+        title="Confirm salary payment?"
+        message={`Pay ${formatCurrency(payTarget?.netPayablePkr || 0)} to ${payTarget?.employeeId?.fullName || 'this employee'} for ${payTarget?.monthYear || ''}? This will post a salary expense to the ledger.`}
+        confirmLabel="Confirm & Pay Salary"
       />
     </div>
   );

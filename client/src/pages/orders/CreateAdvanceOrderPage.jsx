@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, Plus, Printer, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { PrintPreviewModal } from '../../components/global';
+import { ConfirmModal, PrintPreviewModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
+import AdvanceOrderItemsStep from './AdvanceOrderItemsStep';
 import { extractListPayload, formatCurrency } from '../../utils/formatters';
 
-const STEPS = ['1. Customer Guard', '2. Products & Rules', '3. Invoice Style', '4. Submit & Assign'];
+const STEPS = ['1. Pick Customer', '2. Add Products', '3. Print Style', '4. Review & Submit'];
 
 export default function CreateAdvanceOrderPage() {
   const navigate = useNavigate();
@@ -24,6 +26,9 @@ export default function CreateAdvanceOrderPage() {
   const [originalAndDuplicate, setOriginalAndDuplicate] = useState(true);
   const [assignedSalesmanId, setAssignedSalesmanId] = useState('');
   const [printOpen, setPrintOpen] = useState(false);
+  const [removeIdx, setRemoveIdx] = useState(null);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const customersQuery = useQuery({
     queryKey: ['customers-options'],
@@ -52,17 +57,26 @@ export default function CreateAdvanceOrderPage() {
     mutationFn: (payload) => apiClient.post('/orders', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      addToast({ type: 'success', message: 'Advance order created cleanly.' });
+      setSubmitConfirmOpen(false);
+      addToast({ type: 'success', message: 'Advance order created.' });
       navigate('/orders/master');
     },
     onError: (err) => {
+      setSubmitConfirmOpen(false);
       addToast({ type: 'error', message: err?.response?.data?.message || 'Failed to submit advance order.' });
     },
   });
 
+  const customers = customersQuery.data || [];
+  const products = productsQuery.data || [];
+  const prereqReady = !customersQuery.isLoading && !productsQuery.isLoading;
+
   const addLine = () => {
-    const prod = productsQuery.data?.[0];
-    if (!prod) return;
+    const prod = products[0];
+    if (!prod) {
+      addToast({ type: 'warning', message: 'Add a product in Products Master first.' });
+      return;
+    }
     const pack = prod.packingUnits?.[0];
     setLineItems((p) => [
       ...p,
@@ -92,10 +106,20 @@ export default function CreateAdvanceOrderPage() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Advance Order Creation Wizard"
-        subtitle="Credit & blocked account guard, multi-style Chillan/Finance print, and immediate staff assignment"
+        title="New Advance Order"
+        subtitle="Step-by-step order setup with credit limit check, print layout, and salesman assignment"
+        actions={
+          <button
+            type="button"
+            onClick={() => (lineItems.length > 0 || customerId ? setCancelConfirmOpen(true) : navigate('/orders/master'))}
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Orders Master</span>
+          </button>
+        }
         tabs={STEPS.map((label, idx) => ({
           id: label,
           label,
@@ -104,7 +128,17 @@ export default function CreateAdvanceOrderPage() {
         }))}
       />
 
-      <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-[var(--bg-surface)] p-5">
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Add at least one Customer Shop and one Product before creating an advance order."
+          steps={[
+            { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
+            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+          ]}
+        />
+      )}
+
+      <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto rounded-xl border bg-[var(--bg-surface)] p-4 sm:p-5">
         {step === 0 && (
           <div className="max-w-2xl space-y-4">
             <div>
@@ -174,64 +208,16 @@ export default function CreateAdvanceOrderPage() {
         )}
 
         {step === 1 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold">Order Line Items ({lineItems.length})</span>
-              <button type="button" onClick={addLine} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Item</span>
-              </button>
-            </div>
-            {lineItems.map((row, idx) => (
-              <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center border rounded-xl p-2.5 bg-[var(--bg-canvas)]">
-                <select
-                  value={row.productId}
-                  onChange={(e) => {
-                    const p = (productsQuery.data || []).find((x) => x._id === e.target.value);
-                    if (!p) return;
-                    const rate = p.packingUnits?.[0]?.wholesaleSaleRate || p.baseUnit?.wholesaleSaleRate || 0;
-                    setLineItems((prev) =>
-                      prev.map((r, i) => (i === idx ? { ...r, productId: p._id, productName: p.productName, baseRate: rate, customSaleRate: rate } : r))
-                    );
-                  }}
-                  className="sm:col-span-2 h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs"
-                >
-                  {(productsQuery.data || []).map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.productName}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  value={row.quantity}
-                  onChange={(e) =>
-                    setLineItems((prev) => prev.map((r, i) => (i === idx ? { ...r, quantity: Number(e.target.value) } : r)))
-                  }
-                  className="h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums"
-                />
-                <input
-                  type="number"
-                  value={row.customSaleRate}
-                  onChange={(e) =>
-                    setLineItems((prev) => prev.map((r, i) => (i === idx ? { ...r, customSaleRate: Number(e.target.value) } : r)))
-                  }
-                  className="h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs tabular-nums"
-                />
-                <button
-                  type="button"
-                  onClick={() => setLineItems((prev) => prev.filter((_, i) => i !== idx))}
-                  className="h-8 px-2.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs justify-self-end"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            <button type="button" onClick={() => setStep(2)} className="h-9 px-4 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
-              Next: Invoice Style
-            </button>
-          </div>
+          <AdvanceOrderItemsStep
+            lineItems={lineItems}
+            products={products}
+            onAddLine={addLine}
+            onChangeLine={(idx, patch) =>
+              setLineItems((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
+            }
+            onRequestRemove={setRemoveIdx}
+            onNext={() => setStep(2)}
+          />
         )}
 
         {step === 2 && (
@@ -293,9 +279,9 @@ export default function CreateAdvanceOrderPage() {
               </button>
               <button
                 type="button"
-                onClick={handleSubmit}
-                disabled={submitMutation.isPending}
-                className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+                onClick={() => setSubmitConfirmOpen(true)}
+                disabled={!customerId || lineItems.length === 0 || submitMutation.isPending}
+                className="inline-flex items-center gap-1.5 min-h-[42px] px-5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold disabled:opacity-50"
               >
                 <Check className="w-4 h-4" />
                 <span>{submitMutation.isPending ? 'Submitting...' : 'Submit Advance Order'}</span>
@@ -317,6 +303,40 @@ export default function CreateAdvanceOrderPage() {
         ]}
         rows={lineItems}
         summaryRows={[{ label: 'Net Payable', value: formatCurrency(netPayable) }]}
+      />
+
+      <ConfirmModal
+        isOpen={removeIdx !== null}
+        onClose={() => setRemoveIdx(null)}
+        onConfirm={() => {
+          setLineItems((prev) => prev.filter((_, i) => i !== removeIdx));
+          setRemoveIdx(null);
+        }}
+        variant="danger"
+        title="Remove item from order?"
+        message={`Remove ${lineItems[removeIdx]?.productName || 'this item'} from the order?`}
+        confirmLabel="Remove Item"
+      />
+
+      <ConfirmModal
+        isOpen={submitConfirmOpen}
+        onClose={() => setSubmitConfirmOpen(false)}
+        onConfirm={handleSubmit}
+        isLoading={submitMutation.isPending}
+        variant="primary"
+        title="Submit advance order?"
+        message={`Create advance order for ${customer?.shopName || 'selected customer'} totaling ${formatCurrency(netPayable)}?`}
+        confirmLabel="Submit Advance Order"
+      />
+
+      <ConfirmModal
+        isOpen={cancelConfirmOpen}
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={() => navigate('/orders/master')}
+        variant="warning"
+        title="Cancel advance order?"
+        message="Discard your current selections and return to Orders Master?"
+        confirmLabel="Discard & Exit"
       />
     </div>
   );

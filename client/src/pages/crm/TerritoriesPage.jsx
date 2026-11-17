@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Edit, Plus, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
+import { extractListPayload } from '../../utils/formatters';
 
 const INITIAL_FORM = {
   territoryCode: '',
@@ -23,6 +25,19 @@ export default function TerritoriesPage() {
     queryKey: 'territories',
     endpoint: '/crm/territories',
     initialFilters: { territoryType: '', status: '' },
+  });
+
+  const areasCheck = useQuery({
+    queryKey: ['prereq-areas'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/areas', { params: { limit: 1 } })),
+  });
+  const routesCheck = useQuery({
+    queryKey: ['prereq-routes'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/routes', { params: { limit: 1 } })),
+  });
+  const customersCheck = useQuery({
+    queryKey: ['prereq-customers'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/customers', { params: { limit: 1 } })),
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -52,21 +67,32 @@ export default function TerritoriesPage() {
       addToast({ type: 'success', message: 'Territory deleted.' });
       setDeleteTarget(null);
     },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not delete territory.' });
+      setDeleteTarget(null);
+    },
   });
+
+  const prereqReady = !areasCheck.isLoading && !routesCheck.isLoading && !customersCheck.isLoading;
+  const hasAreasAndRoutes =
+    (areasCheck.data?.pagination?.totalRecords || areasCheck.data?.data?.length || 0) > 0 &&
+    (routesCheck.data?.pagination?.totalRecords || routesCheck.data?.data?.length || 0) > 0;
+  const hasCustomers =
+    (customersCheck.data?.pagination?.totalRecords || customersCheck.data?.data?.length || 0) > 0;
 
   const columns = [
     { key: 'territoryCode', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.territoryCode}</span> },
     { key: 'territoryName', header: 'Territory Name', mobilePrimary: true, accessor: 'territoryName' },
-    { key: 'territoryType', header: 'Classification', accessor: 'territoryType' },
+    { key: 'territoryType', header: 'Group By', accessor: 'territoryType' },
     { key: 'areasCount', header: 'Areas', numeric: true, accessor: (r) => r.areas?.length || 0 },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Territory Master"
-        subtitle="Configure Brand-wise, Warehouse-wise, District-wise, and Booker-wise territories"
+        title="Sales Territories"
+        subtitle="Divide your market by district, brand, warehouse, or order booker"
         actions={
           <button
             type="button"
@@ -75,7 +101,7 @@ export default function TerritoriesPage() {
               setForm(INITIAL_FORM);
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add Territory</span>
@@ -83,14 +109,26 @@ export default function TerritoriesPage() {
         }
       />
 
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Add your market Areas, Routes, and Customer Shops first so territories can group them properly."
+          steps={[
+            { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
+            { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
+          ]}
+        />
+      )}
+
       <FilterToolbar
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search territory code or name..."
+        searchPlaceholder="Search by territory code or name..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'territoryType',

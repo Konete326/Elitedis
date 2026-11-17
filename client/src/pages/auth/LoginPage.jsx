@@ -4,6 +4,7 @@ import { AlertCircle, Eye, EyeOff, Lock, Mail, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useShell } from '../../context/ShellContext';
+import { validateField } from '../../utils/validation';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -24,15 +25,20 @@ export default function LoginPage() {
     return <Navigate to={getRoleHomeRoute()} replace />;
   }
 
-  const emailInvalid = (touched.email || submitted) && (!email.trim() || !email.includes('@'));
-  const passwordInvalid = (touched.password || submitted) && password.length < 6;
+  const emailError = (touched.email || submitted) ? validateField('email', email, { required: true, label: 'Email address' }) : '';
+  const passwordError = (touched.password || submitted) ? validateField('password', password, { required: true, minLength: 6, label: 'Password' }) : '';
+  const emailInvalid = Boolean(emailError);
+  const passwordInvalid = Boolean(passwordError);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitted(true);
     setServerError('');
 
-    if (!email.trim() || !email.includes('@') || password.length < 6) {
+    if (
+      validateField('email', email, { required: true, label: 'Email address' }) ||
+      validateField('password', password, { required: true, minLength: 6, label: 'Password' })
+    ) {
       return;
     }
 
@@ -159,9 +165,7 @@ export default function LoginPage() {
                 />
               </div>
               {emailInvalid && (
-                <p className="mt-1 text-xs text-[var(--status-danger)]">
-                  Enter a valid email address.
-                </p>
+                <p className="mt-1 text-xs text-[var(--status-danger)]">{emailError}</p>
               )}
             </div>
 
@@ -194,9 +198,7 @@ export default function LoginPage() {
                 </button>
               </div>
               {passwordInvalid && (
-                <p className="mt-1 text-xs text-[var(--status-danger)]">
-                  Password must be at least 6 characters.
-                </p>
+                <p className="mt-1 text-xs text-[var(--status-danger)]">{passwordError}</p>
               )}
             </div>
 

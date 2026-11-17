@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { FormModal, ImageDropzone } from '../../components/global';
+import { suggestCode, validateField } from '../../utils/validation';
 
-export function buildEmptyCustomer() {
+export function buildEmptyCustomer(suggestedCode = '') {
   return {
-    customerCode: '',
+    customerCode: suggestedCode,
     shopName: '',
     ownerName: '',
     ownerContact: '',
@@ -38,10 +39,29 @@ export default function CustomerFormModal({
   onClose,
   initialValue,
   isEditing,
+  existingCount = 0,
+  existingCodes = [],
   onSave,
   isSubmitting,
 }) {
   const [form, setForm] = useState(() => initialValue || buildEmptyCustomer());
+  const [touched, setTouched] = useState({});
+
+  const errors = {
+    customerCode:
+      touched.customerCode && form.customerCode
+        ? validateField('code', form.customerCode, { label: 'Customer Code' })
+        : '',
+    shopName: touched.shopName
+      ? validateField('required', form.shopName, { required: true, minLength: 2, label: 'Shop Name' })
+      : '',
+    ownerName: touched.ownerName
+      ? validateField('required', form.ownerName, { required: true, minLength: 2, label: 'Owner Name' })
+      : '',
+    ownerContact: touched.ownerContact
+      ? validateField('phone', form.ownerContact, { required: true, label: 'Owner Phone' })
+      : '',
+  };
 
   const updateLoc = (key, val) => {
     setForm((p) => ({ ...p, locationHierarchy: { ...p.locationHierarchy, [key]: val } }));
@@ -51,30 +71,53 @@ export default function CustomerFormModal({
     setForm((p) => ({ ...p, financialTerms: { ...p.financialTerms, [key]: val } }));
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setTouched({ customerCode: true, shopName: true, ownerName: true, ownerContact: true });
+    const invalid =
+      (form.customerCode && validateField('code', form.customerCode, { label: 'Customer Code' })) ||
+      validateField('required', form.shopName, { required: true, minLength: 2, label: 'Shop Name' }) ||
+      validateField('required', form.ownerName, { required: true, minLength: 2, label: 'Owner Name' }) ||
+      validateField('phone', form.ownerContact, { required: true, label: 'Owner Phone' });
+    if (invalid) return;
+    onSave(form);
+  };
+
   return (
     <FormModal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Customer Profile' : 'Add New Customer Shop'}
-      subtitle="7-level location, Pehchan landmark, payment terms, and multi-accounts"
+      title={isEditing ? 'Edit Customer Shop' : 'Add New Customer Shop'}
+      subtitle="Shop details, area & landmark directions (Pehchan), and credit rules"
       size="xl"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(form);
-      }}
+      onSubmit={handleSubmit}
       isSubmitting={isSubmitting}
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer Code</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Customer Code</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((p) => ({ ...p, customerCode: suggestCode('CUST', existingCount, existingCodes) }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
               <input
                 value={form.customerCode}
                 onChange={(e) => setForm((p) => ({ ...p, customerCode: e.target.value.toUpperCase() }))}
-                placeholder="C-1110 (auto if blank)"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                onBlur={() => setTouched((p) => ({ ...p, customerCode: true }))}
+                placeholder="CUST-001"
+                aria-invalid={Boolean(errors.customerCode)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${errors.customerCode ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {errors.customerCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.customerCode}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop / Customer Name</label>
@@ -82,9 +125,12 @@ export default function CustomerFormModal({
                 required
                 value={form.shopName}
                 onChange={(e) => setForm((p) => ({ ...p, shopName: e.target.value }))}
-                placeholder="Lucky Store"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                onBlur={() => setTouched((p) => ({ ...p, shopName: true }))}
+                placeholder="e.g. Lucky General Store"
+                aria-invalid={Boolean(errors.shopName)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${errors.shopName ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {errors.shopName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.shopName}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name</label>
@@ -92,19 +138,25 @@ export default function CustomerFormModal({
                 required
                 value={form.ownerName}
                 onChange={(e) => setForm((p) => ({ ...p, ownerName: e.target.value }))}
-                placeholder="Imtiaz Ahsan"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                onBlur={() => setTouched((p) => ({ ...p, ownerName: true }))}
+                placeholder="e.g. Imtiaz Ahsan"
+                aria-invalid={Boolean(errors.ownerName)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${errors.ownerName ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {errors.ownerName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.ownerName}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Contact</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Phone / WhatsApp</label>
               <input
                 required
                 value={form.ownerContact}
-                onChange={(e) => setForm((p) => ({ ...p, ownerContact: e.target.value }))}
+                onChange={(e) => setForm((p) => ({ ...p, ownerContact: e.target.value.trim() }))}
+                onBlur={() => setTouched((p) => ({ ...p, ownerContact: true }))}
                 placeholder="03001234567"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                aria-invalid={Boolean(errors.ownerContact)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${errors.ownerContact ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {errors.ownerContact && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.ownerContact}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer Type</label>
@@ -141,51 +193,51 @@ export default function CustomerFormModal({
 
         <div className="rounded-xl border p-3.5 space-y-3">
           <h3 className="text-xs font-bold uppercase text-[var(--accent-primary)]">
-            7-Level Geo &amp; Pehchan Location
+            Shop Address &amp; Landmark (Pehchan)
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <input
-              placeholder="1. City (Karachi)"
+              placeholder="City (e.g. Karachi)"
               value={form.locationHierarchy?.city || ''}
               onChange={(e) => updateLoc('city', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <input
-              placeholder="2. Town / Zone (Orangi)"
+              placeholder="Town / Zone (e.g. Orangi)"
               value={form.locationHierarchy?.townOrZone || ''}
               onChange={(e) => updateLoc('townOrZone', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <input
-              placeholder="3. Area (Qasba Colony)"
+              placeholder="Area (e.g. Qasba Colony)"
               value={form.locationHierarchy?.areaName || ''}
               onChange={(e) => updateLoc('areaName', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <input
-              placeholder="4. Route (Jamsheed Pump Road)"
+              placeholder="Route / Road (e.g. Main Road)"
               value={form.locationHierarchy?.routeName || ''}
               onChange={(e) => updateLoc('routeName', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <input
-              placeholder="5. Street"
+              placeholder="Street / Block"
               value={form.locationHierarchy?.street || ''}
               onChange={(e) => updateLoc('street', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <input
-              placeholder="Google Map Link"
+              placeholder="Google Map Link (Optional)"
               value={form.locationHierarchy?.mapLink || ''}
               onChange={(e) => updateLoc('mapLink', e.target.value)}
               className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
             />
             <div className="sm:col-span-3">
               <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
-                6. Local Pehchan / Landmark Remarks
+                Nearby Landmark / Pehchan Directions
               </label>
               <input
-                placeholder="e.g. Pump ky ulty haath road per jali wali shop"
+                placeholder="e.g. Opposite petrol pump, corner green-gate shop"
                 value={form.locationHierarchy?.pehchanRemarks || ''}
                 onChange={(e) => updateLoc('pehchanRemarks', e.target.value)}
                 className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"

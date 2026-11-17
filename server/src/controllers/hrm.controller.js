@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { User, AttendancePayroll, PendingTask, Order, SaleInvoice, Recovery } from '../models/index.js';
 import { destroyImage } from '../config/cloudinary.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
+import { assertNotTargetingSuperAdmin } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { postDoubleEntry } from '../services/accountingPost.service.js';
 import { runWithTransaction } from '../services/stockLedger.service.js';
@@ -9,7 +10,15 @@ import { runWithTransaction } from '../services/stockLedger.service.js';
 export const listEmployees = asyncHandler(async (req, res) => {
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
-  if (req.query.primaryRole) extra.primaryRole = req.query.primaryRole;
+  const isSuperAdmin = req.user.primaryRole === 'SUPER_ADMIN';
+  if (req.query.primaryRole) {
+    if (!isSuperAdmin && req.query.primaryRole === 'SUPER_ADMIN') {
+      return res.status(200).json({ success: true, data: [], pagination: buildPaginationMeta(0) });
+    }
+    extra.primaryRole = req.query.primaryRole;
+  } else if (!isSuperAdmin) {
+    extra.primaryRole = { $ne: 'SUPER_ADMIN' };
+  }
   if (req.query.status) extra.status = req.query.status;
   if (req.query.linkedWarehouseId) extra.linkedWarehouseId = req.query.linkedWarehouseId;
 
@@ -30,6 +39,7 @@ export const listEmployees = asyncHandler(async (req, res) => {
 
 export const createEmployee = asyncHandler(async (req, res) => {
   const { password, email, ...rest } = req.body;
+  assertNotTargetingSuperAdmin(req.user, rest.primaryRole);
   if (!password || String(password).length < 6) {
     throw new AppError('Employee password (min 6 characters) is required.', 400, 'INVALID_PASSWORD');
   }
@@ -53,6 +63,8 @@ export const createEmployee = asyncHandler(async (req, res) => {
 export const updateEmployee = asyncHandler(async (req, res) => {
   const emp = await User.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!emp) throw new AppError('Employee not found.', 404, 'EMPLOYEE_NOT_FOUND');
+  assertNotTargetingSuperAdmin(req.user, emp);
+  assertNotTargetingSuperAdmin(req.user, req.body?.primaryRole);
 
   const oldAvatarId = emp.avatar?.publicId;
   const { password, distributorId: _ignore, ...updates } = req.body;
@@ -74,6 +86,7 @@ export const deleteEmployee = asyncHandler(async (req, res) => {
   }
   const emp = await User.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!emp) throw new AppError('Employee not found.', 404, 'EMPLOYEE_NOT_FOUND');
+  assertNotTargetingSuperAdmin(req.user, emp);
 
   const oldAvatarId = emp.avatar?.publicId;
   await emp.deleteOne();
@@ -85,6 +98,8 @@ export const deleteEmployee = asyncHandler(async (req, res) => {
 export const updateWorkAssignment = asyncHandler(async (req, res) => {
   const emp = await User.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!emp) throw new AppError('Employee not found.', 404, 'EMPLOYEE_NOT_FOUND');
+  assertNotTargetingSuperAdmin(req.user, emp);
+  assertNotTargetingSuperAdmin(req.user, req.body?.primaryRole);
 
   const { primaryRole, workParts, linkedWarehouseId, assignedCompanyIds, assignedBrandIds } = req.body;
   if (primaryRole) emp.primaryRole = primaryRole;
@@ -264,8 +279,9 @@ export const payPayroll = asyncHandler(async (req, res) => {
 
 export const getEmployeePerformanceReport = asyncHandler(async (req, res) => {
   const distributorId = req.distributorId;
+  const empFilter = req.user.primaryRole === 'SUPER_ADMIN' ? { distributorId } : { distributorId, primaryRole: { $ne: 'SUPER_ADMIN' } };
   const [employees, taskStats, orderStats, recoveryStats] = await Promise.all([
-    User.find({ distributorId }).select('profileId fullName primaryRole status').lean(),
+    User.find(empFilter).select('profileId fullName primaryRole status').lean(),
     PendingTask.aggregate([
       { $match: { distributorId } },
       {

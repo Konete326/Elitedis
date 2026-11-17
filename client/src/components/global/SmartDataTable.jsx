@@ -28,8 +28,8 @@ function checkSelected(selectedKeys, key) {
 const ALIGN_MAP = { right: 'text-right', center: 'text-center', left: 'text-left' };
 
 /**
- * Responsive SmartDataTable: sticky-header table on desktop (>=768px) and touch-friendly
- * stacked cards on mobile (<768px), supporting Card View, Empty State CTAs, and pagination.
+ * Responsive SmartDataTable: sticky-header table on desktop (lg >= 1024px) and touch-friendly
+ * stacked cards on mobile/tablet (< 1024px) or Card View, with shimmer loading and Empty State CTA.
  */
 export function SmartDataTable({
   columns = [],
@@ -70,23 +70,25 @@ export function SmartDataTable({
     onSelectionChange(current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
   };
 
+  const cleanEmptyLabel = emptyActionLabel ? String(emptyActionLabel).replace(/^\+\s*/, '') : '';
+
   if (!busy && data.length === 0) {
     return (
-      <div className={`flex-1 min-h-0 flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden ${className}`}>
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-10">
+      <div className={`lg:flex-1 lg:min-h-0 flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] lg:overflow-hidden ${className}`}>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-10 animate-fade-in">
           <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center mb-3">
             <EmptyIcon className="w-6 h-6" strokeWidth={1.75} />
           </div>
           <h3 className="text-base font-semibold text-[var(--text-primary)]">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-[var(--text-secondary)] max-w-md">{emptyDescription}</p>
-          {emptyActionLabel && onEmptyAction && (
+          {cleanEmptyLabel && onEmptyAction && (
             <button
               type="button"
               onClick={onEmptyAction}
-              className="mt-4 inline-flex items-center gap-2 min-h-[40px] px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors duration-200"
+              className="mt-4 inline-flex items-center gap-2 min-h-[42px] px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium transition-colors duration-200"
             >
               <Plus className="w-4 h-4" strokeWidth={2} />
-              <span>{emptyActionLabel}</span>
+              <span>{cleanEmptyLabel}</span>
             </button>
           )}
         </div>
@@ -98,9 +100,9 @@ export function SmartDataTable({
   }
 
   return (
-    <div className={`flex-1 min-h-0 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden transition-colors duration-200 ${className}`}>
+    <div className={`lg:flex-1 lg:min-h-0 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] lg:overflow-hidden transition-colors duration-200 ${className}`}>
       {viewMode !== 'card' && (
-        <div className="hidden md:block flex-1 min-h-0 overflow-auto">
+        <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
           <table className="w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)] text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
               <tr>
@@ -146,11 +148,11 @@ export function SmartDataTable({
               {busy
                 ? Array.from({ length: 5 }).map((_, rIdx) => (
                     <tr key={`skeleton-${rIdx}`}>
-                      {selectable && <td className="px-3 py-3"><div className="h-4 w-4 mx-auto rounded bg-[var(--bg-elevated)] animate-pulse" /></td>}
+                      {selectable && <td className="px-3 py-3"><div className="h-4 w-4 mx-auto rounded skeleton-shimmer" /></td>}
                       {activeCols.map((col) => (
-                        <td key={col.key} className="px-3.5 py-3"><div className="h-4 w-24 rounded bg-[var(--bg-elevated)] animate-pulse" /></td>
+                        <td key={col.key} className="px-3.5 py-3"><div className="h-4 w-24 rounded skeleton-shimmer" /></td>
                       ))}
-                      {renderActions && <td className="px-3.5 py-3"><div className="h-4 w-16 ml-auto rounded bg-[var(--bg-elevated)] animate-pulse" /></td>}
+                      {renderActions && <td className="px-3.5 py-3"><div className="h-4 w-16 ml-auto rounded skeleton-shimmer" /></td>}
                     </tr>
                   ))
                 : data.map((row, rIdx) => {
@@ -194,15 +196,15 @@ export function SmartDataTable({
         </div>
       )}
 
-      <div className={`${viewMode === 'card' ? 'block' : 'md:hidden'} flex-1 min-h-0 overflow-auto p-3`}>
-        <div className={viewMode === 'card' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-3'}>
+      <div className={`${viewMode === 'card' ? 'block' : 'lg:hidden'} lg:flex-1 lg:min-h-0 lg:overflow-auto p-3`}>
+        <div className={viewMode === 'card' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-3'}>
           {busy
             ? Array.from({ length: 4 }).map((_, idx) => (
-                <div key={`card-skel-${idx}`} className="h-32 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 animate-pulse" />
+                <div key={`card-skel-${idx}`} className="h-36 rounded-xl border border-[var(--border-subtle)] skeleton-shimmer" />
               ))
             : data.map((row, rIdx) => {
                 const id = getRowKey(row, rIdx, keyField);
-                if (renderCard) return <div key={id} className="min-w-0">{renderCard(row, rIdx)}</div>;
+                if (renderCard) return <div key={id} className="min-w-0 animate-fade-in">{renderCard(row, rIdx)}</div>;
 
                 const primaryCol = activeCols.find((c) => c.mobilePrimary) || activeCols[0];
                 const badgeCol = activeCols.find((c) => c.mobileBadge);
@@ -213,12 +215,14 @@ export function SmartDataTable({
                   <div
                     key={id}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={`rounded-xl border p-3.5 transition-colors duration-150 ${
-                      selected ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/30' : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)]/50'
-                    }`}
+                    className={`animate-fade-in rounded-xl border p-4 transition-colors duration-150 ${
+                      selected
+                        ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/30'
+                        : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)]/40'
+                    } ${onRowClick ? 'cursor-pointer' : ''}`}
                   >
-                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-[var(--border-subtle)]">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-[var(--border-subtle)]">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         {selectable && (
                           <input
                             type="checkbox"
@@ -236,11 +240,13 @@ export function SmartDataTable({
                       {badgeCol && <div className="shrink-0">{getCellValue(row, badgeCol, rIdx)}</div>}
                     </div>
 
-                    <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
                       {detailCols.slice(0, 6).map((col) => (
                         <div key={col.key} className="min-w-0">
-                          <span className="block text-[11px] text-[var(--text-muted)] truncate">{col.header || col.label}</span>
-                          <span className={`block font-medium text-[var(--text-primary)] truncate ${col.numeric ? 'tabular-nums font-mono' : ''}`}>
+                          <span className="block text-[11px] font-medium text-[var(--text-muted)] truncate">
+                            {col.header || col.label}
+                          </span>
+                          <span className={`mt-0.5 block font-semibold text-[var(--text-primary)] truncate ${col.numeric ? 'tabular-nums font-mono' : ''}`}>
                             {getCellValue(row, col, rIdx)}
                           </span>
                         </div>
@@ -249,7 +255,7 @@ export function SmartDataTable({
 
                     {renderActions && (
                       <div
-                        className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-end gap-2 [&>button]:min-h-[44px] [&>a]:min-h-[44px]"
+                        className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-end gap-2 [&>button]:min-h-[44px] [&>a]:min-h-[44px]"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {renderActions(row, rIdx)}

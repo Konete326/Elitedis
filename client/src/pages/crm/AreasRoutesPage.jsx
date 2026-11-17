@@ -79,19 +79,19 @@ export default function AreasRoutesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Areas & Routes Hierarchy"
-        subtitle="Manage Karachi towns, commercial areas, and road routes for Beat planning"
+        title="Areas &amp; Routes Setup"
+        subtitle="Add cities, market areas, and delivery roads so shops and beat schedules stay organized"
         tabs={[
-          { id: 'areas', label: 'Areas Master', active: tab === 'areas', onClick: () => setTab('areas') },
-          { id: 'routes', label: 'Routes Master', active: tab === 'routes', onClick: () => setTab('routes') },
+          { id: 'areas', label: 'Areas List', active: tab === 'areas', onClick: () => setTab('areas') },
+          { id: 'routes', label: 'Routes List', active: tab === 'routes', onClick: () => setTab('routes') },
         ]}
         actions={
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>{tab === 'areas' ? 'Add Area' : 'Add Route'}</span>
@@ -103,10 +103,12 @@ export default function AreasRoutesPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder={`Search ${tab}...`}
+        searchPlaceholder={tab === 'areas' ? 'Search by area name or code...' : 'Search by route name or code...'}
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
       />
 
       <SmartDataTable

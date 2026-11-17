@@ -29,6 +29,7 @@ export default function OrdersMasterPage() {
 
   const [printOrder, setPrintOrder] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
 
   const approveBatchMutation = useMutation({
     mutationFn: (orderIds) => apiClient.patch('/orders/approve-batch', { orderIds }),
@@ -36,12 +37,14 @@ export default function OrdersMasterPage() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       addToast({
         type: 'success',
-        message: `Approved ${res.data?.data?.approvedCount || 0} orders and reserved stock.`,
+        message: `Approved ${res.data?.data?.approvedCount || 0} order(s) and reserved stock.`,
       });
+      setApproveConfirmOpen(false);
       table.setSelectedKeys([]);
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err?.response?.data?.message || 'Approval failed.' });
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not approve selected orders.' });
+      setApproveConfirmOpen(false);
     },
   });
 
@@ -79,31 +82,32 @@ export default function OrdersMasterPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
         title="Orders Master"
-        subtitle="Normal, Advance, Booker, and Online orders with stock reservation approval"
+        subtitle="View Normal, Advance, Booker, and Online orders and approve stock reservations"
         actions={
           <>
             <button
               type="button"
               onClick={() => navigate('/orders/operations')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Approval &amp; Dispatch</span>
+              <span>Approvals &amp; Dispatch</span>
             </button>
             <button
               type="button"
               onClick={() => navigate('/orders/create-advance')}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
+              <Plus className="w-4 h-4" />
               <span>Advance Order</span>
             </button>
             <button
               type="button"
               onClick={() => navigate('/orders/create-normal')}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Normal Order</span>
@@ -114,8 +118,8 @@ export default function OrdersMasterPage() {
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Orders" value={table.pagination.totalRecords} icon={ShoppingCart} status="primary" />
-        <MetricCard title="Pending Approval" value={table.rows.filter((o) => o.approvalInfo?.status === 'PENDING').length} status="warning" />
-        <MetricCard title="Approved (Reserved)" value={table.rows.filter((o) => o.approvalInfo?.status === 'APPROVED').length} status="success" />
+        <MetricCard title="Waiting Approval" value={table.rows.filter((o) => o.approvalInfo?.status === 'PENDING').length} status="warning" />
+        <MetricCard title="Approved (Stock Locked)" value={table.rows.filter((o) => o.approvalInfo?.status === 'APPROVED').length} status="success" />
         <MetricCard
           title="Page Order Value"
           value={formatCurrency(table.rows.reduce((s, o) => s + (o.grandSummary?.netPayableAmount || 0), 0))}
@@ -127,7 +131,7 @@ export default function OrdersMasterPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search order ID..."
+        searchPlaceholder="Search by order ID..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         columns={columns}
@@ -135,6 +139,8 @@ export default function OrdersMasterPage() {
         onToggleColumn={(k) => table.toggleColumn(k, columns)}
         onResetColumns={table.resetColumns}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         selectedCount={table.selectedKeys.length}
         filters={[
           {
@@ -142,7 +148,14 @@ export default function OrdersMasterPage() {
             label: 'Status',
             value: table.filters.status,
             onChange: (val) => table.setFilter('status', val),
-            options: ['DRAFT', 'PENDING', 'APPROVED', 'DELIVERY_ASSIGNED', 'COMPLETED', 'CANCELLED'],
+            options: [
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'PENDING', label: 'Pending Approval' },
+              { value: 'APPROVED', label: 'Approved' },
+              { value: 'DELIVERY_ASSIGNED', label: 'Out for Delivery' },
+              { value: 'COMPLETED', label: 'Completed' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ],
           },
           {
             key: 'source',
@@ -153,7 +166,7 @@ export default function OrdersMasterPage() {
           },
           {
             key: 'orderMode',
-            label: 'Mode',
+            label: 'Order Type',
             value: table.filters.orderMode,
             onChange: (val) => table.setFilter('orderMode', val),
             options: ['NORMAL', 'ADVANCE', 'POS'],
@@ -163,9 +176,9 @@ export default function OrdersMasterPage() {
           table.selectedKeys.length > 0 && (
             <button
               type="button"
-              onClick={() => approveBatchMutation.mutate(table.selectedKeys)}
+              onClick={() => setApproveConfirmOpen(true)}
               disabled={approveBatchMutation.isPending}
-              className="h-9 px-3 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold"
+              className="min-h-[40px] sm:h-9 px-3 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold"
             >
               Approve Selected ({table.selectedKeys.length})
             </button>
@@ -189,22 +202,24 @@ export default function OrdersMasterPage() {
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyTitle="No orders booked yet"
-        emptyDescription="Create a Normal or Advance Order with the 2-level discount, scheme, and tax engine."
+        emptyDescription="Create a Normal or Advance Order with automatic discounts, free offers, and tax."
         emptyActionLabel="Create Normal Order"
         onEmptyAction={() => navigate('/orders/create-normal')}
         renderActions={(row) => (
           <>
-            <button type="button" onClick={() => setPrintOrder(row)} className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]" title="Print Invoice">
+            <button type="button" onClick={() => setPrintOrder(row)} className="px-2.5 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1" title="Print Invoice">
               <Printer className="w-3.5 h-3.5" />
+              <span className="lg:hidden">Print</span>
             </button>
             {['DRAFT', 'PENDING', 'APPROVED'].includes(row.approvalInfo?.status) && (
               <button
                 type="button"
                 onClick={() => setCancelTarget(row)}
-                className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs"
+                className="px-2.5 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs inline-flex items-center gap-1"
                 title="Cancel Order"
               >
                 <XCircle className="w-3.5 h-3.5" />
+                <span className="lg:hidden">Cancel</span>
               </button>
             )}
           </>
@@ -236,6 +251,17 @@ export default function OrdersMasterPage() {
               ]
             : []
         }
+      />
+
+      <ConfirmModal
+        isOpen={approveConfirmOpen}
+        onClose={() => setApproveConfirmOpen(false)}
+        onConfirm={() => approveBatchMutation.mutate(table.selectedKeys)}
+        isLoading={approveBatchMutation.isPending}
+        variant="primary"
+        title="Approve selected orders?"
+        message={`Approve ${table.selectedKeys.length} selected order(s)? Stock for approved orders will be reserved from available inventory.`}
+        confirmLabel="Approve & Reserve Stock"
       />
 
       <ConfirmModal

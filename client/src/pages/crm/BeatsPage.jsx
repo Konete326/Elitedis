@@ -6,6 +6,7 @@ import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
 
@@ -33,11 +34,30 @@ export default function BeatsPage() {
     queryKey: ['booker-options'],
     queryFn: async () => extractListPayload(await apiClient.get('/hrm/employees', { params: { limit: 100 } })).data,
   });
+  const areasCheck = useQuery({
+    queryKey: ['prereq-areas'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/areas', { params: { limit: 1 } })),
+  });
+  const routesCheck = useQuery({
+    queryKey: ['prereq-routes'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/routes', { params: { limit: 1 } })),
+  });
+  const customersCheck = useQuery({
+    queryKey: ['prereq-customers'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/customers', { params: { limit: 1 } })),
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const prereqReady = !areasCheck.isLoading && !routesCheck.isLoading && !customersCheck.isLoading;
+  const hasAreasAndRoutes =
+    (areasCheck.data?.pagination?.totalRecords || areasCheck.data?.data?.length || 0) > 0 &&
+    (routesCheck.data?.pagination?.totalRecords || routesCheck.data?.data?.length || 0) > 0;
+  const hasCustomers =
+    (customersCheck.data?.pagination?.totalRecords || customersCheck.data?.data?.length || 0) > 0;
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -82,10 +102,10 @@ export default function BeatsPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Booker Beat Plans"
-        subtitle="Monday–Sunday booking routes, accepted customer lists, and 1-click beat duplication"
+        title="Weekly Booker Beat Plans"
+        subtitle="Schedule which day and routes each order booker visits shops, with 1-click copy"
         actions={
           <button
             type="button"
@@ -94,7 +114,7 @@ export default function BeatsPage() {
               setForm(INITIAL_FORM);
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Create Beat Plan</span>
@@ -102,14 +122,26 @@ export default function BeatsPage() {
         }
       />
 
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Set up Areas, Routes, and Customer Shops first before assigning weekly booker beats."
+          steps={[
+            { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
+            { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
+          ]}
+        />
+      )}
+
       <FilterToolbar
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search beat code or name..."
+        searchPlaceholder="Search by beat code or name..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'beatDay',

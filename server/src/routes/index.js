@@ -213,19 +213,21 @@ taskRouter.patch('/:id/dispatch', taskCtrl.executeDispatchTask);
 taskRouter.patch('/:id/put-away', taskCtrl.executePutAwayTask);
 taskRouter.patch('/:id/stock-count', taskCtrl.executeStockCountTask);
 taskRouter.patch('/:id/complete', taskCtrl.completeTask);
+taskRouter.patch('/:id/cancel', taskCtrl.cancelTask);
 router.use('/tasks', taskRouter);
 
 // Dedicated Mobile Portals (/api/v1/portals)
+// Strict isolation: ADMIN requires explicit workParts; only SUPER_ADMIN has universal override
 const portalRouter = express.Router();
-portalRouter.get('/booker/beats', requireRoleOrWorkPart(['ADMIN', 'BOOKER'], ['orderBooker']), portalCtrl.getBookerBeats);
-portalRouter.get('/booker/catalog', requireRoleOrWorkPart(['ADMIN', 'BOOKER'], ['orderBooker']), portalCtrl.getPortalCatalog);
-portalRouter.post('/booker/orders', requireRoleOrWorkPart(['ADMIN', 'BOOKER'], ['orderBooker']), portalCtrl.createBookerOrder);
-portalRouter.get('/booker/history', requireRoleOrWorkPart(['ADMIN', 'BOOKER'], ['orderBooker']), portalCtrl.getBookerHistory);
-portalRouter.get('/pos/catalog', requireRoleOrWorkPart(['ADMIN', 'POS_OPERATOR'], ['posStore']), portalCtrl.getPortalCatalog);
-portalRouter.post('/pos/checkout', requireRoleOrWorkPart(['ADMIN', 'POS_OPERATOR'], ['posStore']), portalCtrl.posCheckout);
-portalRouter.get('/pos/history', requireRoleOrWorkPart(['ADMIN', 'POS_OPERATOR'], ['posStore']), portalCtrl.getPosHistory);
-portalRouter.get('/salesman/delivery-plan', requireRoleOrWorkPart(['ADMIN', 'SALESMAN'], ['salesman']), portalCtrl.getSalesmanDeliveryPlan);
-portalRouter.post('/salesman/deal', requireRoleOrWorkPart(['ADMIN', 'SALESMAN'], ['salesman']), portalCtrl.executeSalesmanDeal);
+portalRouter.get('/booker/beats', requireRoleOrWorkPart(['BOOKER'], ['orderBooker']), portalCtrl.getBookerBeats);
+portalRouter.get('/booker/catalog', requireRoleOrWorkPart(['BOOKER'], ['orderBooker']), portalCtrl.getPortalCatalog);
+portalRouter.post('/booker/orders', requireRoleOrWorkPart(['BOOKER'], ['orderBooker']), portalCtrl.createBookerOrder);
+portalRouter.get('/booker/history', requireRoleOrWorkPart(['BOOKER'], ['orderBooker']), portalCtrl.getBookerHistory);
+portalRouter.get('/pos/catalog', requireRoleOrWorkPart(['POS_OPERATOR'], ['posStore']), portalCtrl.getPortalCatalog);
+portalRouter.post('/pos/checkout', requireRoleOrWorkPart(['POS_OPERATOR'], ['posStore']), portalCtrl.posCheckout);
+portalRouter.get('/pos/history', requireRoleOrWorkPart(['POS_OPERATOR'], ['posStore']), portalCtrl.getPosHistory);
+portalRouter.get('/salesman/delivery-plan', requireRoleOrWorkPart(['SALESMAN'], ['salesman']), portalCtrl.getSalesmanDeliveryPlan);
+portalRouter.post('/salesman/deal', requireRoleOrWorkPart(['SALESMAN'], ['salesman']), portalCtrl.executeSalesmanDeal);
 router.use('/portals', portalRouter);
 
 // HRM (/api/v1/hrm)

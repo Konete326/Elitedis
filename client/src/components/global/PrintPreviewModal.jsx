@@ -125,13 +125,13 @@ export function PrintPreviewModal({
       aria-modal="true"
       aria-label={title}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-6xl h-[92dvh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden"
+        className="w-full max-w-6xl h-[95dvh] sm:h-[92dvh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden animate-scale-in"
       >
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2.5 px-3 sm:px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">{title}</h2>

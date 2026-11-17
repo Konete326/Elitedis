@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, Plus } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { TouchKeypadModal } from '../../components/global';
+import { ConfirmModal, TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import MovementLineRow from './MovementLineRow';
 import { extractListPayload } from '../../utils/formatters';
 
@@ -30,6 +31,7 @@ export default function CreateMovementPage() {
   const [status, setStatus] = useState('COMPLETED');
   const [items, setItems] = useState([]);
   const [keypadTarget, setKeypadTarget] = useState(null);
+  const [removeIndexTarget, setRemoveIndexTarget] = useState(null);
 
   const warehousesQuery = useQuery({
     queryKey: ['warehouses-options'],
@@ -144,13 +146,18 @@ export default function CreateMovementPage() {
     });
   };
 
+  const warehouses = warehousesQuery.data || [];
+  const products = productsQuery.data || [];
+  const missingPrereqs =
+    !warehousesQuery.isLoading && !productsQuery.isLoading && (warehouses.length === 0 || products.length === 0);
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Create Stock Movement"
         subtitle="Execute purchase intake, warehouse transfers, physical adjustments, or damage returns"
         actions={
-          <button type="button" onClick={() => navigate('/stock/movements')} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
+          <button type="button" onClick={() => navigate('/stock/movements')} className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium">
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Movements</span>
           </button>
@@ -166,7 +173,17 @@ export default function CreateMovementPage() {
         }))}
       />
 
-      <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      {missingPrereqs && (
+        <SetupGuideBanner
+          missingMessage="Create at least one Warehouse and one Product SKU before posting Stock Movements."
+          steps={[
+            { label: 'Warehouse', done: warehouses.length > 0, to: '/stock/warehouses', actionLabel: 'Warehouses' },
+            { label: 'Product SKU', done: products.length > 0, to: '/inventory/products', actionLabel: 'Products' },
+          ]}
+        />
+      )}
+
+      <form onSubmit={handleSubmit} className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 lg:overflow-hidden">
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Task / Reference Name</label>
@@ -178,7 +195,7 @@ export default function CreateMovementPage() {
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">From Warehouse</label>
               <select required value={fromWarehouseId} onChange={(e) => setFromWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select source...</option>
-                {(warehousesQuery.data || []).map((w) => (
+                {warehouses.map((w) => (
                   <option key={w._id} value={w._id}>
                     {w.warehouseName}
                   </option>
@@ -192,7 +209,7 @@ export default function CreateMovementPage() {
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Destination Warehouse</label>
               <select required value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select destination...</option>
-                {(warehousesQuery.data || []).map((w) => (
+                {warehouses.map((w) => (
                   <option key={w._id} value={w._id}>
                     {w.warehouseName}
                   </option>
@@ -224,19 +241,19 @@ export default function CreateMovementPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col rounded-xl border bg-[var(--bg-surface)] overflow-hidden">
+        <div className="lg:flex-1 lg:min-h-0 flex flex-col rounded-xl border bg-[var(--bg-surface)] lg:overflow-hidden">
           <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b bg-[var(--bg-elevated)]">
             <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Movement Line Items ({items.length})</span>
-            <button type="button" onClick={addLineItem} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
+            <button type="button" onClick={addLineItem} className="inline-flex items-center gap-1 min-h-[38px] sm:h-8 px-3 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
               <Plus className="w-3.5 h-3.5" />
               <span>Add Item</span>
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-auto p-3 space-y-2.5">
+          <div className="lg:flex-1 lg:min-h-0 lg:overflow-auto p-3 space-y-2.5">
             {items.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
-                Select warehouses above and click "+ Add Item" to configure batches and quantities.
+              <div className="py-10 text-center text-sm text-[var(--text-muted)]">
+                Select warehouses above and tap Add Item to configure batches and quantities.
               </div>
             ) : (
               items.map((row, idx) => (
@@ -245,19 +262,19 @@ export default function CreateMovementPage() {
                   row={row}
                   idx={idx}
                   movementType={movementType}
-                  products={productsQuery.data || []}
+                  products={products}
                   batches={batchesQuery.data || []}
                   destZones={destZones}
                   updateLine={updateLine}
                   onOpenKeypad={(i, field) => setKeypadTarget({ idx: i, field, val: items[i][field] })}
-                  onRemove={(i) => setItems((prev) => prev.filter((_, n) => n !== i))}
+                  onRemove={(i) => setRemoveIndexTarget(i)}
                 />
               ))
             )}
           </div>
 
           <div className="shrink-0 flex justify-end gap-2 px-4 py-3 border-t bg-[var(--bg-elevated)]">
-            <button type="submit" disabled={mutation.isPending} className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
+            <button type="submit" disabled={mutation.isPending} className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:h-10 px-5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
               <Check className="w-4 h-4" />
               <span>{mutation.isPending ? 'Submitting...' : 'Submit Movement'}</span>
             </button>
@@ -273,6 +290,18 @@ export default function CreateMovementPage() {
         onConfirm={(val) => {
           if (keypadTarget) updateLine(keypadTarget.idx, keypadTarget.field, val);
         }}
+      />
+
+      <ConfirmModal
+        isOpen={removeIndexTarget !== null}
+        onClose={() => setRemoveIndexTarget(null)}
+        onConfirm={() => {
+          setItems((prev) => prev.filter((_, n) => n !== removeIndexTarget));
+          setRemoveIndexTarget(null);
+        }}
+        title="Remove movement item row?"
+        message="Remove this batch line from the current stock movement?"
+        confirmLabel="Remove Row"
       />
     </div>
   );

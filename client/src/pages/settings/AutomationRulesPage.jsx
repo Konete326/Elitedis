@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Pencil, Play, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Bell, Pencil, Play, Plus, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
@@ -145,26 +145,39 @@ export default function AutomationRulesPage() {
     { key: 'createdAt', header: 'Time', accessor: (r) => formatDateTime(r.createdAt) },
   ];
 
+  const handleRefresh = async () => {
+    await Promise.all([automationQuery.refetch(), notificationsQuery.refetch()]);
+    addToast({ type: 'success', message: 'Automation rules and alerts refreshed.' });
+  };
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Business Automation Rules & Alerts"
-        subtitle="Configure Low-Stock Auto-Purchase drafts, Expiry warnings, Credit limits, and alert evaluation sweeps"
+        title="Automatic Alerts &amp; Rules"
+        subtitle="Get automatic alerts for low stock, near-expiry batches, and customer credit limits"
         actions={
           <>
             <button
               type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium hover:bg-[var(--bg-elevated)]"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${automationQuery.isFetching || notificationsQuery.isFetching ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+            <button
+              type="button"
               onClick={() => sweepMutation.mutate()}
               disabled={sweepMutation.isPending}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold hover:bg-[var(--bg-elevated)]"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold hover:bg-[var(--bg-elevated)]"
             >
               <Play className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
-              <span>{sweepMutation.isPending ? 'Running Sweep...' : 'Run Sweep Now'}</span>
+              <span>{sweepMutation.isPending ? 'Checking...' : 'Check Alerts Now'}</span>
             </button>
             <button
               type="button"
               onClick={openCreateModal}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Add Rule</span>
@@ -174,13 +187,13 @@ export default function AutomationRulesPage() {
       />
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard title="Configured Rules" value={rules.length} icon={SlidersHorizontal} status="primary" loading={automationQuery.isLoading} />
+        <MetricCard title="Total Rules" value={rules.length} icon={SlidersHorizontal} status="primary" loading={automationQuery.isLoading} />
         <MetricCard title="Active Rules" value={rules.filter((r) => r.isEnabled).length} status="success" loading={automationQuery.isLoading} />
         <MetricCard title="Unread Alerts" value={alerts.filter((a) => !a.isRead).length} icon={Bell} status="danger" loading={notificationsQuery.isLoading} />
-        <MetricCard title="Idempotency Guard" value="ACTIVE" subtitle="Zero duplicate PR drafts" status="info" />
+        <MetricCard title="Duplicate Protection" value="ACTIVE" subtitle="No duplicate purchase drafts" status="info" />
       </div>
 
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 overflow-hidden">
+      <div className="lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 lg:overflow-hidden">
         <SmartDataTable
           columns={ruleColumns}
           data={rules}

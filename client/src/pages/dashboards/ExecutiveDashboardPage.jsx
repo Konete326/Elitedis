@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { MetricCard, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import MiniBarChart from '../../components/shared/MiniBarChart';
@@ -25,10 +26,10 @@ import StatusBadge from '../../components/shared/StatusBadge';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/formatters';
 
 const DASHBOARD_MODULES = [
-  { id: 'main', label: 'Main Business', ctaTo: '/orders/create-normal', ctaLabel: '+ New Order' },
+  { id: 'main', label: 'Main Business', ctaTo: '/orders/create-normal', ctaLabel: 'New Order' },
   { id: 'inventory', label: 'Inventory', ctaTo: '/inventory/products', ctaLabel: 'Product Master' },
   { id: 'stock', label: 'Stock & Warehouse', ctaTo: '/stock/list', ctaLabel: 'Stock Batches' },
-  { id: 'purchase', label: 'Purchase', ctaTo: '/stock/movements/create', ctaLabel: '+ Purchase Intake' },
+  { id: 'purchase', label: 'Purchase', ctaTo: '/stock/movements/create', ctaLabel: 'Purchase Intake' },
   { id: 'sales', label: 'Sales & Orders', ctaTo: '/sales/master', ctaLabel: 'Sales Master' },
   { id: 'accounts', label: 'Accounts & Recovery', ctaTo: '/accounts/movements', ctaLabel: 'Account Queue' },
   { id: 'crm', label: 'CRM & Beats', ctaTo: '/crm/customers', ctaLabel: 'Customer Master' },
@@ -42,6 +43,7 @@ const DASH_LIMIT = Number(import.meta.env.VITE_DASHBOARD_PAGE_SIZE) || 5;
 export default function ExecutiveDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToast } = useShell();
   const [activeModule, setActiveModule] = useState('main');
   const distributorId = user?.distributorId || 'default';
 
@@ -147,7 +149,7 @@ export default function ExecutiveDashboardPage() {
   ].filter((x) => x.value > 0);
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title={`${currentMeta.label} Dashboard`}
         subtitle="Real-time distribution KPIs, operational counts, and active queues"
@@ -156,8 +158,11 @@ export default function ExecutiveDashboardPage() {
           <>
             <button
               type="button"
-              onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium theme-transition"
+              onClick={async () => {
+                await refetch();
+                addToast({ type: 'info', message: `${currentMeta.label} dashboard refreshed.` });
+              }}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium theme-transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -165,7 +170,7 @@ export default function ExecutiveDashboardPage() {
             <button
               type="button"
               onClick={() => navigate(currentMeta.ctaTo)}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold theme-transition"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold theme-transition"
             >
               <span>{currentMeta.ctaLabel}</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -210,7 +215,7 @@ export default function ExecutiveDashboardPage() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="lg:flex-1 lg:min-h-0 flex flex-col">
         <SmartDataTable
           columns={recentColumns}
           data={recentRows}

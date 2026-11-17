@@ -164,9 +164,9 @@ export default function AppRoutes() {
           <Route path="/tasks/pending" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER', 'SALESMAN', 'BOOKER']}><PendingTasksPage /></ProtectedRoute>} />
           <Route path="/tasks/execute/:taskId" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER', 'SALESMAN', 'BOOKER']}><ExecuteTaskPage /></ProtectedRoute>} />
 
-          <Route path="/portal/booker" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'BOOKER']} requiredWorkPart="orderBooker"><BookerPortalPage /></ProtectedRoute>} />
-          <Route path="/portal/pos" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'POS_OPERATOR']} requiredWorkPart="posStore"><PosPortalPage /></ProtectedRoute>} />
-          <Route path="/portal/salesman" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'SALESMAN']} requiredWorkPart="salesman"><SalesmanPortalPage /></ProtectedRoute>} />
+          <Route path="/portal/booker" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'BOOKER']} requiredWorkPart="orderBooker"><BookerPortalPage /></ProtectedRoute>} />
+          <Route path="/portal/pos" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'POS_OPERATOR']} requiredWorkPart="posStore"><PosPortalPage /></ProtectedRoute>} />
+          <Route path="/portal/salesman" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SALESMAN']} requiredWorkPart="salesman"><SalesmanPortalPage /></ProtectedRoute>} />
 
           <Route path="/hrm/employees" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><EmployeesPage /></ProtectedRoute>} />
           <Route path="/hrm/attendance" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><AttendancePage /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart3, DollarSign, Printer, Receipt, RefreshCw, RotateCcw, Truck } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
+import { useShell } from '../../context/ShellContext';
 import { FilterToolbar, MetricCard, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import MiniBarChart from '../../components/shared/MiniBarChart';
@@ -11,6 +12,7 @@ import { extractListPayload, formatCurrency, formatDateTime, formatNumber } from
 
 export default function DailySalesReportPage() {
   const { user } = useAuth();
+  const { addToast } = useShell();
   const today = new Date().toISOString().slice(0, 10);
 
   const [date, setDate] = useState(today);
@@ -34,6 +36,11 @@ export default function DailySalesReportPage() {
       return response.data?.data || response.data || {};
     },
   });
+
+  const handleRefresh = async () => {
+    await dsrQuery.refetch();
+    addToast({ type: 'success', message: 'Daily sales report refreshed.' });
+  };
 
   const dsr = dsrQuery.data || {};
   const summary = dsr.summary || {};
@@ -98,16 +105,16 @@ export default function DailySalesReportPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
         title="Daily Sales Report (DSR)"
-        subtitle="Automated daily summary of bookings, dispatches, delivered sales, spot returns, recoveries, and expenses"
+        subtitle="Today's summary of bookings, deliveries, collected payments, returns, and trip expenses"
         actions={
           <>
             <button
               type="button"
-              onClick={() => dsrQuery.refetch()}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium"
+              onClick={handleRefresh}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${dsrQuery.isFetching ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -115,10 +122,10 @@ export default function DailySalesReportPage() {
             <button
               type="button"
               onClick={() => setPrintOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print DSR</span>
+              <span>Print Report</span>
             </button>
           </>
         }
@@ -126,8 +133,8 @@ export default function DailySalesReportPage() {
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Sales" value={formatCurrency(totalSalesPkr)} icon={DollarSign} status="primary" loading={dsrQuery.isLoading} />
-        <MetricCard title="Total Recovered" value={formatCurrency(totalCollectedPkr)} icon={Receipt} status="success" loading={dsrQuery.isLoading} />
-        <MetricCard title="Credit Outstanding" value={formatCurrency(totalCreditPkr)} icon={Truck} status="warning" loading={dsrQuery.isLoading} />
+        <MetricCard title="Total Collected" value={formatCurrency(totalCollectedPkr)} icon={Receipt} status="success" loading={dsrQuery.isLoading} />
+        <MetricCard title="Unpaid Credit" value={formatCurrency(totalCreditPkr)} icon={Truck} status="warning" loading={dsrQuery.isLoading} />
         <MetricCard
           title="Trip Expenses"
           value={formatCurrency(totalExpensesPkr)}
@@ -139,6 +146,8 @@ export default function DailySalesReportPage() {
       </div>
 
       <FilterToolbar
+        onRefresh={handleRefresh}
+        isRefreshing={dsrQuery.isFetching}
         onResetFilters={() => {
           setDate(today);
           setSalesmanId('');
@@ -146,16 +155,16 @@ export default function DailySalesReportPage() {
       >
         <input
           type="date"
-          aria-label="DSR Date"
+          aria-label="Report Date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs font-mono"
+          className="w-full md:w-auto min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs font-mono"
         />
         <select
-          aria-label="Filter by Salesman"
+          aria-label="Filter by Staff Member"
           value={salesmanId}
           onChange={(e) => setSalesmanId(e.target.value)}
-          className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs sm:text-sm"
+          className="w-full md:w-auto min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs sm:text-sm"
         >
           <option value="">All Staff (Salesmen &amp; Bookers)</option>
           {(staffQuery.data || []).map((emp) => (

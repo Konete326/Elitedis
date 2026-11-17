@@ -78,20 +78,31 @@ export default function PosPortalPage() {
     });
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([
+      catalogQuery.refetch(),
+      customersQuery.refetch(),
+      ...(tab === 'history' ? [historyQuery.refetch()] : []),
+    ]);
+    addToast({ type: 'success', message: 'POS counter refreshed.' });
+  };
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Point of Sale (POS Store)"
-        subtitle="Walk-in retail and registered wholesale counter checkout with instant receipts"
+        title="POS Store Counter"
+        subtitle="Fast retail and wholesale counter billing with instant receipt printing"
+        onRefresh={handleRefresh}
+        isRefreshing={catalogQuery.isFetching || customersQuery.isFetching || historyQuery.isFetching}
         tabs={[
-          { id: 'counter', label: 'POS Checkout', active: tab === 'counter', onClick: () => setTab('counter') },
-          { id: 'history', label: 'POS History & Daily Profit', active: tab === 'history', onClick: () => setTab('history') },
+          { id: 'counter', label: 'Counter Billing', active: tab === 'counter', onClick: () => setTab('counter') },
+          { id: 'history', label: 'Sales History & Profit', active: tab === 'history', onClick: () => setTab('history') },
         ]}
       />
 
       {tab === 'counter' ? (
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3 overflow-hidden">
-          <div className="lg:col-span-2 flex flex-col rounded-xl border bg-[var(--bg-surface)] overflow-hidden min-h-0">
+        <div className="lg:flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-3 lg:overflow-hidden">
+          <div className="lg:col-span-2 flex flex-col rounded-xl border bg-[var(--bg-surface)] lg:overflow-hidden lg:min-h-0">
             <div className="shrink-0 p-3 border-b bg-[var(--bg-elevated)] flex flex-wrap gap-2 items-center">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -99,20 +110,20 @@ export default function PosPortalPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Scan barcode or search SKU / product..."
-                  className="w-full h-9 pl-9 pr-3 rounded-lg border bg-[var(--bg-surface)] text-sm"
+                  className="w-full min-h-[40px] sm:h-9 pl-9 pr-3 rounded-lg border bg-[var(--bg-surface)] text-sm"
                 />
               </div>
               <select
                 value={invoiceMode}
                 onChange={(e) => setInvoiceMode(e.target.value)}
-                className="h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold"
+                className="min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] text-xs font-semibold"
               >
                 <option value="POS_RETAIL">Retail Mode</option>
                 <option value="POS_WHOLESALE">Wholesale Mode</option>
               </select>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
+            <div className="max-h-[46vh] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
               {(catalogQuery.data || []).map((prod) => {
                 const rate =
                   invoiceMode === 'POS_WHOLESALE'
@@ -138,14 +149,14 @@ export default function PosPortalPage() {
             </div>
           </div>
 
-          <div className="flex flex-col rounded-xl border bg-[var(--bg-surface)] overflow-hidden min-h-0">
+          <div className="flex flex-col rounded-xl border bg-[var(--bg-surface)] lg:overflow-hidden lg:min-h-0">
             <div className="shrink-0 p-3 border-b bg-[var(--bg-elevated)] space-y-2">
               <select
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
+                className="w-full min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
               >
-                <option value="">Walk-in Independent Customer</option>
+                <option value="">Walk-in Customer</option>
                 {(customersQuery.data || []).map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.shopName}
@@ -156,13 +167,13 @@ export default function PosPortalPage() {
                 <input
                   value={walkInCustomerName}
                   onChange={(e) => setWalkInCustomerName(e.target.value)}
-                  placeholder="Customer label"
-                  className="w-full h-8 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
+                  placeholder="Customer name"
+                  className="w-full min-h-[38px] sm:h-8 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
                 />
               )}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+            <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto p-3 space-y-2">
               {cart.length === 0 ? (
                 <div className="py-10 text-center text-xs text-[var(--text-muted)]">
                   <Store className="w-6 h-6 mx-auto mb-2 text-[var(--accent-primary)]" />
@@ -218,7 +229,7 @@ export default function PosPortalPage() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border bg-[var(--bg-surface)] divide-y">
+        <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto rounded-xl border bg-[var(--bg-surface)] divide-y">
           {(historyQuery.data || []).map((sale) => (
             <div key={sale._id} className="flex items-center justify-between px-4 py-3 text-xs">
               <div>

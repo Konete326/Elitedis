@@ -88,4 +88,26 @@ export function requireRoleOrWorkPart(roles = [], workPartKeys = []) {
   };
 }
 
-export default { requireRole, requireWorkPart, requireAny: requireRoleOrWorkPart };
+/**
+ * Enforces strict SUPER_ADMIN vs ADMIN isolation:
+ * Non-SUPER_ADMIN users may never create, edit, assign workParts, or delete a SUPER_ADMIN account.
+ */
+export function assertNotTargetingSuperAdmin(actorUser, targetRoleOrUser) {
+  const actorRole = actorUser?.primaryRole;
+  const targetRole = typeof targetRoleOrUser === 'string' ? targetRoleOrUser : targetRoleOrUser?.primaryRole;
+  if (actorRole !== 'SUPER_ADMIN' && targetRole === 'SUPER_ADMIN') {
+    throw new AppError(
+      'Forbidden: only a Super Admin can view or modify a Super Admin account.',
+      403,
+      'FORBIDDEN_SUPER_ADMIN_MUTATION'
+    );
+  }
+}
+
+export default {
+  requireRole,
+  requireWorkPart,
+  requireRoleOrWorkPart,
+  requireAny: requireRoleOrWorkPart,
+  assertNotTargetingSuperAdmin,
+};

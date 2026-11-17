@@ -56,15 +56,15 @@ export default function AttendancePage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Attendance & Leave Management"
-        subtitle="Track daily staff check-ins, absences, half-days, and leave requests"
+        title="Staff Attendance &amp; Leave"
+        subtitle="Track daily staff check-ins, absences, half-days, and leave entries"
         actions={
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Record Attendance</span>
@@ -73,7 +73,11 @@ export default function AttendancePage() {
       />
 
       <FilterToolbar
+        viewMode={table.viewMode}
+        onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'attendanceStatus',
@@ -89,12 +93,13 @@ export default function AttendancePage() {
         columns={columns}
         data={table.rows}
         loading={table.isLoading}
+        viewMode={table.viewMode}
         pagination={table.pagination}
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={UserCheck}
-        emptyTitle="No attendance entries yet"
-        emptyDescription="Record daily attendance or leave entries for your staff."
+        emptyTitle="No attendance records yet"
+        emptyDescription="Record daily attendance or leave entries for your team members."
         emptyActionLabel="Record Attendance"
         onEmptyAction={() => setModalOpen(true)}
       />

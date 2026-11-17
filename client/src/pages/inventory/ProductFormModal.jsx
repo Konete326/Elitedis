@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { FormModal } from '../../components/global';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import ProductUnitPanels from './ProductUnitPanels';
+import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyProduct() {
   return {
@@ -39,11 +41,64 @@ export function buildEmptyProduct() {
   };
 }
 
+export function computeBaseWeightKg(baseUnit) {
+  const val = Number(baseUnit?.weightValue) || 0;
+  const isSmall = baseUnit?.weightUnit === 'g' || baseUnit?.weightUnit === 'ml';
+  return Number((isSmall ? val / 1000 : val).toFixed(4));
+}
+
+export function computePackingMath(baseWeightKg, pack0) {
+  const conv = Math.max(1, Number(pack0?.conversionQty) || 1);
+  const w = Number(pack0?.dimensions?.width) || 0;
+  const l = Number(pack0?.dimensions?.length) || 0;
+  const h = Number(pack0?.dimensions?.height) || 0;
+  return {
+    packingWeightKg: Number((baseWeightKg * conv).toFixed(4)),
+    areaSq: Number((w * l).toFixed(3)),
+    volumeCubic: Number((w * l * h).toFixed(3)),
+  };
+}
+
+export function buildProductPayload(form, baseWeightKg, pack0, packingMath) {
+  return {
+    ...form,
+    subCategoryId: form.subCategoryId || null,
+    baseUnit: {
+      ...form.baseUnit,
+      weightValue: Number(form.baseUnit.weightValue) || 0,
+      weightInKg: baseWeightKg,
+      traderPurchaseRate: Number(form.baseUnit.traderPurchaseRate) || 0,
+      wholesaleSaleRate: Number(form.baseUnit.wholesaleSaleRate) || 0,
+      posRetailEndRate: Number(form.baseUnit.posRetailEndRate) || 0,
+    },
+    packingUnits: [
+      {
+        ...pack0,
+        conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
+        packingWeightKg: packingMath.packingWeightKg,
+        traderPurchaseRate: Number(pack0.traderPurchaseRate) || 0,
+        wholesaleSaleRate: Number(pack0.wholesaleSaleRate) || 0,
+        posRetailEndRate: Number(pack0.posRetailEndRate) || 0,
+        dimensions: {
+          ...(pack0.dimensions || {}),
+          width: Number(pack0.dimensions?.width) || 0,
+          length: Number(pack0.dimensions?.length) || 0,
+          height: Number(pack0.dimensions?.height) || 0,
+          areaSq: packingMath.areaSq,
+          volumeCubic: packingMath.volumeCubic,
+        },
+      },
+    ],
+  };
+}
+
 export default function ProductFormModal({
   isOpen,
   onClose,
   initialValue,
   isEditing,
+  existingCount = 0,
+  existingCodes = [],
   companies = [],
   brands = [],
   categories = [],
@@ -52,25 +107,15 @@ export default function ProductFormModal({
   isSubmitting,
 }) {
   const [form, setForm] = useState(() => initialValue || buildEmptyProduct());
+  const [touched, setTouched] = useState({});
 
-  const baseWeightKg = useMemo(() => {
-    const val = Number(form.baseUnit?.weightValue) || 0;
-    const isSmall = form.baseUnit?.weightUnit === 'g' || form.baseUnit?.weightUnit === 'ml';
-    return Number((isSmall ? val / 1000 : val).toFixed(4));
-  }, [form.baseUnit?.weightValue, form.baseUnit?.weightUnit]);
+  const skuError = touched.skuCode ? validateField('sku', form.skuCode, { required: true, label: 'SKU Code' }) : '';
+  const nameError = touched.productName ? validateField('required', form.productName, { required: true, minLength: 2, label: 'Product Name' }) : '';
+  const barcodeError = touched.barcode ? validateField('barcode', form.barcode, { label: 'Barcode' }) : '';
 
+  const baseWeightKg = useMemo(() => computeBaseWeightKg(form.baseUnit), [form.baseUnit]);
   const pack0 = form.packingUnits?.[0] || buildEmptyProduct().packingUnits[0];
-  const packingMath = useMemo(() => {
-    const conv = Math.max(1, Number(pack0.conversionQty) || 1);
-    const w = Number(pack0.dimensions?.width) || 0;
-    const l = Number(pack0.dimensions?.length) || 0;
-    const h = Number(pack0.dimensions?.height) || 0;
-    return {
-      packingWeightKg: Number((baseWeightKg * conv).toFixed(4)),
-      areaSq: Number((w * l).toFixed(3)),
-      volumeCubic: Number((w * l * h).toFixed(3)),
-    };
-  }, [baseWeightKg, pack0]);
+  const packingMath = useMemo(() => computePackingMath(baseWeightKg, pack0), [baseWeightKg, pack0]);
 
   const filteredBrands = useMemo(
     () =>
@@ -95,38 +140,37 @@ export default function ProductFormModal({
   const updatePackDim = (key, val) =>
     setForm((p) => ({ ...p, packingUnits: [{ ...pack0, dimensions: { ...(pack0.dimensions || {}), [key]: val } }] }));
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave({
-      ...form,
-      subCategoryId: form.subCategoryId || null,
+  const applySuggestedRates = (rates) => {
+    setForm((p) => ({
+      ...p,
       baseUnit: {
-        ...form.baseUnit,
-        weightValue: Number(form.baseUnit.weightValue) || 0,
-        weightInKg: baseWeightKg,
-        traderPurchaseRate: Number(form.baseUnit.traderPurchaseRate) || 0,
-        wholesaleSaleRate: Number(form.baseUnit.wholesaleSaleRate) || 0,
-        posRetailEndRate: Number(form.baseUnit.posRetailEndRate) || 0,
+        ...p.baseUnit,
+        traderPurchaseRate: rates.basePurchaseRate,
+        wholesaleSaleRate: rates.baseWholesaleRate,
+        posRetailEndRate: rates.baseRetailRate,
       },
       packingUnits: [
         {
           ...pack0,
-          conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
-          packingWeightKg: packingMath.packingWeightKg,
-          traderPurchaseRate: Number(pack0.traderPurchaseRate) || 0,
-          wholesaleSaleRate: Number(pack0.wholesaleSaleRate) || 0,
-          posRetailEndRate: Number(pack0.posRetailEndRate) || 0,
-          dimensions: {
-            ...(pack0.dimensions || {}),
-            width: Number(pack0.dimensions?.width) || 0,
-            length: Number(pack0.dimensions?.length) || 0,
-            height: Number(pack0.dimensions?.height) || 0,
-            areaSq: packingMath.areaSq,
-            volumeCubic: packingMath.volumeCubic,
-          },
+          traderPurchaseRate: rates.packPurchaseRate,
+          wholesaleSaleRate: rates.packWholesaleRate,
+          posRetailEndRate: rates.packRetailRate,
         },
       ],
-    });
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setTouched({ skuCode: true, productName: true, barcode: true });
+    if (
+      validateField('sku', form.skuCode, { required: true, label: 'SKU Code' }) ||
+      validateField('required', form.productName, { required: true, minLength: 2, label: 'Product Name' }) ||
+      validateField('barcode', form.barcode, { label: 'Barcode' })
+    ) {
+      return;
+    }
+    onSave(buildProductPayload(form, baseWeightKg, pack0, packingMath));
   };
 
   return (
@@ -140,18 +184,60 @@ export default function ProductFormModal({
       isSubmitting={isSubmitting}
     >
       <div className="space-y-5">
+        {(companies.length === 0 || brands.length === 0 || categories.length === 0) && (
+          <SetupGuideBanner
+            missingMessage="Products require a Company, Brand, and Category before saving."
+            steps={[
+              { label: 'Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+              { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+              { label: 'Category', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
+            ]}
+          />
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">SKU Code</label>
-            <input required value={form.skuCode} onChange={(e) => setForm((p) => ({ ...p, skuCode: e.target.value.toUpperCase() }))} placeholder="SDH-10" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">SKU Code</label>
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, skuCode: suggestCode('SKU', existingCount, existingCodes) }))}
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
+            <input
+              required
+              value={form.skuCode}
+              onChange={(e) => setForm((p) => ({ ...p, skuCode: e.target.value.toUpperCase() }))}
+              onBlur={() => setTouched((p) => ({ ...p, skuCode: true }))}
+              placeholder="SKU-001"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${skuError ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {skuError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{skuError}</p>}
           </div>
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product Name</label>
-            <input required value={form.productName} onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))} placeholder="SURAJ Double Horse Rs10" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
+            <input
+              required
+              value={form.productName}
+              onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, productName: true }))}
+              placeholder="SURAJ Double Horse Rs10"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode</label>
-            <input value={form.barcode} onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono" />
+            <input
+              value={form.barcode}
+              onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, barcode: true }))}
+              placeholder="8964000123456"
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${barcodeError ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {barcodeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{barcodeError}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company</label>
@@ -214,6 +300,7 @@ export default function ProductFormModal({
           updateBase={updateBase}
           updatePack0={updatePack0}
           updatePackDim={updatePackDim}
+          onApplyRates={applySuggestedRates}
           isSubmitting={isSubmitting}
         />
       </div>

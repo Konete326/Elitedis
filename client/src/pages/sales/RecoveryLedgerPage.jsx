@@ -79,18 +79,18 @@ export default function RecoveryLedgerPage() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Recovery & Payment Ledger"
-        subtitle="Cash, JazzCash / EasyPaisa online transfers, cheques, and customer returns"
+        title="Customer Payment Collections"
+        subtitle="Track cash, JazzCash / EasyPaisa online transfers, cheques, and shop payments"
         actions={
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
-            <span>Record Collection</span>
+            <span>Record Payment</span>
           </button>
         }
       />
@@ -102,22 +102,24 @@ export default function RecoveryLedgerPage() {
           value={formatCurrency(table.rows.reduce((s, r) => s + (r.amountPkr || 0), 0))}
           status="success"
         />
-        <MetricCard title="Pending Verification" value={table.rows.filter((r) => r.status === 'PENDING_VERIFICATION').length} status="warning" />
-        <MetricCard title="Cheque Collections" value={table.rows.filter((r) => r.paymentMode === 'CHEQUE').length} status="info" />
+        <MetricCard title="Waiting Approval" value={table.rows.filter((r) => r.status === 'PENDING_VERIFICATION').length} status="warning" />
+        <MetricCard title="Cheque Receipts" value={table.rows.filter((r) => r.paymentMode === 'CHEQUE').length} status="info" />
       </div>
 
       <FilterToolbar
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search recovery code..."
+        searchPlaceholder="Search by receipt code..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'paymentMode',
-            label: 'Mode',
+            label: 'Payment Mode',
             value: table.filters.paymentMode,
             onChange: (val) => table.setFilter('paymentMode', val),
             options: ['CASH', 'ONLINE', 'CHEQUE', 'MIXED'],
@@ -140,9 +142,9 @@ export default function RecoveryLedgerPage() {
         pagination={table.pagination}
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
-        emptyTitle="No recovery collections recorded"
-        emptyDescription="Record Cash, Online, or Cheque customer collections here."
-        emptyActionLabel="Record Collection"
+        emptyTitle="No payment collections yet"
+        emptyDescription="Record Cash, Online, or Cheque payments received from customers here."
+        emptyActionLabel="Record Payment"
         onEmptyAction={() => setModalOpen(true)}
       />
 

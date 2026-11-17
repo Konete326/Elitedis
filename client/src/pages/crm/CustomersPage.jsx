@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CreditCard, Edit, Plus, Printer, Trash2, Users } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
@@ -12,9 +12,11 @@ import {
   SmartDataTable,
 } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import CustomerFormModal, { buildEmptyCustomer } from './CustomerFormModal';
-import { formatCurrency } from '../../utils/formatters';
+import { extractListPayload, formatCurrency } from '../../utils/formatters';
+import { suggestCode } from '../../utils/validation';
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -26,9 +28,22 @@ export default function CustomersPage() {
     initialFilters: { customerType: '', paymentCondition: '', status: '' },
   });
 
+  const areasCheck = useQuery({
+    queryKey: ['prereq-areas'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/areas', { params: { limit: 1 } })),
+  });
+  const routesCheck = useQuery({
+    queryKey: ['prereq-routes'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/routes', { params: { limit: 1 } })),
+  });
+
   const [modalState, setModalState] = useState({ open: false, initial: null, editingId: null, key: 0 });
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [idCardTarget, setIdCardTarget] = useState(null);
+
+  const prereqReady = !areasCheck.isLoading && !routesCheck.isLoading;
+  const hasAreas = (areasCheck.data?.pagination?.totalRecords || areasCheck.data?.data?.length || 0) > 0;
+  const hasRoutes = (routesCheck.data?.pagination?.totalRecords || routesCheck.data?.data?.length || 0) > 0;
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -72,7 +87,17 @@ export default function CustomersPage() {
   });
 
   const openCreate = () => {
-    setModalState((p) => ({ open: true, initial: buildEmptyCustomer(), editingId: null, key: p.key + 1 }));
+    const suggested = suggestCode(
+      'CUST',
+      table.pagination.totalRecords,
+      table.rows.map((r) => r.customerCode)
+    );
+    setModalState((p) => ({
+      open: true,
+      initial: buildEmptyCustomer(suggested),
+      editingId: null,
+      key: p.key + 1,
+    }));
   };
 
   const openEdit = (row) => {
@@ -123,21 +148,30 @@ export default function CustomersPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Customer Master (CRM)"
-        subtitle="Wholesalers, retailers, 7-level geo addresses, Pehchan landmarks, and credit terms"
+        title="Customer Shops (CRM)"
+        subtitle="Manage wholesalers, retailers, area landmarks (Pehchan), and credit limits"
         actions={
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add Customer</span>
           </button>
         }
       />
+
+      {prereqReady && (
+        <SetupGuideBanner
+          missingMessage="Add your market Areas and Routes first so you can assign customer shops to delivery routes cleanly."
+          steps={[
+            { label: 'Create Areas & Routes', done: hasAreas && hasRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas & Routes' },
+          ]}
+        />
+      )}
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Customers" value={table.pagination.totalRecords} icon={Users} status="primary" />
@@ -152,14 +186,14 @@ export default function CustomersPage() {
           value={formatCurrency(table.rows.reduce((s, c) => s + (c.financialTerms?.outstandingBalancePkr || 0), 0))}
           status="warning"
         />
-        <MetricCard title="Blocked Accounts" value={table.rows.filter((c) => c.status === 'BLOCKED').length} status="danger" />
+        <MetricCard title="Blocked Shops" value={table.rows.filter((c) => c.status === 'BLOCKED').length} status="danger" />
       </div>
 
       <FilterToolbar
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search shop, owner, contact, Pehchan..."
+        searchPlaceholder="Search shop, owner, phone, or landmark..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         columns={columns}
@@ -167,6 +201,8 @@ export default function CustomersPage() {
         onToggleColumn={(k) => table.toggleColumn(k, columns)}
         onResetColumns={table.resetColumns}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         selectedCount={table.selectedKeys.length}
         filters={[
           {
@@ -246,6 +282,8 @@ export default function CustomersPage() {
           onClose={() => setModalState((p) => ({ ...p, open: false }))}
           initialValue={modalState.initial}
           isEditing={Boolean(modalState.editingId)}
+          existingCount={table.pagination.totalRecords}
+          existingCodes={table.rows.map((r) => r.customerCode)}
           onSave={(payload) => saveMutation.mutate(payload)}
           isSubmitting={saveMutation.isPending}
         />

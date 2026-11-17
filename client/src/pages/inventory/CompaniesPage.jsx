@@ -102,12 +102,12 @@ export default function CompaniesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Companies & Suppliers Master"
         subtitle="Manufacturers, importers, contacts, and payment accounts"
         actions={
-          <button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold theme-transition">
+          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold theme-transition">
             <Plus className="w-4 h-4" />
             <span>Add Company</span>
           </button>
@@ -133,6 +133,8 @@ export default function CompaniesPage() {
         onToggleColumn={(k) => table.toggleColumn(k, columns)}
         onResetColumns={table.resetColumns}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           { key: 'status', label: 'Status', value: table.filters.status, onChange: (val) => table.setFilter('status', val), options: ['ACTIVE', 'INACTIVE'] },
           { key: 'businessType', label: 'Type', value: table.filters.businessType, onChange: (val) => table.setFilter('businessType', val), options: ['MANUFACTURER', 'IMPORTER', 'DISTRIBUTOR', 'SUPPLIER'] },
@@ -178,6 +180,8 @@ export default function CompaniesPage() {
           onClose={() => setModalState((p) => ({ ...p, open: false }))}
           initialValue={modalState.initial}
           isEditing={Boolean(modalState.editingId)}
+          existingCount={table.pagination.totalRecords}
+          existingCodes={table.rows.map((r) => r.companyCode)}
           onSave={(payload) => saveMutation.mutate(payload)}
           isSubmitting={saveMutation.isPending}
         />

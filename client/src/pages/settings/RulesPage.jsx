@@ -73,6 +73,10 @@ export default function RulesPage() {
       addToast({ type: 'success', message: 'Rule deleted.' });
       setDeleteTarget(null);
     },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not delete rule.' });
+      setDeleteTarget(null);
+    },
   });
 
   const columns = [
@@ -91,10 +95,10 @@ export default function RulesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Master Commercial Rules Engine"
-        subtitle="Configure Product-level & Grand-level taxes, discounts, charges, and free schemes"
+        title="Discount, Tax &amp; Offer Rules"
+        subtitle="Set up automatic item and whole-bill taxes, discounts, extra charges, and free item offers"
         tabs={CATEGORIES.map((c) => ({
           id: c.id,
           label: c.label,
@@ -112,7 +116,7 @@ export default function RulesPage() {
               });
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add {activeCat.label.slice(0, -1)}</span>
@@ -124,17 +128,22 @@ export default function RulesPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search rule name..."
+        searchPlaceholder="Search by rule name..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'level',
-            label: 'Level',
+            label: 'Applies To',
             value: table.filters.level,
             onChange: (val) => table.setFilter('level', val),
-            options: ['PRODUCT_LEVEL', 'GRAND_LEVEL'],
+            options: [
+              { value: 'PRODUCT_LEVEL', label: 'Per Product' },
+              { value: 'GRAND_LEVEL', label: 'Whole Bill' },
+            ],
           },
           {
             key: 'status',
@@ -155,8 +164,8 @@ export default function RulesPage() {
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={SlidersHorizontal}
-        emptyTitle={`No ${activeCat.label.toLowerCase()} configured`}
-        emptyDescription="Create rules to automate level-1 item and level-2 grand invoice math."
+        emptyTitle={`No ${activeCat.label.toLowerCase()} added yet`}
+        emptyDescription="Create rules to apply discounts, charges, tax, or free bonus products automatically on orders."
         emptyActionLabel="Create Rule"
         onEmptyAction={() => {
           setEditingId(null);

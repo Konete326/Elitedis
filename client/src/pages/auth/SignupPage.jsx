@@ -4,6 +4,7 @@ import { AlertCircle, Building2, Eye, EyeOff, Lock, Mail, Moon, Phone, Sun, User
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useShell } from '../../context/ShellContext';
+import { validateField } from '../../utils/validation';
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -37,14 +38,22 @@ export default function SignupPage() {
     setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
+  const rawErrors = {
+    fullName: validateField('required', form.fullName, { required: true, minLength: 2, label: 'Full name' }),
+    distributorName: validateField('required', form.distributorName, { required: true, minLength: 2, label: 'Agency name' }),
+    email: validateField('email', form.email, { required: true, label: 'Email address' }),
+    phone: validateField('phone', form.phone, { required: true, label: 'Contact number' }),
+    password: validateField('password', form.password, { required: true, minLength: 8, label: 'Password' }),
+    confirmPassword: form.confirmPassword !== form.password ? 'Passwords do not match.' : '',
+  };
+
   const errors = {
-    fullName: (touched.fullName || submitted) && form.fullName.trim().length < 2,
-    distributorName: (touched.distributorName || submitted) && form.distributorName.trim().length < 2,
-    email: (touched.email || submitted) && (!form.email.trim() || !form.email.includes('@')),
-    phone: (touched.phone || submitted) && form.phone.trim().length < 7,
-    password: (touched.password || submitted) && form.password.length < 8,
-    confirmPassword:
-      (touched.confirmPassword || submitted) && form.confirmPassword !== form.password,
+    fullName: (touched.fullName || submitted) ? rawErrors.fullName : '',
+    distributorName: (touched.distributorName || submitted) ? rawErrors.distributorName : '',
+    email: (touched.email || submitted) ? rawErrors.email : '',
+    phone: (touched.phone || submitted) ? rawErrors.phone : '',
+    password: (touched.password || submitted) ? rawErrors.password : '',
+    confirmPassword: (touched.confirmPassword || submitted) ? rawErrors.confirmPassword : '',
   };
 
   async function handleSubmit(event) {
@@ -52,14 +61,7 @@ export default function SignupPage() {
     setSubmitted(true);
     setServerError('');
 
-    const hasError =
-      form.fullName.trim().length < 2 ||
-      form.distributorName.trim().length < 2 ||
-      !form.email.includes('@') ||
-      form.phone.trim().length < 7 ||
-      form.password.length < 8 ||
-      form.confirmPassword !== form.password;
-
+    const hasError = Object.values(rawErrors).some(Boolean);
     if (hasError) return;
 
     setIsSubmitting(true);
@@ -143,7 +145,7 @@ export default function SignupPage() {
                 value={form.fullName}
                 onChange={(e) => updateField('fullName', e.target.value)}
                 onBlur={() => markTouched('fullName')}
-                aria-invalid={errors.fullName}
+                aria-invalid={Boolean(errors.fullName)}
                 placeholder="Iftikhar Ahmed"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.fullName ? 'border-[var(--status-danger)]' : ''
@@ -151,7 +153,7 @@ export default function SignupPage() {
               />
             </div>
             {errors.fullName && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Enter your full name.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.fullName}</p>
             )}
           </div>
 
@@ -167,7 +169,7 @@ export default function SignupPage() {
                 value={form.distributorName}
                 onChange={(e) => updateField('distributorName', e.target.value)}
                 onBlur={() => markTouched('distributorName')}
-                aria-invalid={errors.distributorName}
+                aria-invalid={Boolean(errors.distributorName)}
                 placeholder="Al-Rehman Traders Karachi"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.distributorName ? 'border-[var(--status-danger)]' : ''
@@ -175,7 +177,7 @@ export default function SignupPage() {
               />
             </div>
             {errors.distributorName && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Enter your agency name.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.distributorName}</p>
             )}
           </div>
 
@@ -191,7 +193,7 @@ export default function SignupPage() {
                 value={form.email}
                 onChange={(e) => updateField('email', e.target.value)}
                 onBlur={() => markTouched('email')}
-                aria-invalid={errors.email}
+                aria-invalid={Boolean(errors.email)}
                 placeholder="owner@agency.com"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.email ? 'border-[var(--status-danger)]' : ''
@@ -199,7 +201,7 @@ export default function SignupPage() {
               />
             </div>
             {errors.email && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Enter a valid email.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.email}</p>
             )}
           </div>
 
@@ -215,7 +217,7 @@ export default function SignupPage() {
                 value={form.phone}
                 onChange={(e) => updateField('phone', e.target.value)}
                 onBlur={() => markTouched('phone')}
-                aria-invalid={errors.phone}
+                aria-invalid={Boolean(errors.phone)}
                 placeholder="03001234567"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-3 py-2.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.phone ? 'border-[var(--status-danger)]' : ''
@@ -223,7 +225,7 @@ export default function SignupPage() {
               />
             </div>
             {errors.phone && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Enter a valid phone number.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.phone}</p>
             )}
           </div>
 
@@ -239,7 +241,7 @@ export default function SignupPage() {
                 value={form.password}
                 onChange={(e) => updateField('password', e.target.value)}
                 onBlur={() => markTouched('password')}
-                aria-invalid={errors.password}
+                aria-invalid={Boolean(errors.password)}
                 placeholder="Min 8 characters"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.password ? 'border-[var(--status-danger)]' : ''
@@ -255,7 +257,7 @@ export default function SignupPage() {
               </button>
             </div>
             {errors.password && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Minimum 8 characters required.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.password}</p>
             )}
           </div>
 
@@ -271,7 +273,7 @@ export default function SignupPage() {
                 value={form.confirmPassword}
                 onChange={(e) => updateField('confirmPassword', e.target.value)}
                 onBlur={() => markTouched('confirmPassword')}
-                aria-invalid={errors.confirmPassword}
+                aria-invalid={Boolean(errors.confirmPassword)}
                 placeholder="Repeat password"
                 className={`w-full rounded-lg border bg-[var(--bg-canvas)] pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] ${
                   errors.confirmPassword ? 'border-[var(--status-danger)]' : ''
@@ -279,7 +281,7 @@ export default function SignupPage() {
               />
             </div>
             {errors.confirmPassword && (
-              <p className="mt-1 text-xs text-[var(--status-danger)]">Passwords do not match.</p>
+              <p className="mt-1 text-xs text-[var(--status-danger)]">{errors.confirmPassword}</p>
             )}
           </div>
 

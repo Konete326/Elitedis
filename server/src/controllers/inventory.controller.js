@@ -126,8 +126,19 @@ export const brandHandlers = buildResourceHandlers({
   filterKeys: ['companyId', 'brandType', 'status'],
   populate: 'companyId',
   extractPublicIds: (doc) => [doc.logo?.publicId, doc.coverImage?.publicId],
-  beforeCreate: async (payload) => {
+  beforeCreate: async (payload, req) => {
+    if (!payload.companyId) {
+      throw new AppError('Please create or select a Company first before creating a Brand.', 400, 'PREREQUISITE_COMPANY_REQUIRED');
+    }
+    if (!(await Company.exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
+      throw new AppError('Selected Company was not found. Please create a Company first.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
+    }
     if (!payload.brandCode) payload.brandCode = `BRD-${Date.now().toString().slice(-5)}`;
+  },
+  beforeUpdate: async (payload, _existing, req) => {
+    if (payload.companyId && !(await Company.exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
+      throw new AppError('Selected Company was not found. Please create a Company first.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
+    }
   },
   beforeDelete: async (doc, req) => {
     const hasProducts = await Product.exists({ distributorId: req.distributorId, brandId: doc._id });
@@ -155,7 +166,11 @@ export const categoryHandlers = buildResourceHandlers({
   filterKeys: ['companyId', 'status'],
   populate: 'companyId linkedBrandIds',
   extractPublicIds: (doc) => [doc.image?.publicId],
-  beforeCreate: async (payload) => {
+  beforeCreate: async (payload, req) => {
+    if (payload.companyId === '') payload.companyId = null;
+    if (payload.companyId && !(await Company.exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
+      throw new AppError('Selected Company was not found. Please create a Company first.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
+    }
     if (!payload.code) payload.code = `CAT-${Date.now().toString().slice(-5)}`;
   },
   beforeDelete: categoryGuard,
@@ -169,11 +184,40 @@ export const subCategoryHandlers = buildResourceHandlers({
   filterKeys: ['parentCategoryId', 'companyId', 'status'],
   populate: 'parentCategoryId companyId linkedBrandIds',
   extractPublicIds: (doc) => [doc.image?.publicId],
-  beforeCreate: async (payload) => {
+  beforeCreate: async (payload, req) => {
+    if (payload.companyId === '') payload.companyId = null;
+    if (!payload.parentCategoryId) {
+      throw new AppError('Please create and select a Parent Category first before creating a Sub-Category.', 400, 'PREREQUISITE_CATEGORY_REQUIRED');
+    }
+    if (!(await Category.exists({ _id: payload.parentCategoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
+      throw new AppError('Parent Category was not found. Please create a Category first.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
+    }
     if (!payload.code) payload.code = `SUB-${Date.now().toString().slice(-5)}`;
   },
   beforeDelete: categoryGuard,
 });
+
+async function assertProductPrerequisites(payload, req, isUpdate = false) {
+  if (payload.subCategoryId === '') payload.subCategoryId = null;
+  if (!isUpdate || payload.companyId !== undefined) {
+    if (!payload.companyId) throw new AppError('Please create a Company first before creating a Product.', 400, 'PREREQUISITE_COMPANY_REQUIRED');
+    if (!(await Company.exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
+      throw new AppError('Selected Company was not found. Please create a Company first.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
+    }
+  }
+  if (!isUpdate || payload.brandId !== undefined) {
+    if (!payload.brandId) throw new AppError('Please create a Brand first before creating a Product.', 400, 'PREREQUISITE_BRAND_REQUIRED');
+    if (!(await Brand.exists({ _id: payload.brandId, distributorId: req.distributorId }))) {
+      throw new AppError('Selected Brand was not found. Please create a Brand first.', 400, 'PREREQUISITE_BRAND_NOT_FOUND');
+    }
+  }
+  if (!isUpdate || payload.categoryId !== undefined) {
+    if (!payload.categoryId) throw new AppError('Please create a Category first before creating a Product.', 400, 'PREREQUISITE_CATEGORY_REQUIRED');
+    if (!(await Category.exists({ _id: payload.categoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
+      throw new AppError('Selected Category was not found. Please create a Category first.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
+    }
+  }
+}
 
 export const productHandlers = buildResourceHandlers({
   Model: Product,
@@ -185,8 +229,12 @@ export const productHandlers = buildResourceHandlers({
     doc.baseUnit?.image?.publicId,
     ...(doc.packingUnits || []).map((u) => u.image?.publicId),
   ],
-  beforeCreate: async (payload) => {
+  beforeCreate: async (payload, req) => {
+    await assertProductPrerequisites(payload, req, false);
     if (!payload.skuCode) payload.skuCode = `SKU-${Date.now().toString().slice(-6)}`;
+  },
+  beforeUpdate: async (payload, _existing, req) => {
+    await assertProductPrerequisites(payload, req, true);
   },
   beforeDelete: async (doc, req) => {
     const hasStock = await StockBatch.exists({

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FormModal, ImageDropzone } from '../../components/global';
+import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyCompany() {
   return {
@@ -22,8 +23,21 @@ export function buildEmptyCompany() {
   };
 }
 
-export default function CompanyFormModal({ isOpen, onClose, initialValue, isEditing, onSave, isSubmitting }) {
+export default function CompanyFormModal({
+  isOpen,
+  onClose,
+  initialValue,
+  isEditing,
+  existingCount = 0,
+  existingCodes = [],
+  onSave,
+  isSubmitting,
+}) {
   const [form, setForm] = useState(() => initialValue || buildEmptyCompany());
+  const [touched, setTouched] = useState({});
+
+  const codeError = touched.companyCode ? validateField('code', form.companyCode, { required: true, label: 'Company Code' }) : '';
+  const nameError = touched.companyName ? validateField('required', form.companyName, { required: true, minLength: 2, label: 'Company Name' }) : '';
 
   const updateSubRow = (field, index, key, value) => {
     setForm((prev) => ({
@@ -48,6 +62,13 @@ export default function CompanyFormModal({ isOpen, onClose, initialValue, isEdit
       size="xl"
       onSubmit={(e) => {
         e.preventDefault();
+        setTouched({ companyCode: true, companyName: true });
+        if (
+          validateField('code', form.companyCode, { required: true, label: 'Company Code' }) ||
+          validateField('required', form.companyName, { required: true, minLength: 2, label: 'Company Name' })
+        ) {
+          return;
+        }
         onSave(form);
       }}
       isSubmitting={isSubmitting}
@@ -56,12 +77,39 @@ export default function CompanyFormModal({ isOpen, onClose, initialValue, isEdit
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company Code</label>
-              <input required value={form.companyCode} onChange={(e) => setForm((p) => ({ ...p, companyCode: e.target.value.toUpperCase() }))} placeholder="GC-04523" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono" />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Company Code</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((p) => ({ ...p, companyCode: suggestCode('COMP', existingCount, existingCodes) }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
+              <input
+                required
+                value={form.companyCode}
+                onChange={(e) => setForm((p) => ({ ...p, companyCode: e.target.value.toUpperCase() }))}
+                onBlur={() => setTouched((p) => ({ ...p, companyCode: true }))}
+                placeholder="COMP-001"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${codeError ? 'border-[var(--status-danger)]' : ''}`}
+              />
+              {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company Name</label>
-              <input required value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} placeholder="GREEN CHEMICALS" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
+              <input
+                required
+                value={form.companyName}
+                onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, companyName: true }))}
+                placeholder="Green Chemicals"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
+              />
+              {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name</label>

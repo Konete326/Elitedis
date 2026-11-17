@@ -83,14 +83,14 @@ export function ConfirmModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-overlay)] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
       onClick={() => !busy && handleClose?.()}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden transition-colors duration-200"
+        className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden transition-colors duration-200 animate-scale-in"
       >
-        <div className="flex items-start gap-3 p-5">
+        <div className="flex items-start gap-3 p-4 sm:p-5">
           <div
             className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${style.iconBg}`}
           >
@@ -115,19 +115,19 @@ export function ConfirmModal({
             disabled={busy}
             onClick={() => handleClose?.()}
             aria-label="Close confirmation dialog"
-            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:opacity-40"
+            className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:opacity-40"
           >
             <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-3.5 bg-[var(--bg-elevated)]/60 border-t border-[var(--border-subtle)]">
+        <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 px-4 sm:px-5 py-3.5 bg-[var(--bg-elevated)]/60 border-t border-[var(--border-subtle)]">
           {secondaryAction && (
             <button
               type="button"
               disabled={busy}
               onClick={secondaryAction.onClick}
-              className="mr-auto min-h-[40px] px-3.5 py-2 rounded-lg border border-[var(--accent-primary)]/40 bg-[var(--accent-soft)] text-[var(--accent-primary)] text-xs sm:text-sm font-semibold hover:opacity-90 transition"
+              className="w-full sm:w-auto sm:mr-auto min-h-[44px] sm:min-h-[40px] px-3.5 py-2 rounded-lg border border-[var(--accent-primary)]/40 bg-[var(--accent-soft)] text-[var(--accent-primary)] text-xs sm:text-sm font-semibold hover:opacity-90 transition"
             >
               {secondaryAction.label}
             </button>
@@ -136,7 +136,7 @@ export function ConfirmModal({
             type="button"
             disabled={busy}
             onClick={() => handleClose?.()}
-            className="min-h-[40px] px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 transition"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 transition"
           >
             {cancelLabel || cancelText}
           </button>
@@ -145,7 +145,7 @@ export function ConfirmModal({
               type="button"
               disabled={busy || disableConfirm}
               onClick={onConfirm}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 ${style.button}`}
+              className={`w-full sm:w-auto min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 ${style.button}`}
             >
               {busy ? 'Processing...' : confirmLabel || confirmText}
             </button>

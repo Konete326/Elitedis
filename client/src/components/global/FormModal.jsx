@@ -12,7 +12,8 @@ const SIZE_CLASSES = {
 };
 
 /**
- * Reusable z-50 slide-over drawer or centered modal with Esc close and ShellContext scroll lock cleanup.
+ * Reusable z-50 slide-over drawer or centered modal with Esc close, smooth entrance animation,
+ * mobile-friendly sizing, and ShellContext scroll lock cleanup.
  */
 export function FormModal({
   isOpen,
@@ -60,7 +61,7 @@ export function FormModal({
 
   const content = (
     <>
-      <div className="shrink-0 flex items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <div className="shrink-0 flex items-start justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
         <div className="min-w-0">
           <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] truncate">
             {title}
@@ -92,14 +93,14 @@ export function FormModal({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => onClose?.()}
-                className="min-h-[40px] px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 transition"
+                className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[40px] px-4 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 transition"
               >
                 {cancelLabel}
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="min-h-[40px] px-5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-semibold disabled:opacity-50 transition"
+                className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[40px] px-5 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-sm font-semibold disabled:opacity-50 transition"
               >
                 {isSubmitting ? 'Saving...' : submitLabel}
               </button>
@@ -116,16 +117,16 @@ export function FormModal({
       aria-modal="true"
       aria-label={title}
       onClick={() => closeOnBackdrop && !isSubmitting && onClose?.()}
-      className={`fixed inset-0 z-50 flex bg-[var(--bg-overlay)] backdrop-blur-sm ${
-        isDrawer ? 'justify-end' : 'items-center justify-center p-3 sm:p-5'
+      className={`fixed inset-0 z-50 flex bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in ${
+        isDrawer ? 'justify-end' : 'items-center justify-center p-2.5 sm:p-5'
       }`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className={`w-full ${widthClass} flex flex-col bg-[var(--bg-surface)] border-[var(--border-subtle)] shadow-2xl overflow-hidden transition-colors duration-200 ${
           isDrawer
-            ? 'h-full border-l'
-            : 'max-h-[92dvh] rounded-2xl border'
+            ? 'h-full border-l animate-drawer-right'
+            : 'max-h-[94dvh] sm:max-h-[92dvh] rounded-2xl border animate-scale-in'
         } ${className}`}
       >
         {onSubmit ? (

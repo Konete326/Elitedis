@@ -13,8 +13,10 @@ import {
   SmartDataTable,
 } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const INITIAL_FORM = {
   brandCode: '',
@@ -48,7 +50,11 @@ export default function BrandsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const codeError = touched.brandCode ? validateField('code', form.brandCode, { required: true, label: 'Brand Code' }) : '';
+  const nameError = touched.brandName ? validateField('required', form.brandName, { required: true, minLength: 2, label: 'Brand Name' }) : '';
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -78,12 +84,14 @@ export default function BrandsPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setTouched({});
     setForm(INITIAL_FORM);
     setModalOpen(true);
   };
 
   const openEdit = (row) => {
     setEditingId(row._id);
+    setTouched({});
     setForm({
       ...INITIAL_FORM,
       ...row,
@@ -119,8 +127,10 @@ export default function BrandsPage() {
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
+  const companies = companiesQuery.data || [];
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Brands Master"
         subtitle="Manage manufacturer brands, cover visuals, and brand managers"
@@ -128,7 +138,7 @@ export default function BrandsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add Brand</span>
@@ -136,10 +146,17 @@ export default function BrandsPage() {
         }
       />
 
+      {!companiesQuery.isLoading && companies.length === 0 && (
+        <SetupGuideBanner
+          missingMessage="Create at least one Company or Supplier first so every Brand belongs to a parent manufacturer."
+          steps={[{ label: 'Create Company / Supplier', done: false, to: '/inventory/companies', actionLabel: 'Go to Companies' }]}
+        />
+      )}
+
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Brands" value={table.pagination.totalRecords} icon={Tag} status="primary" />
         <MetricCard title="Active Brands" value={table.rows.filter((b) => b.status === 'ACTIVE').length} status="success" />
-        <MetricCard title="Linked Companies" value={companiesQuery.data?.length || 0} status="info" />
+        <MetricCard title="Linked Companies" value={companies.length} status="info" />
         <MetricCard title="Inactive Brands" value={table.rows.filter((b) => b.status === 'INACTIVE').length} status="default" />
       </div>
 
@@ -151,6 +168,8 @@ export default function BrandsPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'companyId',
@@ -201,6 +220,13 @@ export default function BrandsPage() {
         size="lg"
         onSubmit={(e) => {
           e.preventDefault();
+          setTouched({ brandCode: true, brandName: true });
+          if (
+            validateField('code', form.brandCode, { required: true, label: 'Brand Code' }) ||
+            validateField('required', form.brandName, { required: true, minLength: 2, label: 'Brand Name' })
+          ) {
+            return;
+          }
           saveMutation.mutate(form);
         }}
         isSubmitting={saveMutation.isPending}
@@ -208,14 +234,30 @@ export default function BrandsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Code</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Brand Code</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      brandCode: suggestCode('BR', table.pagination.totalRecords, table.rows.map((r) => r.brandCode)),
+                    }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
               <input
                 required
                 value={form.brandCode}
                 onChange={(e) => setForm((p) => ({ ...p, brandCode: e.target.value.toUpperCase() }))}
-                placeholder="S-01"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                onBlur={() => setTouched((p) => ({ ...p, brandCode: true }))}
+                placeholder="BR-001"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${codeError ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Name</label>
@@ -223,9 +265,11 @@ export default function BrandsPage() {
                 required
                 value={form.brandName}
                 onChange={(e) => setForm((p) => ({ ...p, brandName: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, brandName: true }))}
                 placeholder="SURAJ"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Company</label>

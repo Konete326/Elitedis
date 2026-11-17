@@ -224,6 +224,29 @@ export const completeTask = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: task });
 });
 
+export const cancelTask = asyncHandler(async (req, res) => {
+  const task = await PendingTask.findOne({ _id: req.params.id, distributorId: req.distributorId });
+  if (!task) throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
+  if (!['FRESH', 'DRAFT', 'PENDING'].includes(task.status)) {
+    throw new AppError(`Cannot cancel a task that is already ${task.status}.`, 400, 'TASK_INVALID_STATE');
+  }
+
+  task.status = 'CANCELLED';
+  await task.save();
+
+  await recordAuditLog({
+    distributorId: req.distributorId,
+    actorId: req.user._id,
+    module: 'TASKS',
+    action: 'CANCEL_TASK',
+    entityModel: 'PendingTask',
+    entityId: task._id,
+    afterState: { taskCode: task.taskCode, reason: req.body?.reason || '' },
+  });
+
+  res.status(200).json({ success: true, data: task });
+});
+
 export default {
   listMyTasks,
   getTaskById,
@@ -232,4 +255,5 @@ export default {
   executePutAwayTask,
   executeStockCountTask,
   completeTask,
+  cancelTask,
 };

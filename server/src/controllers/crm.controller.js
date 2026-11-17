@@ -1,4 +1,4 @@
-import { Customer, Territory, BeatPlan, Order, SaleInvoice, Recovery } from '../models/index.js';
+import { Customer, Territory, BeatPlan, User, Order, SaleInvoice, Recovery } from '../models/index.js';
 import { destroyImage } from '../config/cloudinary.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
@@ -15,44 +15,27 @@ export const listCustomers = asyncHandler(async (req, res) => {
   if (req.query.territoryId) extra['commercialAssignments.territoryId'] = req.query.territoryId;
   if (req.query.bookerId) extra['commercialAssignments.assignedBookerIds'] = req.query.bookerId;
 
-  const filter = buildScopedFilter(
-    req,
-    extra,
-    ['customerCode', 'shopName', 'ownerName', 'ownerContact', 'locationHierarchy.pehchanRemarks'],
-    searchRegex
-  );
-
+  const filter = buildScopedFilter(req, extra, ['customerCode', 'shopName', 'ownerName', 'ownerContact', 'locationHierarchy.pehchanRemarks'], searchRegex);
   const [customers, totalRecords] = await Promise.all([
-    Customer.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
+    Customer.find(filter).sort(sort).skip(skip).limit(limit)
       .populate('commercialAssignments.assignedBookerIds', 'fullName profileId')
-      .populate('commercialAssignments.territoryId', 'territoryCode territoryName')
-      .lean(),
+      .populate('commercialAssignments.territoryId', 'territoryCode territoryName').lean(),
     Customer.countDocuments(filter),
   ]);
-
   res.status(200).json({ success: true, data: customers, pagination: buildPaginationMeta(totalRecords) });
 });
 
 export const getCustomerById = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ _id: req.params.id, distributorId: req.distributorId })
     .populate('commercialAssignments.assignedBookerIds', 'fullName profileId phone')
-    .populate('commercialAssignments.territoryId', 'territoryCode territoryName')
-    .lean();
+    .populate('commercialAssignments.territoryId', 'territoryCode territoryName').lean();
   if (!customer) throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
-
   const [recentOrders, recentInvoices, recentRecoveries] = await Promise.all([
     Order.find({ distributorId: req.distributorId, customerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean(),
     SaleInvoice.find({ distributorId: req.distributorId, customerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean(),
     Recovery.find({ distributorId: req.distributorId, customerId: customer._id }).sort({ createdAt: -1 }).limit(5).lean(),
   ]);
-
-  res.status(200).json({
-    success: true,
-    data: { ...customer, recentOrders, recentInvoices, recentRecoveries },
-  });
+  res.status(200).json({ success: true, data: { ...customer, recentOrders, recentInvoices, recentRecoveries } });
 });
 
 export const createCustomer = asyncHandler(async (req, res) => {
@@ -61,6 +44,18 @@ export const createCustomer = asyncHandler(async (req, res) => {
     distributorId: req.distributorId,
     customerCode: req.body.customerCode || `CUST-${Date.now().toString().slice(-5)}`,
   };
+  if (!payload.shopName || !payload.ownerName || !payload.ownerContact) {
+    throw new AppError('Shop Name, Owner Name, and Owner Contact are required to create a Customer.', 400, 'CUSTOMER_FIELDS_REQUIRED');
+  }
+  if (payload.locationHierarchy) {
+    if (payload.locationHierarchy.areaId === '') payload.locationHierarchy.areaId = null;
+    if (payload.locationHierarchy.routeId === '') payload.locationHierarchy.routeId = null;
+    if (payload.locationHierarchy.areaId) {
+      const areaExists = await Territory.exists({ distributorId: req.distributorId, 'areas._id': payload.locationHierarchy.areaId });
+      if (!areaExists) throw new AppError('Selected Area was not found. Please create an Area & Route first.', 400, 'PREREQUISITE_AREA_NOT_FOUND');
+    }
+  }
+  if (payload.commercialAssignments?.territoryId === '') payload.commercialAssignments.territoryId = null;
   const created = await Customer.create(payload);
   res.status(201).json({ success: true, data: created });
 });
@@ -252,14 +247,15 @@ export const addAreaToTerritory = asyncHandler(async (req, res) => {
 
 export const addRouteToArea = asyncHandler(async (req, res) => {
   const { territoryId, areaId, ...routeData } = req.body;
+  if (!areaId) throw new AppError('Please create or select an Area first before adding a Route.', 400, 'PREREQUISITE_AREA_REQUIRED');
   const territory = await Territory.findOne({
     distributorId: req.distributorId,
     ...(territoryId ? { _id: territoryId } : { 'areas._id': areaId }),
   });
-  if (!territory) throw new AppError('Parent territory/area not found.', 404, 'AREA_NOT_FOUND');
+  if (!territory) throw new AppError('Parent Area was not found. Please create an Area first in CRM Areas & Routes.', 404, 'PREREQUISITE_AREA_NOT_FOUND');
 
   const area = territory.areas.id(areaId);
-  if (!area) throw new AppError('Area not found.', 404, 'AREA_NOT_FOUND');
+  if (!area) throw new AppError('Area not found. Please create an Area first.', 404, 'PREREQUISITE_AREA_NOT_FOUND');
 
   area.routes.push({
     ...routeData,
@@ -291,6 +287,12 @@ export const listBeatPlans = asyncHandler(async (req, res) => {
 });
 
 export const createBeatPlan = asyncHandler(async (req, res) => {
+  if (!req.body.assignedBookerId) {
+    throw new AppError('Please create or select an Order Booker employee first before creating a Beat Plan.', 400, 'PREREQUISITE_BOOKER_REQUIRED');
+  }
+  if (!(await User.exists({ _id: req.body.assignedBookerId, distributorId: req.distributorId }))) {
+    throw new AppError('Assigned Order Booker was not found. Please create an employee first.', 400, 'PREREQUISITE_BOOKER_NOT_FOUND');
+  }
   const created = await BeatPlan.create({
     ...req.body,
     distributorId: req.distributorId,

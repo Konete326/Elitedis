@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Calculator, CheckCircle2, Save } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { TouchKeypadModal } from '../../components/global';
+import { ConfirmModal, TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 
@@ -16,6 +16,7 @@ export default function ExecuteTaskPage() {
 
   const [edits, setEdits] = useState({});
   const [keypadTarget, setKeypadTarget] = useState(null);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
 
   const taskQuery = useQuery({
     queryKey: ['task-detail', taskId],
@@ -68,38 +69,40 @@ export default function ExecuteTaskPage() {
     onSuccess: (_res, vars) => {
       queryClient.invalidateQueries({ queryKey: ['pending-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-detail', taskId] });
-      addToast({ type: 'success', message: vars.complete ? 'Task closed and posted.' : 'Task draft saved.' });
+      setCompleteConfirmOpen(false);
+      addToast({ type: 'success', message: vars.complete ? 'Task completed and saved.' : 'Task draft saved.' });
       if (vars.complete) navigate('/tasks/pending');
     },
     onError: (err) => {
+      setCompleteConfirmOpen(false);
       addToast({ type: 'error', message: err?.response?.data?.message || 'Task action failed.' });
     },
   });
 
   if (taskQuery.isLoading) {
-    return <div className="p-8 text-sm text-[var(--text-muted)]">Loading guided task wizard...</div>;
+    return <div className="p-8 text-sm text-[var(--text-muted)]">Loading task checklist...</div>;
   }
 
   const checklist = task?.checklistItems || [];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title={task?.title || 'Task Execution Wizard'}
-        subtitle={`Task Code: ${task?.taskCode || ''} · Type: ${task?.taskType || ''}`}
+        title={task?.title || 'Task Checklist'}
+        subtitle={`Task ID: ${task?.taskCode || ''} · Job: ${task?.taskType || ''}`}
         badge={task?.priority}
         actions={
           <>
-            <button type="button" onClick={() => navigate('/tasks/pending')} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-xs font-medium">
+            <button type="button" onClick={() => navigate('/tasks/pending')} className="inline-flex items-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border text-xs font-medium">
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Queue</span>
+              <span>Back to Queue</span>
             </button>
             <StatusBadge status={task?.status || 'FRESH'} />
           </>
         }
       />
 
-      <div className="flex-1 min-h-0 overflow-auto rounded-xl border bg-[var(--bg-surface)] p-4 space-y-2.5">
+      <div className="lg:flex-1 lg:min-h-0 lg:overflow-auto rounded-xl border bg-[var(--bg-surface)] p-4 space-y-2.5">
         {checklist.length === 0 ? (
           <div className="py-10 text-center text-sm text-[var(--text-muted)]">
             No line items on this task. You can mark it complete to close the assignment.
@@ -154,21 +157,32 @@ export default function ExecuteTaskPage() {
           type="button"
           onClick={() => commitMutation.mutate({ complete: false })}
           disabled={commitMutation.isPending}
-          className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg border text-xs font-semibold"
+          className="inline-flex items-center gap-1.5 min-h-[42px] px-4 rounded-lg border text-xs font-semibold"
         >
           <Save className="w-4 h-4" />
           <span>Save Draft</span>
         </button>
         <button
           type="button"
-          onClick={() => commitMutation.mutate({ complete: true })}
+          onClick={() => setCompleteConfirmOpen(true)}
           disabled={commitMutation.isPending}
-          className="inline-flex items-center gap-1.5 h-10 px-5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+          className="inline-flex items-center gap-1.5 min-h-[42px] px-5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
         >
           <CheckCircle2 className="w-4 h-4" />
           <span>Complete &amp; Close Task</span>
         </button>
       </div>
+
+      <ConfirmModal
+        isOpen={completeConfirmOpen}
+        onClose={() => setCompleteConfirmOpen(false)}
+        onConfirm={() => commitMutation.mutate({ complete: true })}
+        isLoading={commitMutation.isPending}
+        variant="primary"
+        title="Complete and close task?"
+        message="This will finalize verified quantities and close the task."
+        confirmLabel="Complete Task"
+      />
 
       <TouchKeypadModal
         isOpen={Boolean(keypadTarget)}

@@ -56,8 +56,11 @@ export default function TemplatesPage() {
         : apiClient.post('/rules/templates', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['print-templates'] });
-      addToast({ type: 'success', message: editingId ? 'Template updated.' : 'Template saved.' });
+      addToast({ type: 'success', message: editingId ? 'Print template updated.' : 'Print template saved.' });
       setModalOpen(false);
+    },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not save template.' });
     },
   });
 
@@ -65,7 +68,11 @@ export default function TemplatesPage() {
     mutationFn: (id) => apiClient.delete(`/rules/templates/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['print-templates'] });
-      addToast({ type: 'success', message: 'Template deleted.' });
+      addToast({ type: 'success', message: 'Print template deleted.' });
+      setDeleteTarget(null);
+    },
+    onError: (err) => {
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Could not delete template.' });
       setDeleteTarget(null);
     },
   });
@@ -80,10 +87,10 @@ export default function TemplatesPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Print Layouts & Templates"
-        subtitle="Customize Headers, Footers, Signatures, English/Urdu labels, and Invoice Notes"
+        title="Print Layouts &amp; Templates"
+        subtitle="Set up bill headers, signatures, English or Urdu labels, and receipt paper sizes"
         actions={
           <button
             type="button"
@@ -92,7 +99,7 @@ export default function TemplatesPage() {
               setForm(INITIAL_FORM);
               setModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Add Template</span>
@@ -104,8 +111,12 @@ export default function TemplatesPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search template name..."
+        searchPlaceholder="Search by template name..."
+        viewMode={table.viewMode}
+        onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'documentType',
@@ -121,12 +132,13 @@ export default function TemplatesPage() {
         columns={columns}
         data={table.rows}
         loading={table.isLoading}
+        viewMode={table.viewMode}
         pagination={table.pagination}
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={Printer}
-        emptyTitle="No custom print templates yet"
-        emptyDescription="Configure A4, Landscape, and 80mm POS thermal templates for invoices and dispatch sheets."
+        emptyTitle="No print templates added yet"
+        emptyDescription="Create A4, Landscape, and 80mm POS receipt styles for bills and dispatch sheets."
         emptyActionLabel="Create Template"
         onEmptyAction={() => {
           setEditingId(null);

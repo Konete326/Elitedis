@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../services/apiClient';
 import { useAuth } from '../context/AuthContext';
+import { useShell } from '../context/ShellContext';
 import { extractListPayload } from '../utils/formatters';
 
 export function useServerTable({
@@ -14,6 +15,7 @@ export function useServerTable({
   enabled = true,
 }) {
   const { user } = useAuth();
+  const { addToast } = useShell();
   const distributorId = user?.distributorId || 'default';
 
   const [page, setPage] = useState(1);
@@ -78,11 +80,17 @@ export function useServerTable({
     setPage(1);
   }, []);
 
-  const resetFilters = useCallback(() => {
+  const resetFilters = useCallback(async () => {
     setSearch('');
     setFilters(initialFilters);
     setPage(1);
-  }, [initialFilters]);
+    await query.refetch();
+  }, [initialFilters, query.refetch]);
+
+  const refresh = useCallback(async () => {
+    await query.refetch();
+    addToast({ type: 'info', message: 'List refreshed.' });
+  }, [query.refetch, addToast]);
 
   const handlePageSizeChange = useCallback((nextLimit) => {
     setLimit(Number(nextLimit) || defaultLimit);
@@ -119,6 +127,7 @@ export function useServerTable({
     isError: query.isError,
     error: query.error,
     refetch: query.refetch,
+    refresh,
     page,
     setPage,
     limit,

@@ -5,7 +5,7 @@ import { ArrowLeftRight, CheckCircle2, Eye, EyeOff, Plus, Printer } from 'lucide
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { formatDateTime } from '../../utils/formatters';
@@ -22,6 +22,7 @@ export default function MovementsPage() {
   });
 
   const [printTarget, setPrintTarget] = useState(null);
+  const [approveTarget, setApproveTarget] = useState(null);
 
   const approveMutation = useMutation({
     mutationFn: (id) => apiClient.patch(`/stocks/movements/${id}/approve`),
@@ -29,9 +30,11 @@ export default function MovementsPage() {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['stock-batches'] });
       addToast({ type: 'success', message: 'Stock movement approved and posted.' });
+      setApproveTarget(null);
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Approval failed.' });
+      setApproveTarget(null);
     },
   });
 
@@ -58,7 +61,7 @@ export default function MovementsPage() {
   ];
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Stock Movements Ledger"
         subtitle="Inter-warehouse transfers, same transfers, physical adjustments, purchases, and returns"
@@ -66,7 +69,7 @@ export default function MovementsPage() {
           <button
             type="button"
             onClick={() => navigate('/stock/movements/create')}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>Create Movement</span>
@@ -82,6 +85,8 @@ export default function MovementsPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'movementType',
@@ -128,7 +133,7 @@ export default function MovementsPage() {
             {row.status === 'PENDING' && (
               <button
                 type="button"
-                onClick={() => approveMutation.mutate(row._id)}
+                onClick={() => setApproveTarget(row)}
                 className="px-2.5 py-1.5 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold inline-flex items-center gap-1"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -168,6 +173,16 @@ export default function MovementsPage() {
           { key: 'lineDecision', header: 'Decision' },
         ]}
         rows={printTarget?.items || []}
+      />
+      <ConfirmModal
+        isOpen={Boolean(approveTarget)}
+        onClose={() => setApproveTarget(null)}
+        onConfirm={() => approveMutation.mutate(approveTarget._id)}
+        isLoading={approveMutation.isPending}
+        variant="primary"
+        title="Approve & Post Stock Movement?"
+        message={`Approve movement ${approveTarget?.movementCode || ''} and post stock batch updates immediately?`}
+        confirmLabel="Approve Movement"
       />
     </div>
   );

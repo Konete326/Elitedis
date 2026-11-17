@@ -42,7 +42,7 @@ export function ToastContainer() {
     <div
       aria-live="polite"
       aria-label="Notifications"
-      className="fixed bottom-4 right-4 z-60 flex flex-col gap-2 w-[calc(100vw-2rem)] max-w-sm pointer-events-none"
+      className="fixed bottom-3 right-3 left-3 sm:left-auto sm:bottom-4 sm:right-4 z-60 flex flex-col gap-2 sm:w-96 max-w-full pointer-events-none"
     >
       {toasts.map((toast) => {
         const style = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
@@ -51,7 +51,7 @@ export function ToastContainer() {
           <div
             key={toast.id}
             role="status"
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border ${style.border} bg-[var(--bg-surface)] shadow-xl transition-colors duration-200`}
+            className={`animate-slide-up pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border ${style.border} bg-[var(--bg-surface)] shadow-xl transition-colors duration-200`}
           >
             <div
               className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center ${style.badge}`}

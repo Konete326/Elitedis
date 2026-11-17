@@ -41,14 +41,21 @@ export default function SalesmanPortalPage() {
 
   const sheets = planQuery.data || [];
 
+  const handleRefresh = async () => {
+    await Promise.all([planQuery.refetch(), salesQuery.refetch()]);
+    addToast({ type: 'success', message: 'Delivery plan refreshed.' });
+  };
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="Salesman Delivery & Recovery Portal"
-        subtitle="Verify Bills, Recovery & Dispatch Stock, execute customer deals, and log trip expenses"
+        title="Salesman Delivery &amp; Recovery Portal"
+        subtitle="See your assigned delivery stops, collect shop payments, and record fuel expenses"
+        onRefresh={handleRefresh}
+        isRefreshing={planQuery.isFetching || salesQuery.isFetching}
       />
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+      <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto space-y-3">
         {sheets.length === 0 ? (
           <div className="rounded-xl border bg-[var(--bg-surface)] p-8 text-center text-sm text-[var(--text-muted)]">
             <Truck className="w-7 h-7 mx-auto mb-2 text-[var(--accent-primary)]" />

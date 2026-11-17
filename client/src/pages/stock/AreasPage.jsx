@@ -7,6 +7,7 @@ import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import AreaFormModal, { buildEmptyArea } from './AreaFormModal';
 import { extractListPayload } from '../../utils/formatters';
@@ -103,18 +104,31 @@ export default function AreasPage() {
     { key: 'allowed', header: 'Allowed SKUs', numeric: true, accessor: (r) => r.allowedProducts?.length || 0 },
   ];
 
+  const warehouses = warehousesQuery.data || [];
+  const hasAnyZone = warehouses.some((w) => (w.zones || []).length > 0);
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Floor, Rack & Storage Areas"
         subtitle="Assign allowed products (Min/Max packing limits) with zero-quantity deletion guard"
         actions={
-          <button type="button" onClick={openCreate} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
+          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
             <Plus className="w-4 h-4" />
             <span>Add Floor / Rack</span>
           </button>
         }
       />
+
+      {!warehousesQuery.isLoading && (!warehouses.length || !hasAnyZone) && (
+        <SetupGuideBanner
+          missingMessage="Set up a Warehouse and at least one Zone before creating storage Floor/Rack Areas."
+          steps={[
+            { label: 'Create Warehouse', done: warehouses.length > 0, to: '/stock/warehouses', actionLabel: 'Warehouses' },
+            { label: 'Add Zone', done: hasAnyZone, to: '/stock/zones', actionLabel: 'Zones' },
+          ]}
+        />
+      )}
 
       <FilterToolbar
         searchValue={table.search}
@@ -124,6 +138,8 @@ export default function AreasPage() {
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'warehouseId',
@@ -175,7 +191,9 @@ export default function AreasPage() {
           onClose={() => setModalState((p) => ({ ...p, open: false }))}
           initialValue={modalState.initial}
           isEditing={Boolean(modalState.editing)}
-          warehouses={warehousesQuery.data || []}
+          existingCount={table.pagination.totalRecords}
+          existingCodes={table.rows.map((r) => r.areaCode)}
+          warehouses={warehouses}
           products={productsQuery.data || []}
           onSave={(payload) => saveMutation.mutate(payload)}
           isSubmitting={saveMutation.isPending}

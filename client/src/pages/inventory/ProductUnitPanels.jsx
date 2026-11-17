@@ -1,4 +1,6 @@
+import { Calculator } from 'lucide-react';
 import { ImageDropzone } from '../../components/global';
+import { suggestTierRates } from '../../utils/validation';
 
 export default function ProductUnitPanels({
   form,
@@ -8,18 +10,43 @@ export default function ProductUnitPanels({
   updateBase,
   updatePack0,
   updatePackDim,
+  onApplyRates,
   isSubmitting,
 }) {
+  const handleAutoCalcRates = () => {
+    const conv = Math.max(1, Number(pack0.conversionQty) || 1);
+    const baseRate = Number(form.baseUnit.traderPurchaseRate) || Number(pack0.traderPurchaseRate) / conv || 0;
+    const rates = suggestTierRates(baseRate, conv);
+    if (onApplyRates) {
+      onApplyRates(rates);
+    } else {
+      updateBase('traderPurchaseRate', rates.basePurchaseRate);
+      updateBase('wholesaleSaleRate', rates.baseWholesaleRate);
+      updateBase('posRetailEndRate', rates.baseRetailRate);
+      updatePack0('traderPurchaseRate', rates.packPurchaseRate);
+    }
+  };
+
   return (
     <>
       <div className="rounded-xl border p-4 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent-primary)]">
             Base Unit &amp; 3-Tier Pricing
           </h3>
-          <span className="text-xs font-mono tabular-nums text-[var(--text-muted)]">
-            Base Weight: {baseWeightKg} Kg
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleAutoCalcRates}
+              className="inline-flex items-center gap-1 rounded-md border bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:opacity-90"
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              <span>Auto Calculate Pack Rates</span>
+            </button>
+            <span className="text-xs font-mono tabular-nums text-[var(--text-muted)]">
+              Base Weight: {baseWeightKg} Kg
+            </span>
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-2.5">

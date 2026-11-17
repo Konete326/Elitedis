@@ -69,18 +69,18 @@ export default function AccountLedgersPage() {
   };
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
-        title="General Ledger & Day Book"
-        subtitle="Double-entry journal vouchers, AR/AP entries, cash, and bank ledgers"
+        title="General Ledger &amp; Day Book"
+        subtitle="Complete record of sales, purchases, payments, expenses, and manual accounting entries"
         actions={
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold"
+            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
-            <span>New Journal Voucher</span>
+            <span>New Journal Entry</span>
           </button>
         }
       />
@@ -89,19 +89,23 @@ export default function AccountLedgersPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search voucher no or narration..."
+        searchPlaceholder="Search by voucher number or note..."
+        viewMode={table.viewMode}
+        onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         filters={[
           {
             key: 'voucherType',
-            label: 'Voucher Type',
+            label: 'Entry Type',
             value: table.filters.voucherType,
             onChange: (val) => table.setFilter('voucherType', val),
             options: ['SALE', 'PURCHASE', 'RECOVERY', 'PAYMENT', 'EXPENSE', 'STOCK_ADJUSTMENT', 'PAYROLL', 'JOURNAL'],
           },
           {
             key: 'accountCategory',
-            label: 'Category',
+            label: 'Account Group',
             value: table.filters.accountCategory,
             onChange: (val) => table.setFilter('accountCategory', val),
             options: ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'],
@@ -113,13 +117,14 @@ export default function AccountLedgersPage() {
         columns={columns}
         data={table.rows}
         loading={table.isLoading}
+        viewMode={table.viewMode}
         pagination={table.pagination}
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={Landmark}
-        emptyTitle="No journal entries posted yet"
-        emptyDescription="Balanced Debit/Credit entries post automatically from approved sales, recoveries, and payroll."
-        emptyActionLabel="Post Journal Voucher"
+        emptyTitle="No accounting entries yet"
+        emptyDescription="Debit and Credit entries appear automatically from approved sales, collections, and payroll."
+        emptyActionLabel="New Journal Entry"
         onEmptyAction={() => setModalOpen(true)}
       />
 

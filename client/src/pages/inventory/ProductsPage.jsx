@@ -12,6 +12,7 @@ import {
   SmartDataTable,
 } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import ProductFormModal, { buildEmptyProduct } from './ProductFormModal';
 import { extractListPayload, formatCurrency } from '../../utils/formatters';
@@ -26,22 +27,11 @@ export default function ProductsPage() {
     initialFilters: { companyId: '', brandId: '', categoryId: '', status: '' },
   });
 
-  const companiesQuery = useQuery({
-    queryKey: ['companies-options'],
-    queryFn: async () => extractListPayload(await apiClient.get('/inventory/companies', { params: { limit: 100 } })).data,
-  });
-  const brandsQuery = useQuery({
-    queryKey: ['brands-options'],
-    queryFn: async () => extractListPayload(await apiClient.get('/inventory/brands', { params: { limit: 100 } })).data,
-  });
-  const categoriesQuery = useQuery({
-    queryKey: ['categories-options'],
-    queryFn: async () => extractListPayload(await apiClient.get('/inventory/categories', { params: { limit: 100 } })).data,
-  });
-  const subCategoriesQuery = useQuery({
-    queryKey: ['sub-categories-options'],
-    queryFn: async () => extractListPayload(await apiClient.get('/inventory/sub-categories', { params: { limit: 100 } })).data,
-  });
+  const fetchOpts = (path) => async () => extractListPayload(await apiClient.get(path, { params: { limit: 100 } })).data;
+  const companiesQuery = useQuery({ queryKey: ['companies-options'], queryFn: fetchOpts('/inventory/companies') });
+  const brandsQuery = useQuery({ queryKey: ['brands-options'], queryFn: fetchOpts('/inventory/brands') });
+  const categoriesQuery = useQuery({ queryKey: ['categories-options'], queryFn: fetchOpts('/inventory/categories') });
+  const subCategoriesQuery = useQuery({ queryKey: ['sub-categories-options'], queryFn: fetchOpts('/inventory/sub-categories') });
 
   const [modalState, setModalState] = useState({ open: false, initial: null, editingId: null, key: 0 });
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -175,8 +165,14 @@ export default function ProductsPage() {
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
+  const companies = companiesQuery.data || [];
+  const brands = brandsQuery.data || [];
+  const categories = categoriesQuery.data || [];
+  const missingPrereqs =
+    !companiesQuery.isLoading && !brandsQuery.isLoading && !categoriesQuery.isLoading && (!companies.length || !brands.length || !categories.length);
+
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
+    <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Product Master Catalog"
         subtitle="Static SKU catalog separated from warehouse stock batches"
@@ -185,7 +181,7 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setPrintOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Rate List</span>
@@ -193,7 +189,7 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
               <span>Add Product</span>
@@ -202,10 +198,21 @@ export default function ProductsPage() {
         }
       />
 
+      {missingPrereqs && (
+        <SetupGuideBanner
+          missingMessage="Set up at least one Company, Brand, and Category before creating Products."
+          steps={[
+            { label: 'Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+            { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+            { label: 'Category', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
+          ]}
+        />
+      )}
+
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Products" value={table.pagination.totalRecords} icon={Package} status="primary" />
         <MetricCard title="Active SKUs" value={table.rows.filter((p) => p.status === 'ACTIVE').length} status="success" />
-        <MetricCard title="Brands Represented" value={brandsQuery.data?.length || 0} status="info" />
+        <MetricCard title="Brands Represented" value={brands.length} status="info" />
         <MetricCard title="Selected Rows" value={table.selectedKeys.length} icon={CheckSquare} status="default" />
       </div>
 
@@ -221,6 +228,8 @@ export default function ProductsPage() {
         onToggleColumn={(k) => table.toggleColumn(k, columns)}
         onResetColumns={table.resetColumns}
         onResetFilters={table.resetFilters}
+        onRefresh={table.refresh}
+        isRefreshing={table.isFetching}
         selectedCount={table.selectedKeys.length}
         filters={[
           {
@@ -297,9 +306,11 @@ export default function ProductsPage() {
           onClose={() => setModalState((p) => ({ ...p, open: false }))}
           initialValue={modalState.initial}
           isEditing={Boolean(modalState.editingId)}
-          companies={companiesQuery.data || []}
-          brands={brandsQuery.data || []}
-          categories={categoriesQuery.data || []}
+          existingCount={table.pagination.totalRecords}
+          existingCodes={table.rows.map((r) => r.skuCode)}
+          companies={companies}
+          brands={brands}
+          categories={categories}
           subCategories={subCategoriesQuery.data || []}
           onSave={(payload) => saveMutation.mutate(payload)}
           isSubmitting={saveMutation.isPending}
