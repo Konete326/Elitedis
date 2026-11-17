@@ -58,6 +58,28 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication requests. Try again shortly.' },
 });
 
+// ── Health check / root ──────────────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'ELITE DIST ERP API is running 🚀',
+    version: 'v1',
+    env: env.NODE_ENV,
+    uptime: `${Math.floor(process.uptime())}s`,
+    db: getDbStatus(),
+  });
+});
+
+app.get('/health', (_req, res) => {
+  const db = getDbStatus();
+  res.status(db.connected ? 200 : 503).json({
+    success: db.connected,
+    status: db.connected ? 'healthy' : 'degraded',
+    db,
+    uptime: `${Math.floor(process.uptime())}s`,
+  });
+});
+
 app.use('/api/v1/auth', authLimiter);
 app.use('/api/v1', apiRouter);
 
