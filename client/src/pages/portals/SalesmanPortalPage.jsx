@@ -132,15 +132,15 @@ export default function SalesmanPortalPage() {
             <p className="font-mono tabular-nums">Original Total: {formatCurrency(dealTarget?.order?.grandSummary?.netPayableAmount)}</p>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">On-Spot Extra Discount (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">On-Spot Extra Discount PKR (Optional)</label>
             <input type="number" min="0" value={extraDisc} onChange={(e) => setExtraDisc(Number(e.target.value))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Payment Collected (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Payment Collected PKR (Optional)</label>
             <input type="number" min="0" value={cashAmount} onChange={(e) => setCashAmount(Number(e.target.value))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trip Expense — Gas / Petrol (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trip Expense — Gas / Petrol PKR (Optional)</label>
             <input type="number" min="0" value={fuelExpense} onChange={(e) => setFuelExpense(Number(e.target.value))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
         </div>

@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, X, ArrowRight } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
 
 /**
- * Global theme-aware Coming Soon modal for planned phases and upcoming routes.
+ * Portal-mounted (z-[100]) Coming Soon modal for planned phases and upcoming routes.
  */
 export function ComingSoonModal({
   isOpen: propOpen,
@@ -40,7 +41,7 @@ export function ComingSoonModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  if (!active) return null;
+  if (!active || typeof document === 'undefined') return null;
 
   const title = propTitle || featureName || comingSoonState?.title || 'Scheduled Module';
   const phase = propPhase || comingSoonState?.phase || '';
@@ -49,13 +50,13 @@ export function ComingSoonModal({
     comingSoonState?.description ||
     'This workflow is part of the active ELITE DIST release roadmap and is currently scheduled for upcoming rollout.';
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="coming-soon-title"
       onClick={handleClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -111,7 +112,8 @@ export function ComingSoonModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

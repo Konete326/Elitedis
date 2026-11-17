@@ -48,6 +48,7 @@ export function ShellProvider({ children }) {
     description: '',
     phase: '',
   });
+  const [isAgencyProfileOpen, setIsAgencyProfileOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const scrollLockCountRef = useRef(0);
   const toastTimersRef = useRef(new Map());
@@ -146,6 +147,14 @@ export function ShellProvider({ children }) {
     });
   }, [unlockScroll]);
 
+  const openAgencyProfileModal = useCallback(() => {
+    setIsAgencyProfileOpen(true);
+  }, []);
+
+  const closeAgencyProfileModal = useCallback(() => {
+    setIsAgencyProfileOpen(false);
+  }, []);
+
   const removeToast = useCallback((id) => {
     const timer = toastTimersRef.current.get(id);
     if (timer) {
@@ -194,6 +203,9 @@ export function ShellProvider({ children }) {
       comingSoonState,
       openComingSoon,
       closeComingSoon,
+      isAgencyProfileOpen,
+      openAgencyProfileModal,
+      closeAgencyProfileModal,
       toasts,
       addToast,
       removeToast,
@@ -211,6 +223,9 @@ export function ShellProvider({ children }) {
       comingSoonState,
       openComingSoon,
       closeComingSoon,
+      isAgencyProfileOpen,
+      openAgencyProfileModal,
+      closeAgencyProfileModal,
       toasts,
       addToast,
       removeToast,

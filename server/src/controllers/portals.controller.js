@@ -1,21 +1,25 @@
 import {
-  BeatPlan,
-  Customer,
-  Product,
-  StockBatch,
-  Order,
-  SaleInvoice,
-  DispatchSheet,
-  Recovery,
-  PendingTask,
+  BeatPlan as _BeatPlan,
+  Customer as _Customer,
+  Product as _Product,
+  StockBatch as _StockBatch,
+  Order as _Order,
+  SaleInvoice as _SaleInvoice,
+  DispatchSheet as _DispatchSheet,
+  Recovery as _Recovery,
+  PendingTask as _PendingTask,
 } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { calculateTwoLevelInvoice } from '../services/invoiceCalc.service.js';
 import { deductDeliveredStock, runWithTransaction } from '../services/stockLedger.service.js';
 import { postDoubleEntry, postSaleVoucher } from '../services/accountingPost.service.js';
 
+const m = () => getTenantModels({ BeatPlan: _BeatPlan, Customer: _Customer, Product: _Product, StockBatch: _StockBatch, Order: _Order, SaleInvoice: _SaleInvoice, DispatchSheet: _DispatchSheet, Recovery: _Recovery, PendingTask: _PendingTask });
+
 export const getBookerBeats = asyncHandler(async (req, res) => {
+  const { BeatPlan } = m();
   const filter = { distributorId: req.distributorId, status: 'ACTIVE' };
   if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user.primaryRole)) {
     filter.assignedBookerId = req.user._id;
@@ -29,6 +33,7 @@ export const getBookerBeats = asyncHandler(async (req, res) => {
 });
 
 export const getPortalCatalog = asyncHandler(async (req, res) => {
+  const { Product, StockBatch } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req, { defaultLimit: 24 });
   const extra = { status: 'ACTIVE' };
   for (const key of ['categoryId', 'subCategoryId', 'brandId', 'companyId']) {
@@ -53,6 +58,7 @@ export const getPortalCatalog = asyncHandler(async (req, res) => {
 });
 
 export const createBookerOrder = asyncHandler(async (req, res) => {
+  const { Customer, Order } = m();
   const customer = await Customer.findOne({ _id: req.body.customerId, distributorId: req.distributorId });
   if (!customer) throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
 
@@ -79,6 +85,7 @@ export const createBookerOrder = asyncHandler(async (req, res) => {
 });
 
 export const getBookerHistory = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const { skip, limit, sort, buildPaginationMeta } = buildPaginationQuery(req);
   const filter = { distributorId: req.distributorId, bookerId: req.user._id };
   const [orders, totalRecords] = await Promise.all([
@@ -89,6 +96,7 @@ export const getBookerHistory = asyncHandler(async (req, res) => {
 });
 
 export const posCheckout = asyncHandler(async (req, res) => {
+  const { SaleInvoice, Customer } = m();
   const { customerId = null, walkInCustomerName = 'Walk-in Customer', invoiceMode = 'POS_RETAIL', paidAmountPkr } = req.body;
   const calculated = calculateTwoLevelInvoice(req.body);
   if (calculated.lineItems.length === 0) {
@@ -139,6 +147,7 @@ export const posCheckout = asyncHandler(async (req, res) => {
 });
 
 export const getPosHistory = asyncHandler(async (req, res) => {
+  const { SaleInvoice } = m();
   const { skip, limit, sort, buildPaginationMeta } = buildPaginationQuery(req);
   const filter = { distributorId: req.distributorId, source: 'POS' };
   const [sales, totalRecords] = await Promise.all([
@@ -149,6 +158,7 @@ export const getPosHistory = asyncHandler(async (req, res) => {
 });
 
 export const getSalesmanDeliveryPlan = asyncHandler(async (req, res) => {
+  const { DispatchSheet } = m();
   const filter = { distributorId: req.distributorId, status: { $in: ['PLANNED', 'PICKING', 'DISPATCHED', 'IN_TRANSIT'] } };
   if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user.primaryRole)) {
     filter.salesmanId = req.user._id;
@@ -165,6 +175,7 @@ export const getSalesmanDeliveryPlan = asyncHandler(async (req, res) => {
 });
 
 export const executeSalesmanDeal = asyncHandler(async (req, res) => {
+  const { SaleInvoice, Order, Recovery, PendingTask, Customer } = m();
   const {
     saleInvoiceId,
     dispatchSheetId = null,

@@ -3,11 +3,12 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import ComingSoonModal from './ComingSoonModal';
+import OnboardingWizardModal from './OnboardingWizardModal';
 import ToastContainer from './ToastContainer';
 
 /**
  * Viewport-locked Desktop AppShell (lg:h-dvh lg:overflow-hidden) wrapping
- * Sidebar, Topbar, fluid main workspace, ComingSoonModal, and ToastContainer.
+ * Sidebar, Topbar, fluid main workspace, OnboardingWizardModal, ComingSoonModal, and ToastContainer.
  */
 export function AppShell({ children, notifications, breadcrumbs }) {
   return (
@@ -21,6 +22,7 @@ export function AppShell({ children, notifications, breadcrumbs }) {
         </main>
       </div>
 
+      <OnboardingWizardModal />
       <ComingSoonModal />
       <ToastContainer />
     </div>

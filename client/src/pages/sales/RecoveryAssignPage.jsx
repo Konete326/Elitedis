@@ -68,7 +68,7 @@ export default function RecoveryAssignPage() {
 
       <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 items-end">
         <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign to Staff Member</label>
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign to Staff Member *</label>
           <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
             <option value="">Choose booker or salesman...</option>
             {(staffQuery.data || []).map((u) => (
@@ -79,11 +79,11 @@ export default function RecoveryAssignPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Collection Sheet Title</label>
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Collection Sheet Title (Optional)</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Friday Market Collection" className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Priority</label>
+          <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Priority (Optional)</label>
           <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
             <option value="NORMAL">Normal</option>
             <option value="URGENT">Urgent</option>

@@ -257,7 +257,7 @@ export default function AutomationRulesPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rule Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rule Name *</label>
             <input
               required
               value={form.ruleName}
@@ -268,7 +268,7 @@ export default function AutomationRulesPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trigger Event</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Trigger Event (Optional)</label>
               <select
                 value={form.triggerEvent}
                 onChange={(e) => setForm((p) => ({ ...p, triggerEvent: e.target.value }))}
@@ -281,7 +281,7 @@ export default function AutomationRulesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Action Type</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Action Type (Optional)</label>
               <select
                 value={form.actionType}
                 onChange={(e) => setForm((p) => ({ ...p, actionType: e.target.value }))}
@@ -296,7 +296,7 @@ export default function AutomationRulesPage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-              Threshold Value (Days / % / Qty)
+              Threshold Value (Days / % / Qty) (Optional)
             </label>
             <input
               type="number"
@@ -307,7 +307,7 @@ export default function AutomationRulesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Description</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Description (Optional)</label>
             <textarea
               rows={2}
               value={form.description}

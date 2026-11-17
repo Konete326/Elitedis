@@ -78,7 +78,9 @@ export default function CompanyFormModal({
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Company Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">
+                  Company Code <span className="text-[var(--status-danger)]">*</span>
+                </label>
                 <button
                   type="button"
                   onClick={() =>
@@ -100,7 +102,9 @@ export default function CompanyFormModal({
               {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                Company Name <span className="text-[var(--status-danger)]">*</span>
+              </label>
               <input
                 required
                 value={form.companyName}
@@ -112,15 +116,15 @@ export default function CompanyFormModal({
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input value={form.ownerName} onChange={(e) => setForm((p) => ({ ...p, ownerName: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier / Rep Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier / Rep Name <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input value={form.supplierName} onChange={(e) => setForm((p) => ({ ...p, supplierName: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Business Type</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Business Type <span className="text-[var(--status-danger)]">*</span></label>
               <select value={form.businessType} onChange={(e) => setForm((p) => ({ ...p, businessType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="MANUFACTURER">Manufacturer</option>
                 <option value="IMPORTER">Importer</option>
@@ -129,16 +133,16 @@ export default function CompanyFormModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input value={form.address?.city || ''} onChange={(e) => setForm((p) => ({ ...p, address: { ...p.address, city: e.target.value } }))} placeholder="Karachi" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
             </div>
           </div>
-          <ImageDropzone label="Company Logo" folder="companies" value={form.logo} isSubmitting={isSubmitting} onChange={(logo) => setForm((p) => ({ ...p, logo }))} />
+          <ImageDropzone label="Company Logo (Optional)" folder="companies" value={form.logo} isSubmitting={isSubmitting} onChange={(logo) => setForm((p) => ({ ...p, logo }))} />
         </div>
 
         <div className="rounded-xl border p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Contact Persons</span>
+            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Contact Persons (Optional)</span>
             <button type="button" onClick={() => addSubRow('contacts', { personName: '', role: '', contactNo: '', channelType: 'WHATSAPP', isDefault: false })} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">
               + Add Contact
             </button>

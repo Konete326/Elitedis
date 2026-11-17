@@ -1,4 +1,6 @@
 import { AppError } from './errorMiddleware.js';
+import { Distributor } from '../models/Distributor.model.js';
+import { getTenantConnection, runWithTenantContext } from '../config/tenantDb.js';
 
 /**
  * Escapes special RegExp characters to keep search filters ReDoS-safe.
@@ -8,28 +10,44 @@ export function escapeRegex(value) {
 }
 
 /**
- * Enforces strict multi-distributor tenant isolation on every request.
- * Binds req.distributorId from the authenticated user and blocks cross-tenant overrides.
+ * Enforces strict multi-distributor tenant isolation and routes requests to the
+ * distributor's custom MongoDB Atlas connection pool (when configured) via AsyncLocalStorage.
  */
-export function enforceTenant(req, _res, next) {
-  if (!req.user || !req.user.distributorId) {
-    return next(new AppError('Distributor tenant context is missing from session.', 403, 'TENANT_CONTEXT_MISSING'));
-  }
-
-  req.distributorId = String(req.user.distributorId).trim();
-
-  if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
-    if (req.body.distributorId && req.body.distributorId !== req.distributorId) {
-      return next(new AppError('Cross-distributor data access or mutation is prohibited.', 403, 'TENANT_ISOLATION_VIOLATION'));
+export async function enforceTenant(req, _res, next) {
+  try {
+    if (!req.user || !req.user.distributorId) {
+      return next(new AppError('Distributor tenant context is missing from session.', 403, 'TENANT_CONTEXT_MISSING'));
     }
-    req.body.distributorId = req.distributorId;
-  }
 
-  if (req.query?.distributorId && req.query.distributorId !== req.distributorId) {
-    return next(new AppError('Cross-distributor query access is prohibited.', 403, 'TENANT_ISOLATION_VIOLATION'));
-  }
+    const distributorId = String(req.user.distributorId).trim();
+    req.distributorId = distributorId;
 
-  return next();
+    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+      if (req.body.distributorId && req.body.distributorId !== distributorId) {
+        return next(new AppError('Cross-distributor data access or mutation is prohibited.', 403, 'TENANT_ISOLATION_VIOLATION'));
+      }
+      req.body.distributorId = distributorId;
+    }
+
+    if (req.query?.distributorId && req.query.distributorId !== distributorId) {
+      return next(new AppError('Cross-distributor query access is prohibited.', 403, 'TENANT_ISOLATION_VIOLATION'));
+    }
+
+    const distributor = await Distributor.findOne({ distributorId })
+      .select('+mongodbUri status')
+      .lean();
+
+    if (distributor?.status === 'SUSPENDED' && req.user.primaryRole !== 'SUPER_ADMIN') {
+      return next(new AppError('Your distributor account is currently suspended. Contact platform support.', 403, 'DISTRIBUTOR_SUSPENDED'));
+    }
+
+    const customUri = distributor?.mongodbUri ? String(distributor.mongodbUri).trim() : '';
+    const connection = customUri ? await getTenantConnection(customUri) : null;
+
+    return runWithTenantContext({ distributorId, mongodbUri: customUri, connection }, () => next());
+  } catch (err) {
+    return next(err);
+  }
 }
 
 /**

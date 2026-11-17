@@ -53,12 +53,15 @@ export default function CategoriesPage() {
   const nameError = touched.name ? validateField('required', form.name, { required: true, minLength: 2, label: 'Category Name' }) : '';
 
   const saveMutation = useMutation({
-    mutationFn: (payload) =>
-      editingId
-        ? apiClient.put(`/inventory/categories/${editingId}`, payload)
-        : apiClient.post('/inventory/categories', payload),
+    mutationFn: (payload) => {
+      const clean = { ...payload, companyId: payload.companyId || null };
+      return editingId
+        ? apiClient.put(`/inventory/categories/${editingId}`, clean)
+        : apiClient.post('/inventory/categories', clean);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories-options'] });
       addToast({ type: 'success', message: editingId ? 'Category updated.' : 'Category created.' });
       setModalOpen(false);
     },
@@ -71,6 +74,7 @@ export default function CategoriesPage() {
     mutationFn: (id) => apiClient.delete(`/inventory/categories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories-options'] });
       addToast({ type: 'success', message: 'Category deleted.' });
       setDeleteTarget(null);
     },
@@ -148,12 +152,15 @@ export default function CategoriesPage() {
         }
       />
 
-      {!companiesQuery.isLoading && !brandsQuery.isLoading && (companies.length === 0 || brands.length === 0) && (
+      {(companies.length === 0 || brands.length === 0) && (
         <SetupGuideBanner
-          missingMessage="Add at least one Company and Brand before grouping products into Categories."
+          isLoading={companiesQuery.isLoading || brandsQuery.isLoading}
+          isOptional
+          title="Optional Catalog Grouping"
+          missingMessage="Categories work standalone, or you can optionally link Companies and Brands for deeper filtering."
           steps={[
-            { label: 'Company / Supplier', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
-            { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+            { label: 'Company / Supplier (Optional)', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+            { label: 'Brand (Optional)', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
           ]}
         />
       )}
@@ -230,7 +237,7 @@ export default function CategoriesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Category Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Category Code <span className="text-[var(--status-danger)]">*</span></label>
                 <button
                   type="button"
                   onClick={() =>
@@ -255,7 +262,7 @@ export default function CategoriesPage() {
               {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category Name <span className="text-[var(--status-danger)]">*</span></label>
               <input
                 required
                 value={form.name}
@@ -267,7 +274,7 @@ export default function CategoriesPage() {
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
                 value={form.companyId}
                 onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value }))}
@@ -282,7 +289,7 @@ export default function CategoriesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -295,7 +302,7 @@ export default function CategoriesPage() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Linked Brands</p>
+            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Linked Brands <span className="text-[var(--text-muted)] font-normal">(Optional)</span></p>
             <div className="flex flex-wrap gap-1.5">
               {(brandsQuery.data || []).map((b) => {
                 const selected = form.linkedBrandIds.includes(b._id);

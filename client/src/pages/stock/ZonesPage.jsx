@@ -39,6 +39,7 @@ export default function ZonesPage() {
         : apiClient.post(`/warehouses/${body.warehouseId}/zones`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-zones'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: modalState.editing ? 'Zone updated.' : 'Zone created.' });
       setModalState({ open: false, editing: null, initial: null, key: 0 });
     },
@@ -51,6 +52,7 @@ export default function ZonesPage() {
     mutationFn: (row) => apiClient.delete(`/warehouses/${row.warehouseId}/zones/${row._id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-zones'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: 'Zone deleted.' });
       setDeleteTarget(null);
       setGuardError('');
@@ -94,8 +96,9 @@ export default function ZonesPage() {
         }
       />
 
-      {!warehousesQuery.isLoading && warehouses.length === 0 && (
+      {warehouses.length === 0 && (
         <SetupGuideBanner
+          isLoading={warehousesQuery.isLoading}
           missingMessage="Create a Warehouse before adding Zones or storage sections."
           steps={[{ label: 'Create Warehouse', done: false, to: '/stock/warehouses', actionLabel: 'Go to Warehouses' }]}
         />

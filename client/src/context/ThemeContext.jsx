@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 const THEME_STORAGE_KEY = 'elitedist_theme';
 const ThemeContext = createContext(null);
@@ -37,13 +38,38 @@ export function ThemeProvider({ children }) {
     }
   }, [theme]);
 
-  const setTheme = useCallback((nextTheme) => {
-    setThemeState(nextTheme === 'dark' ? 'dark' : 'light');
+  const applyWithTransition = useCallback((computeNext) => {
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function' && !prefersReduced) {
+      document.startViewTransition(() => {
+        flushSync(() => {
+          setThemeState((prev) => {
+            const next = computeNext(prev);
+            applyThemeToDocument(next);
+            return next;
+          });
+        });
+      });
+    } else {
+      setThemeState(computeNext);
+    }
   }, []);
 
+  const setTheme = useCallback(
+    (nextTheme) => {
+      const normalized = nextTheme === 'dark' ? 'dark' : 'light';
+      applyWithTransition(() => normalized);
+    },
+    [applyWithTransition]
+  );
+
   const toggleTheme = useCallback(() => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  }, []);
+    applyWithTransition((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, [applyWithTransition]);
 
   const value = useMemo(
     () => ({

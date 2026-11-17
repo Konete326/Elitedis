@@ -38,7 +38,7 @@ export default function OrderLineItemCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
-              Product #{idx + 1}
+              Product #{idx + 1} *
             </label>
             <select
               value={row.productId}
@@ -65,7 +65,7 @@ export default function OrderLineItemCard({
         <div className="grid grid-cols-2 gap-2.5">
           <div>
             <label className="block text-[11px] text-[var(--text-muted)] mb-1">
-              Qty ({row.unitName})
+              Qty ({row.unitName}) *
             </label>
             <div className="flex gap-1">
               <input
@@ -87,7 +87,7 @@ export default function OrderLineItemCard({
           </div>
 
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Standard Rate</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Standard Rate *</label>
             <input
               type="number"
               min="0"
@@ -98,7 +98,7 @@ export default function OrderLineItemCard({
           </div>
 
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Custom Price</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Custom Price (Optional)</label>
             <input
               type="number"
               min="0"
@@ -123,7 +123,7 @@ export default function OrderLineItemCard({
       {/* Desktop / Tablet Row (>= 768px) */}
       <div className="hidden md:grid md:grid-cols-7 gap-2 items-end">
         <div className="md:col-span-2">
-          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Product</label>
+          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Product *</label>
           <select
             value={row.productId}
             onChange={(e) => handleSelectProduct(e.target.value)}
@@ -137,7 +137,7 @@ export default function OrderLineItemCard({
           </select>
         </div>
         <div>
-          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Qty ({row.unitName})</label>
+          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Qty ({row.unitName}) *</label>
           <div className="flex gap-1">
             <input
               type="number"
@@ -157,7 +157,7 @@ export default function OrderLineItemCard({
           </div>
         </div>
         <div>
-          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Standard Rate</label>
+          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Standard Rate *</label>
           <input
             type="number"
             min="0"
@@ -167,7 +167,7 @@ export default function OrderLineItemCard({
           />
         </div>
         <div>
-          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Custom Price</label>
+          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Custom Price (Optional)</label>
           <input
             type="number"
             min="0"

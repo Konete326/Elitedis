@@ -98,7 +98,7 @@ export default function CustomerFormModal({
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Customer Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Customer Code (Optional)</label>
                 <button
                   type="button"
                   onClick={() =>
@@ -120,7 +120,7 @@ export default function CustomerFormModal({
               {errors.customerCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.customerCode}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop / Customer Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop / Customer Name *</label>
               <input
                 required
                 value={form.shopName}
@@ -133,7 +133,7 @@ export default function CustomerFormModal({
               {errors.shopName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.shopName}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name *</label>
               <input
                 required
                 value={form.ownerName}
@@ -146,7 +146,7 @@ export default function CustomerFormModal({
               {errors.ownerName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.ownerName}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Phone / WhatsApp</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Phone / WhatsApp *</label>
               <input
                 required
                 value={form.ownerContact}
@@ -159,7 +159,7 @@ export default function CustomerFormModal({
               {errors.ownerContact && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.ownerContact}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer Type</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer Type (Optional)</label>
               <select
                 value={form.customerType}
                 onChange={(e) => setForm((p) => ({ ...p, customerType: e.target.value }))}
@@ -172,7 +172,7 @@ export default function CustomerFormModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop Category</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop Category (Optional)</label>
               <input
                 value={form.shopCategory}
                 onChange={(e) => setForm((p) => ({ ...p, shopCategory: e.target.value }))}
@@ -183,7 +183,7 @@ export default function CustomerFormModal({
           </div>
 
           <ImageDropzone
-            label="Shop Picture"
+            label="Shop Picture (Optional)"
             folder="customers"
             value={form.shopPic}
             isSubmitting={isSubmitting}
@@ -193,48 +193,18 @@ export default function CustomerFormModal({
 
         <div className="rounded-xl border p-3.5 space-y-3">
           <h3 className="text-xs font-bold uppercase text-[var(--accent-primary)]">
-            Shop Address &amp; Landmark (Pehchan)
+            Shop Address &amp; Landmark (Optional)
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <input
-              placeholder="City (e.g. Karachi)"
-              value={form.locationHierarchy?.city || ''}
-              onChange={(e) => updateLoc('city', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
-            <input
-              placeholder="Town / Zone (e.g. Orangi)"
-              value={form.locationHierarchy?.townOrZone || ''}
-              onChange={(e) => updateLoc('townOrZone', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
-            <input
-              placeholder="Area (e.g. Qasba Colony)"
-              value={form.locationHierarchy?.areaName || ''}
-              onChange={(e) => updateLoc('areaName', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
-            <input
-              placeholder="Route / Road (e.g. Main Road)"
-              value={form.locationHierarchy?.routeName || ''}
-              onChange={(e) => updateLoc('routeName', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
-            <input
-              placeholder="Street / Block"
-              value={form.locationHierarchy?.street || ''}
-              onChange={(e) => updateLoc('street', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
-            <input
-              placeholder="Google Map Link (Optional)"
-              value={form.locationHierarchy?.mapLink || ''}
-              onChange={(e) => updateLoc('mapLink', e.target.value)}
-              className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-            />
+            <input placeholder="City (Optional)" value={form.locationHierarchy?.city || ''} onChange={(e) => updateLoc('city', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            <input placeholder="Town / Zone (Optional)" value={form.locationHierarchy?.townOrZone || ''} onChange={(e) => updateLoc('townOrZone', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            <input placeholder="Area (Optional)" value={form.locationHierarchy?.areaName || ''} onChange={(e) => updateLoc('areaName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            <input placeholder="Route / Road (Optional)" value={form.locationHierarchy?.routeName || ''} onChange={(e) => updateLoc('routeName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            <input placeholder="Street / Block (Optional)" value={form.locationHierarchy?.street || ''} onChange={(e) => updateLoc('street', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            <input placeholder="Google Map Link (Optional)" value={form.locationHierarchy?.mapLink || ''} onChange={(e) => updateLoc('mapLink', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
             <div className="sm:col-span-3">
               <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
-                Nearby Landmark / Pehchan Directions
+                Nearby Landmark / Pehchan Directions (Optional)
               </label>
               <input
                 placeholder="e.g. Opposite petrol pump, corner green-gate shop"
@@ -248,7 +218,7 @@ export default function CustomerFormModal({
 
         <div className="rounded-xl border p-3.5 grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Condition</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Condition (Optional)</label>
             <select
               value={form.financialTerms?.paymentCondition || 'PAID_CASH'}
               onChange={(e) => updateFin('paymentCondition', e.target.value)}
@@ -260,7 +230,7 @@ export default function CustomerFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Limit (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Limit PKR (Optional)</label>
             <input
               type="number"
               min="0"
@@ -270,7 +240,7 @@ export default function CustomerFormModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Days</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Days (Optional)</label>
             <input
               type="number"
               min="0"
@@ -280,7 +250,7 @@ export default function CustomerFormModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Account Status</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Account Status (Optional)</label>
             <select
               value={form.status}
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}

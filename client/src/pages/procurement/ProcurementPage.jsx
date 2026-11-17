@@ -148,15 +148,14 @@ export default function ProcurementPage() {
         }
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Add at least one Supplier Company and one Product before creating supplier purchase orders."
-          steps={[
-            { label: 'Add at least 1 Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Add Company' },
-            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        isLoading={!prereqReady}
+        missingMessage="Add at least one Supplier Company and one Product before creating supplier purchase orders."
+        steps={[
+          { label: 'Add at least 1 Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Add Company' },
+          { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+        ]}
+      />
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard

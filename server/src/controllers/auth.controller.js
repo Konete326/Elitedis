@@ -2,7 +2,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { User } from '../models/index.js';
+import { destroyImage } from '../config/cloudinary.js';
+import { getTenantModel } from '../config/tenantDb.js';
+import { User, Distributor, PrintTemplate } from '../models/index.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 
 const loginSchema = z.object({
@@ -26,15 +28,10 @@ function issueTokens(user) {
     distributorId: user.distributorId,
     primaryRole: user.primaryRole,
   };
-
-  const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN,
-  });
-
+  const accessToken = jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_EXPIRES_IN });
   const refreshToken = jwt.sign({ sub: user._id.toString(), type: 'refresh' }, env.JWT_REFRESH_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRES_IN,
   });
-
   return { accessToken, refreshToken };
 }
 
@@ -48,54 +45,72 @@ function setRefreshCookie(res, refreshToken) {
   });
 }
 
+function formatAgencyProfile(doc) {
+  if (!doc) return null;
+  const obj = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+  const hasCustomDb = Boolean(obj.mongodbUri);
+  delete obj.mongodbUri;
+  return { ...obj, hasCustomDb };
+}
+
+async function ensureAgencyProfile(distributorId, fallbackUser = null) {
+  let dist = await Distributor.findOne({ distributorId }).select('+mongodbUri');
+  if (!dist) {
+    dist = await Distributor.create({
+      distributorId,
+      distributorName: fallbackUser?.distributorName || distributorId,
+      ownerName: fallbackUser?.fullName || '',
+      email: fallbackUser?.email || '',
+      phone: fallbackUser?.phone || '',
+      businessProfile: {
+        companyTitle: fallbackUser?.distributorName || distributorId,
+        phonePrimary: fallbackUser?.phone || '',
+        email: fallbackUser?.email || '',
+      },
+      onboardingCompleted: false,
+      onboardingSkipped: false,
+      status: 'ACTIVE',
+    });
+  }
+  return formatAgencyProfile(dist);
+}
+
 export const login = asyncHandler(async (req, res) => {
   const parsed = loginSchema.parse(req.body);
   const identifier = (parsed.email || parsed.identifier || '').trim();
-  const password = parsed.password;
-  if (!identifier) {
-    throw new AppError('Email or Profile ID is required.', 400, 'IDENTIFIER_REQUIRED');
-  }
+  if (!identifier) throw new AppError('Email or Profile ID is required.', 400, 'IDENTIFIER_REQUIRED');
 
   const user = await User.findOne({
     $or: [{ email: identifier.toLowerCase() }, { profileId: identifier.toUpperCase() }],
   });
-
-  if (!user) {
+  if (!user || !(await bcrypt.compare(parsed.password, user.passwordHash))) {
     throw new AppError('Invalid email/profile ID or password.', 401, 'INVALID_CREDENTIALS');
   }
-
-  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-  if (!isPasswordValid) {
-    throw new AppError('Invalid email/profile ID or password.', 401, 'INVALID_CREDENTIALS');
-  }
-
   if (user.status !== 'ACTIVE') {
     throw new AppError(`Your account is ${user.status}. Please contact your administrator.`, 403, 'ACCOUNT_INACTIVE');
+  }
+
+  const agencyProfile = await ensureAgencyProfile(user.distributorId, user);
+  if (agencyProfile?.status === 'SUSPENDED' && user.primaryRole !== 'SUPER_ADMIN') {
+    throw new AppError('Your distributor account is currently suspended.', 403, 'DISTRIBUTOR_SUSPENDED');
   }
 
   const { accessToken, refreshToken } = issueTokens(user);
   user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
   user.lastLoginAt = new Date();
   await user.save();
-
   setRefreshCookie(res, refreshToken);
 
   res.status(200).json({
     success: true,
-    data: {
-      user: user.toJSON(),
-      accessToken,
-      refreshToken,
-    },
+    data: { user: user.toJSON(), agencyProfile, accessToken, refreshToken },
   });
 });
 
 export const register = asyncHandler(async (req, res) => {
   const parsed = registerSchema.parse(req.body);
   const normalizedEmail = parsed.email.toLowerCase().trim();
-
-  const existing = await User.exists({ email: normalizedEmail });
-  if (existing) {
+  if (await User.exists({ email: normalizedEmail })) {
     throw new AppError('An account with this email already exists.', 409, 'EMAIL_EXISTS');
   }
 
@@ -104,11 +119,28 @@ export const register = asyncHandler(async (req, res) => {
     .toUpperCase()
     .slice(0, 8);
   const distributorId = `${slug || 'DIST'}-${Date.now().toString().slice(-4)}`;
+  const distributorName = parsed.distributorName || `${parsed.fullName} Distribution`;
   const passwordHash = await bcrypt.hash(parsed.password, 12);
+
+  await Distributor.create({
+    distributorId,
+    distributorName,
+    ownerName: parsed.fullName,
+    email: normalizedEmail,
+    phone: parsed.phone,
+    businessProfile: {
+      companyTitle: distributorName,
+      phonePrimary: parsed.phone,
+      email: normalizedEmail,
+    },
+    onboardingCompleted: false,
+    onboardingSkipped: false,
+    status: 'ACTIVE',
+  });
 
   const user = await User.create({
     distributorId,
-    distributorName: parsed.distributorName || `${parsed.fullName} Distribution`,
+    distributorName,
     profileId: `ADM-${Date.now().toString().slice(-5)}`,
     fullName: parsed.fullName,
     email: normalizedEmail,
@@ -127,27 +159,21 @@ export const register = asyncHandler(async (req, res) => {
     lastLoginAt: new Date(),
   });
 
+  const agencyProfile = await ensureAgencyProfile(distributorId, user);
   const { accessToken, refreshToken } = issueTokens(user);
   user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
   await user.save();
-
   setRefreshCookie(res, refreshToken);
 
   res.status(201).json({
     success: true,
-    data: {
-      user: user.toJSON(),
-      accessToken,
-      refreshToken,
-    },
+    data: { user: user.toJSON(), agencyProfile, accessToken, refreshToken },
   });
 });
 
 export const refresh = asyncHandler(async (req, res) => {
   const incomingToken = req.body?.refreshToken || req.cookies?.refreshToken;
-  if (!incomingToken) {
-    throw new AppError('Refresh token is missing.', 401, 'REFRESH_TOKEN_MISSING');
-  }
+  if (!incomingToken) throw new AppError('Refresh token is missing.', 401, 'REFRESH_TOKEN_MISSING');
 
   let decoded;
   try {
@@ -160,40 +186,114 @@ export const refresh = asyncHandler(async (req, res) => {
   if (!user || user.status !== 'ACTIVE' || !user.refreshTokenHash) {
     throw new AppError('Session is no longer active. Please sign in again.', 401, 'SESSION_REVOKED');
   }
-
-  const matches = await bcrypt.compare(incomingToken, user.refreshTokenHash);
-  if (!matches) {
+  if (!(await bcrypt.compare(incomingToken, user.refreshTokenHash))) {
     user.refreshTokenHash = null;
     await user.save();
     throw new AppError('Refresh token reuse detected. Please sign in again.', 401, 'TOKEN_REUSE_DETECTED');
   }
 
+  const agencyProfile = await ensureAgencyProfile(user.distributorId, user);
   const { accessToken, refreshToken } = issueTokens(user);
   user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
   await user.save();
-
   setRefreshCookie(res, refreshToken);
 
-  res.status(200).json({
-    success: true,
-    data: {
-      user: user.toJSON(),
-      accessToken,
-      refreshToken,
-    },
-  });
+  res.status(200).json({ success: true, data: { user: user.toJSON(), agencyProfile, accessToken, refreshToken } });
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  if (req.user?._id) {
-    await User.findByIdAndUpdate(req.user._id, { refreshTokenHash: null });
-  }
+  if (req.user?._id) await User.findByIdAndUpdate(req.user._id, { refreshTokenHash: null });
   res.clearCookie('refreshToken', { path: '/api/v1/auth' });
   res.status(200).json({ success: true, message: 'Signed out successfully.' });
 });
 
 export const getMe = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: req.user });
+  const agencyProfile = await ensureAgencyProfile(req.user.distributorId, req.user);
+  res.status(200).json({ success: true, data: { ...req.user, agencyProfile } });
 });
 
-export default { login, register, refresh, logout, getMe };
+export const getAgencyProfile = asyncHandler(async (req, res) => {
+  const profile = await ensureAgencyProfile(req.distributorId, req.user);
+  res.status(200).json({ success: true, data: profile });
+});
+
+export const updateAgencyProfile = asyncHandler(async (req, res) => {
+  await ensureAgencyProfile(req.distributorId, req.user);
+  const dist = await Distributor.findOne({ distributorId: req.distributorId }).select('+mongodbUri');
+  const oldLogoId = dist.businessProfile?.logo?.publicId;
+
+  const incoming = req.body.businessProfile || req.body;
+  const prevProfile = dist.businessProfile?.toObject?.() || dist.businessProfile || {};
+  const mergedProfile = { ...prevProfile };
+  const allowedKeys = [
+    'companyTitle', 'tagline', 'logo', 'phonePrimary', 'phoneSecondary', 'email', 'website',
+    'ntn', 'strn', 'city', 'area', 'fullAddress', 'headerNote', 'footerNote', 'urduHeaderTitle',
+    'showLogo', 'showUrduLabels',
+  ];
+  for (const key of allowedKeys) {
+    if (incoming[key] !== undefined) mergedProfile[key] = incoming[key];
+  }
+
+  if (req.body.distributorName) dist.distributorName = req.body.distributorName;
+  else if (mergedProfile.companyTitle) dist.distributorName = mergedProfile.companyTitle;
+
+  dist.businessProfile = mergedProfile;
+  dist.onboardingCompleted = true;
+  dist.onboardingSkipped = false;
+  await dist.save();
+
+  const newLogoId = dist.businessProfile?.logo?.publicId;
+  if (oldLogoId && newLogoId !== oldLogoId) await destroyImage(oldLogoId).catch(() => {});
+
+  // Sync branding into default PrintTemplate for this tenant
+  const PrintTemplateM = getTenantModel('PrintTemplate', PrintTemplate);
+  const existingTpl = await PrintTemplateM.findOne({ distributorId: req.distributorId, isDefault: true });
+  if (existingTpl) {
+    existingTpl.headerConfig.companyTitle = mergedProfile.companyTitle || dist.distributorName;
+    existingTpl.headerConfig.showLogo = mergedProfile.showLogo !== false;
+    existingTpl.headerConfig.subjectLine = mergedProfile.headerNote || existingTpl.headerConfig.subjectLine;
+    existingTpl.footerConfig.footerNoteLine = mergedProfile.footerNote || existingTpl.footerConfig.footerNoteLine;
+    existingTpl.showUrduLabels = Boolean(mergedProfile.showUrduLabels);
+    await existingTpl.save();
+  } else {
+    await PrintTemplateM.create({
+      distributorId: req.distributorId,
+      templateCode: 'TPL-DEFAULT',
+      templateName: `${mergedProfile.companyTitle || dist.distributorName} Standard Invoice`,
+      documentType: 'NORMAL_INVOICE',
+      headerConfig: {
+        showLogo: mergedProfile.showLogo !== false,
+        showCompanyName: true,
+        companyTitle: mergedProfile.companyTitle || dist.distributorName,
+        showAddress: true,
+        subjectLine: mergedProfile.headerNote || '',
+      },
+      footerConfig: { footerNoteLine: mergedProfile.footerNote || '' },
+      showUrduLabels: Boolean(mergedProfile.showUrduLabels),
+      isDefault: true,
+    });
+  }
+
+  res.status(200).json({ success: true, data: formatAgencyProfile(dist) });
+});
+
+export const skipAgencyOnboarding = asyncHandler(async (req, res) => {
+  await ensureAgencyProfile(req.distributorId, req.user);
+  const dist = await Distributor.findOneAndUpdate(
+    { distributorId: req.distributorId },
+    { $set: { onboardingSkipped: true } },
+    { new: true }
+  ).select('+mongodbUri');
+  res.status(200).json({ success: true, data: formatAgencyProfile(dist) });
+});
+
+export default {
+  login,
+  register,
+  refresh,
+  logout,
+  getMe,
+  getAgencyProfile,
+  updateAgencyProfile,
+  skipAgencyOnboarding,
+};

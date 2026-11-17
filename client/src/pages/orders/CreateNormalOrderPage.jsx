@@ -75,6 +75,7 @@ export default function CreateNormalOrderPage() {
     mutationFn: (payload) => apiClient.post('/orders', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
       setSubmitConfirmOpen(false);
       addToast({ type: 'success', message: 'Normal order submitted for approval.' });
       navigate('/orders/master');
@@ -166,20 +167,19 @@ export default function CreateNormalOrderPage() {
         }
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Add at least one Customer Shop and one Product before creating an order."
-          steps={[
-            { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
-            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        isLoading={!prereqReady}
+        missingMessage="Add at least one Customer Shop and one Product before creating an order."
+        steps={[
+          { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
+          { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+        ]}
+      />
 
       <form onSubmit={handleSubmit} className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 lg:overflow-hidden">
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3.5 grid grid-cols-1 lg:grid-cols-4 gap-3 items-center">
           <div className="lg:col-span-2">
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Customer Shop</label>
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Customer Shop *</label>
             <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-10 sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">Choose customer shop...</option>
               {customers.map((c) => (
@@ -190,7 +190,7 @@ export default function CreateNormalOrderPage() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Order Priority</label>
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Order Priority (Optional)</label>
             <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className="w-full h-10 sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="REGULAR">Regular</option>
               <option value="URGENT">Urgent</option>

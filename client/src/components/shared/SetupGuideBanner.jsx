@@ -1,33 +1,92 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, Info } from 'lucide-react';
+import { ArrowRight, Check, Info, X } from 'lucide-react';
+
+function readDismissedState(storageKey) {
+  try {
+    return sessionStorage.getItem(storageKey) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Prerequisite Setup Guide Banner: guides operators through missing parent records
- * (Companies, Categories, Warehouses, Customers, Products) with 1-click links.
+ * Prerequisite Setup Guide Banner: hides while loading, supports sessionStorage Dismiss,
+ * distinguishes optional setup hints, and provides 1-click navigation links.
  */
 export function SetupGuideBanner({
   steps = [],
   missingMessage = '',
-  title = 'Complete Setup First',
+  title = 'Quick Setup Required',
+  isLoading = false,
+  optional = false,
+  isOptional = false,
   className = '',
 }) {
+  const storageKey = `elitedist_guide_dismissed_${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+  const [dismissed, setDismissed] = useState(() => readDismissedState(storageKey));
+
+  if (isLoading || dismissed) return null;
+
   const incompleteSteps = steps.filter((step) => !step.done);
   if (steps.length > 0 && incompleteSteps.length === 0) return null;
   if (steps.length === 0 && !missingMessage) return null;
 
+  const showOptional = optional || isOptional;
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      sessionStorage.setItem(storageKey, '1');
+    } catch {
+      // Ignore storage quota errors
+    }
+  };
+
   return (
     <div
       role="status"
-      className={`animate-fade-in shrink-0 rounded-xl border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3.5 sm:p-4 transition-colors duration-200 ${className}`}
+      className={`animate-fade-in shrink-0 rounded-xl border p-3.5 sm:p-4 transition-colors duration-200 ${
+        showOptional
+          ? 'border-[var(--accent-primary)]/30 bg-[var(--accent-soft)]/50'
+          : 'border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10'
+      } ${className}`}
     >
       <div className="flex items-start gap-3">
-        <div className="shrink-0 w-9 h-9 rounded-lg bg-[var(--status-warning)]/15 text-[var(--status-warning)] flex items-center justify-center">
+        <div
+          className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
+            showOptional
+              ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+              : 'bg-[var(--status-warning)]/15 text-[var(--status-warning)]'
+          }`}
+        >
           <Info className="w-4 h-4" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)]">{title}</h3>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)]">{title}</h3>
+              {showOptional && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+                  Optional Guide
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleDismiss}
+              aria-label="Dismiss setup guide"
+              title="Dismiss"
+              className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <X className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
+          </div>
           <p className="mt-0.5 text-xs text-[var(--text-secondary)] leading-relaxed">
-            {missingMessage || 'Create these required records first so dropdowns and links work smoothly.'}
+            {missingMessage ||
+              (showOptional
+                ? 'These setup steps are optional, or you can configure them now for structured reporting.'
+                : 'Create these required records first so dropdowns and links work smoothly.')}
           </p>
 
           {steps.length > 0 && (

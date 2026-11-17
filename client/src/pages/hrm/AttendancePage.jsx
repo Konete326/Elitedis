@@ -117,7 +117,7 @@ export default function AttendancePage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Employee</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Employee *</label>
             <select required value={form.employeeId} onChange={(e) => setForm((p) => ({ ...p, employeeId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">Select employee...</option>
               {(employeesQuery.data || []).map((emp) => (
@@ -128,11 +128,11 @@ export default function AttendancePage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Date</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Date (Optional)</label>
             <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status (Optional)</label>
             <select value={form.attendanceStatus} onChange={(e) => setForm((p) => ({ ...p, attendanceStatus: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="PRESENT">Present</option>
               <option value="ABSENT">Absent</option>
@@ -142,8 +142,8 @@ export default function AttendancePage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Remarks</label>
-            <input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Remarks (Optional)</label>
+            <input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} placeholder="e.g. On field route" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
         </div>
       </FormModal>

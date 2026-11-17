@@ -45,6 +45,7 @@ export default function BookerPortalPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booker-history'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
       addToast({ type: 'success', message: 'Booker order submitted for approval.' });
       setCart([]);
       setSelectedCustomer(null);

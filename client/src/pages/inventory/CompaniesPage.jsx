@@ -29,6 +29,7 @@ export default function CompaniesPage() {
         : apiClient.post('/inventory/companies', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['companies-options'] });
       addToast({ type: 'success', message: modalState.editingId ? 'Company updated.' : 'Company created.' });
       setModalState({ open: false, editingId: null, initial: null, key: 0 });
     },
@@ -41,6 +42,7 @@ export default function CompaniesPage() {
     mutationFn: (id) => apiClient.delete(`/inventory/companies/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
+      queryClient.invalidateQueries({ queryKey: ['companies-options'] });
       addToast({ type: 'success', message: 'Company deleted.' });
       setDeleteTarget(null);
     },

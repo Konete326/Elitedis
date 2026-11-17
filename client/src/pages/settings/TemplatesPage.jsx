@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Plus, Printer, Trash2 } from 'lucide-react';
+import { Building2, Edit, Plus, Printer, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
@@ -35,7 +35,7 @@ const INITIAL_FORM = {
 
 export default function TemplatesPage() {
   const queryClient = useQueryClient();
-  const { addToast } = useShell();
+  const { addToast, openAgencyProfileModal } = useShell();
 
   const table = useServerTable({
     queryKey: 'print-templates',
@@ -92,18 +92,28 @@ export default function TemplatesPage() {
         title="Print Layouts &amp; Templates"
         subtitle="Set up bill headers, signatures, English or Urdu labels, and receipt paper sizes"
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              setEditingId(null);
-              setForm(INITIAL_FORM);
-              setModalOpen(true);
-            }}
-            className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Template</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => openAgencyProfileModal?.()}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+            >
+              <Building2 className="w-4 h-4 text-[var(--accent-primary)]" />
+              <span>Edit Agency &amp; Bill Branding</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(null);
+                setForm(INITIAL_FORM);
+                setModalOpen(true);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Template</span>
+            </button>
+          </>
         }
       />
 
@@ -182,7 +192,7 @@ export default function TemplatesPage() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Template Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Template Name *</label>
             <input
               required
               value={form.templateName}
@@ -192,7 +202,7 @@ export default function TemplatesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Document Type</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Document Type (Optional)</label>
             <select value={form.documentType} onChange={(e) => setForm((p) => ({ ...p, documentType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               {DOC_TYPES.map((d) => (
                 <option key={d} value={d}>
@@ -202,7 +212,7 @@ export default function TemplatesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Paper Layout</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Paper Layout (Optional)</label>
             <select value={form.layoutType} onChange={(e) => setForm((p) => ({ ...p, layoutType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="A4_PORTRAIT">A4 Portrait</option>
               <option value="A4_LANDSCAPE">A4 Landscape</option>
@@ -211,21 +221,21 @@ export default function TemplatesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Header Company Title</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Header Company Title (Optional)</label>
             <input
               value={form.headerConfig?.companyTitle || ''}
               onChange={(e) => setForm((p) => ({ ...p, headerConfig: { ...p.headerConfig, companyTitle: e.target.value } }))}
               className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
             />
           </div>
-          <div className="sm:col-span-2 flex items-center gap-4 text-xs pt-1">
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-4 text-xs pt-1">
             <label className="inline-flex items-center gap-1.5">
               <input type="checkbox" checked={form.showUrduLabels} onChange={(e) => setForm((p) => ({ ...p, showUrduLabels: e.target.checked }))} />
-              <span>Include Urdu Labels</span>
+              <span>Include Urdu Labels (Optional)</span>
             </label>
             <label className="inline-flex items-center gap-1.5">
               <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm((p) => ({ ...p, isDefault: e.target.checked }))} />
-              <span>Set as Default for Document Type</span>
+              <span>Set as Default for Document Type (Optional)</span>
             </label>
           </div>
         </div>

@@ -40,13 +40,22 @@ export default function EmployeesPage() {
     ? table.rows
     : table.rows.filter((r) => r.primaryRole !== 'SUPER_ADMIN');
 
+  const invalidateEmployees = () => {
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+    queryClient.invalidateQueries({ queryKey: ['employees-options'] });
+    queryClient.invalidateQueries({ queryKey: ['booker-options'] });
+    queryClient.invalidateQueries({ queryKey: ['staff-options'] });
+    queryClient.invalidateQueries({ queryKey: ['salesmen-options'] });
+    queryClient.invalidateQueries({ queryKey: ['dsr-staff-options'] });
+  };
+
   const saveMutation = useMutation({
     mutationFn: (payload) =>
       modalState.editingId
         ? apiClient.put(`/hrm/employees/${modalState.editingId}`, payload)
         : apiClient.post('/hrm/employees', payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      invalidateEmployees();
       addToast({ type: 'success', message: modalState.editingId ? 'Staff member updated.' : 'Staff member added.' });
       setModalState((p) => ({ ...p, open: false }));
     },
@@ -58,7 +67,7 @@ export default function EmployeesPage() {
   const toggleWorkPartMutation = useMutation({
     mutationFn: ({ id, workParts }) => apiClient.patch(`/hrm/work-assignments/${id}`, { workParts }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      invalidateEmployees();
       addToast({ type: 'success', message: 'Staff job access updated.' });
     },
     onError: (err) => {
@@ -69,7 +78,7 @@ export default function EmployeesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id) => apiClient.delete(`/hrm/employees/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      invalidateEmployees();
       addToast({ type: 'success', message: 'Staff member removed.' });
       setDeleteTarget(null);
     },

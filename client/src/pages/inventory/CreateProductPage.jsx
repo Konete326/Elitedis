@@ -77,6 +77,7 @@ export default function CreateProductPage() {
     mutationFn: (payload) => apiClient.post('/inventory/products', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-options'] });
       addToast({ type: 'success', message: 'Product added to master catalog.' });
       if (saveAndNew) {
         setForm(buildEmptyProduct());
@@ -152,11 +153,14 @@ export default function CreateProductPage() {
 
       {missingPrereqs && (
         <SetupGuideBanner
-          missingMessage="Add at least one Company, Brand, and Category before creating a Product SKU."
+          isLoading={companiesQuery.isLoading || brandsQuery.isLoading || categoriesQuery.isLoading}
+          isOptional
+          title="Optional Catalog Grouping"
+          missingMessage="Add Products anytime! Companies, Brands, and Categories are optional for catalog filtering."
           steps={[
-            { label: 'Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
-            { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
-            { label: 'Category', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
+            { label: 'Company (Optional)', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+            { label: 'Brand (Optional)', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+            { label: 'Category (Optional)', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
           ]}
         />
       )}
@@ -166,7 +170,7 @@ export default function CreateProductPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">SKU Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">SKU Code <span className="text-[var(--status-danger)]">*</span></label>
                 <button
                   type="button"
                   onClick={() => setForm((p) => ({ ...p, skuCode: suggestCode('SKU', Date.now() % 900) }))}
@@ -186,7 +190,7 @@ export default function CreateProductPage() {
               {skuError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{skuError}</p>}
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product Name <span className="text-[var(--status-danger)]">*</span></label>
               <input
                 required
                 value={form.productName}
@@ -198,7 +202,7 @@ export default function CreateProductPage() {
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input
                 value={form.barcode}
                 onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
@@ -209,14 +213,13 @@ export default function CreateProductPage() {
               {barcodeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{barcodeError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
-                required
                 value={form.companyId}
                 onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value, brandId: '' }))}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
-                <option value="">Select company...</option>
+                <option value="">None / Optional...</option>
                 {companies.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.companyName}
@@ -225,14 +228,13 @@ export default function CreateProductPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
-                required
                 value={form.brandId}
                 onChange={(e) => setForm((p) => ({ ...p, brandId: e.target.value }))}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
-                <option value="">Select brand...</option>
+                <option value="">None / Optional...</option>
                 {filteredBrands.map((b) => (
                   <option key={b._id} value={b._id}>
                     {b.brandName}
@@ -241,14 +243,13 @@ export default function CreateProductPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
-                required
                 value={form.categoryId}
                 onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value, subCategoryId: '' }))}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
-                <option value="">Select category...</option>
+                <option value="">None / Optional...</option>
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.name}
@@ -257,7 +258,7 @@ export default function CreateProductPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
                 value={form.subCategoryId}
                 onChange={(e) => setForm((p) => ({ ...p, subCategoryId: e.target.value }))}
@@ -273,7 +274,7 @@ export default function CreateProductPage() {
             </div>
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
                 <select
                   value={form.status}
                   onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}

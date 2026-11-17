@@ -51,8 +51,13 @@ export default function AreasRoutesPage() {
         ? apiClient.post('/crm/areas', areaForm)
         : apiClient.post('/crm/routes', routeForm),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`crm-${tab}`] });
+      queryClient.invalidateQueries({ queryKey: ['crm-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-routes'] });
       queryClient.invalidateQueries({ queryKey: ['crm-areas-options'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-areas-routes'] });
+      queryClient.invalidateQueries({ queryKey: ['prereq-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['prereq-routes'] });
+      queryClient.invalidateQueries({ queryKey: ['territories-options'] });
       addToast({ type: 'success', message: tab === 'areas' ? 'Area created.' : 'Route created.' });
       setModalOpen(false);
     },
@@ -154,7 +159,7 @@ export default function AreasRoutesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Code</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Code *</label>
               <input
                 required
                 value={areaForm.areaCode}
@@ -164,7 +169,7 @@ export default function AreasRoutesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name *</label>
               <input
                 required
                 value={areaForm.areaName}
@@ -174,7 +179,7 @@ export default function AreasRoutesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Town / Sub-District</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Town / Sub-District (Optional)</label>
               <input
                 value={areaForm.subDistrict}
                 onChange={(e) => setAreaForm((p) => ({ ...p, subDistrict: e.target.value }))}
@@ -182,7 +187,7 @@ export default function AreasRoutesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City (Optional)</label>
               <input
                 value={areaForm.city}
                 onChange={(e) => setAreaForm((p) => ({ ...p, city: e.target.value }))}
@@ -193,7 +198,7 @@ export default function AreasRoutesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area *</label>
               <select
                 required
                 value={routeForm.areaId}
@@ -209,7 +214,7 @@ export default function AreasRoutesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Code</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Code *</label>
               <input
                 required
                 value={routeForm.routeCode}
@@ -219,7 +224,7 @@ export default function AreasRoutesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Name *</label>
               <input
                 required
                 value={routeForm.routeName}

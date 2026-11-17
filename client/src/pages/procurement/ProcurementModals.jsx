@@ -59,7 +59,7 @@ export function CreatePoModal({
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company *</label>
             <select
               required
               value={form.supplierCompanyId}
@@ -75,7 +75,7 @@ export function CreatePoModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Order Stage</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Order Stage (Optional)</label>
             <select
               value={form.status}
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -88,7 +88,7 @@ export function CreatePoModal({
           </div>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Receiving Warehouse</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Receiving Warehouse *</label>
           <select
             required
             value={form.toWarehouseId}
@@ -104,7 +104,7 @@ export function CreatePoModal({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product *</label>
           <select
             required
             value={form.productId}
@@ -128,7 +128,7 @@ export function CreatePoModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Base Quantity</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Base Quantity *</label>
             <input
               type="number"
               min="1"
@@ -139,7 +139,7 @@ export function CreatePoModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Purchase Rate (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Purchase Rate PKR (Optional)</label>
             <input
               type="number"
               min="0"
@@ -194,7 +194,7 @@ export function ReceiveGoodsModal({ target, warehouses, onClose, onSubmit, isSub
           <strong className="text-[var(--text-primary)]">{wh?.warehouseName || target?.toWarehouseId?.warehouseName || '—'}</strong>
         </p>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Put-Away Zone</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Put-Away Zone *</label>
           <select
             required
             value={zoneId}
@@ -214,7 +214,7 @@ export function ReceiveGoodsModal({ target, warehouses, onClose, onSubmit, isSub
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rack / Floor Area</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rack / Floor Area *</label>
           <select
             required
             value={areaId}
@@ -265,7 +265,7 @@ export function PaySupplierModal({ isOpen, target, companies, onClose, onSubmit,
     >
       <div className="space-y-3">
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company *</label>
           <select
             required
             value={supplierCompanyId}
@@ -282,7 +282,7 @@ export function PaySupplierModal({ isOpen, target, companies, onClose, onSubmit,
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Mode</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Mode (Optional)</label>
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
@@ -294,7 +294,7 @@ export function PaySupplierModal({ isOpen, target, companies, onClose, onSubmit,
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Amount (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Amount (PKR) *</label>
             <input
               type="number"
               min="1"
@@ -307,7 +307,7 @@ export function PaySupplierModal({ isOpen, target, companies, onClose, onSubmit,
           </div>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Narration</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Narration (Optional)</label>
           <input
             value={narration}
             onChange={(e) => setNarration(e.target.value)}

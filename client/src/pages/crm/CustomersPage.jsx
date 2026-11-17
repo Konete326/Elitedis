@@ -52,6 +52,9 @@ export default function CustomersPage() {
         : apiClient.post('/crm/customers', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers-options'] });
+      queryClient.invalidateQueries({ queryKey: ['prereq-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['booker-customers'] });
       addToast({ type: 'success', message: modalState.editingId ? 'Customer updated.' : 'Customer added.' });
       setModalState({ open: false, initial: null, editingId: null, key: 0 });
     },
@@ -64,6 +67,9 @@ export default function CustomersPage() {
     mutationFn: (id) => apiClient.delete(`/crm/customers/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers-options'] });
+      queryClient.invalidateQueries({ queryKey: ['prereq-customers'] });
+      queryClient.invalidateQueries({ queryKey: ['booker-customers'] });
       addToast({ type: 'success', message: 'Customer deleted.' });
       setDeleteTarget(null);
     },
@@ -164,14 +170,14 @@ export default function CustomersPage() {
         }
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Add your market Areas and Routes first so you can assign customer shops to delivery routes cleanly."
-          steps={[
-            { label: 'Create Areas & Routes', done: hasAreas && hasRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas & Routes' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        optional
+        isLoading={!prereqReady}
+        missingMessage="Add your market Areas and Routes first so you can assign customer shops to delivery routes cleanly."
+        steps={[
+          { label: 'Create Areas & Routes', done: hasAreas && hasRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas & Routes' },
+        ]}
+      />
 
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Total Customers" value={table.pagination.totalRecords} icon={Users} status="primary" />

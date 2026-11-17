@@ -63,6 +63,7 @@ import FinancialStatementsPage from '../pages/accounts/FinancialStatementsPage';
 import ReportsCenterPage from '../pages/reports/ReportsCenterPage';
 import CompanySharePage from '../pages/reports/CompanySharePage';
 import ProcurementPage from '../pages/procurement/ProcurementPage';
+import DistributorsPage from '../pages/super-admin/DistributorsPage';
 import NotFound404 from '../pages/errors/NotFound404';
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN'];
@@ -180,6 +181,8 @@ export default function AppRoutes() {
 
           <Route path="/reports/center" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'ACCOUNTANT', 'WAREHOUSE_MANAGER']}><ReportsCenterPage /></ProtectedRoute>} />
           <Route path="/reports/company-share" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'BOOKER']}><CompanySharePage /></ProtectedRoute>} />
+
+          <Route path="/super-admin/distributors" element={<ProtectedRoute allowedRoles={['SUPER_ADMIN']}><DistributorsPage /></ProtectedRoute>} />
         </Route>
       </Route>
 

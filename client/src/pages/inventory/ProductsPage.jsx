@@ -14,7 +14,7 @@ import {
 import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
-import ProductFormModal, { buildEmptyProduct } from './ProductFormModal';
+import ProductFormModal, { PRODUCT_RATE_LIST_COLUMNS, buildEmptyProduct } from './ProductFormModal';
 import { extractListPayload, formatCurrency } from '../../utils/formatters';
 
 export default function ProductsPage() {
@@ -44,6 +44,7 @@ export default function ProductsPage() {
         : apiClient.post('/inventory/products', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-options'] });
       addToast({ type: 'success', message: modalState.editingId ? 'Product updated.' : 'Product created.' });
       setModalState({ open: false, initial: null, editingId: null, key: 0 });
     },
@@ -56,6 +57,7 @@ export default function ProductsPage() {
     mutationFn: (id) => apiClient.delete(`/inventory/products/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-options'] });
       addToast({ type: 'success', message: 'Product deleted.' });
       setDeleteTarget(null);
     },
@@ -73,6 +75,7 @@ export default function ProductsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-options'] });
       addToast({ type: 'success', message: 'Bulk product rule updated.' });
       table.setSelectedKeys([]);
     },
@@ -200,11 +203,14 @@ export default function ProductsPage() {
 
       {missingPrereqs && (
         <SetupGuideBanner
-          missingMessage="Set up at least one Company, Brand, and Category before creating Products."
+          isLoading={companiesQuery.isLoading || brandsQuery.isLoading || categoriesQuery.isLoading}
+          isOptional
+          title="Optional Catalog Grouping"
+          missingMessage="Add Products anytime! Companies, Brands, and Categories are optional for catalog filtering."
           steps={[
-            { label: 'Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
-            { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
-            { label: 'Category', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
+            { label: 'Company (Optional)', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+            { label: 'Brand (Optional)', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+            { label: 'Category (Optional)', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
           ]}
         />
       )}
@@ -322,12 +328,7 @@ export default function ProductsPage() {
         onClose={() => setPrintOpen(false)}
         title="Product Wholesale & Retail Rate List"
         documentType="Rate List"
-        columns={[
-          { key: 'skuCode', header: 'SKU', numeric: true },
-          { key: 'productName', header: 'Product Name' },
-          { key: 'wholesale', header: 'Wholesale Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.wholesaleSaleRate || r.baseUnit?.wholesaleSaleRate || 0 },
-          { key: 'retail', header: 'POS End Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.posRetailEndRate || r.baseUnit?.posRetailEndRate || 0 },
-        ]}
+        columns={PRODUCT_RATE_LIST_COLUMNS}
         rows={table.rows}
       />
 

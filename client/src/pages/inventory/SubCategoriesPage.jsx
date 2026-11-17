@@ -48,12 +48,15 @@ export default function SubCategoriesPage() {
   const nameError = touched.name ? validateField('required', form.name, { required: true, minLength: 2, label: 'Sub-Category Name' }) : '';
 
   const saveMutation = useMutation({
-    mutationFn: (payload) =>
-      editingId
-        ? apiClient.put(`/inventory/sub-categories/${editingId}`, payload)
-        : apiClient.post('/inventory/sub-categories', payload),
+    mutationFn: (payload) => {
+      const clean = { ...payload, companyId: payload.companyId || null };
+      return editingId
+        ? apiClient.put(`/inventory/sub-categories/${editingId}`, clean)
+        : apiClient.post('/inventory/sub-categories', clean);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sub-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-categories-options'] });
       addToast({ type: 'success', message: editingId ? 'Sub-category updated.' : 'Sub-category created.' });
       setModalOpen(false);
     },
@@ -66,6 +69,7 @@ export default function SubCategoriesPage() {
     mutationFn: (id) => apiClient.delete(`/inventory/sub-categories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sub-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-categories-options'] });
       addToast({ type: 'success', message: 'Sub-category deleted.' });
       setDeleteTarget(null);
     },
@@ -128,8 +132,9 @@ export default function SubCategoriesPage() {
         }
       />
 
-      {!categoriesQuery.isLoading && categories.length === 0 && (
+      {categories.length === 0 && (
         <SetupGuideBanner
+          isLoading={categoriesQuery.isLoading}
           missingMessage="Create at least one Parent Category before adding Sub-Categories."
           steps={[{ label: 'Create Category', done: false, to: '/inventory/categories', actionLabel: 'Go to Categories' }]}
         />
@@ -207,7 +212,7 @@ export default function SubCategoriesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Code <span className="text-[var(--status-danger)]">*</span></label>
                 <button
                   type="button"
                   onClick={() =>
@@ -232,7 +237,7 @@ export default function SubCategoriesPage() {
               {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category Name <span className="text-[var(--status-danger)]">*</span></label>
               <input
                 required
                 value={form.name}
@@ -244,7 +249,7 @@ export default function SubCategoriesPage() {
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Category</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Category <span className="text-[var(--status-danger)]">*</span></label>
               <select
                 required
                 value={form.parentCategoryId}
@@ -260,7 +265,7 @@ export default function SubCategoriesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -271,7 +276,7 @@ export default function SubCategoriesPage() {
               </select>
             </div>
           </div>
-          <ImageDropzone label="Sub-Category Image" folder="categories" value={form.image} onChange={(image) => setForm((p) => ({ ...p, image }))} />
+          <ImageDropzone label="Sub-Category Image (Optional)" folder="categories" value={form.image} onChange={(image) => setForm((p) => ({ ...p, image }))} />
         </div>
       </FormModal>
 

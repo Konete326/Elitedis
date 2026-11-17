@@ -66,13 +66,17 @@ export default function PayrollPage() {
         subtitle="Create monthly salary sheets with automatic sales commissions and ledger posting"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="month"
-              aria-label="Payroll Month"
-              value={monthYear}
-              onChange={(e) => setMonthYear(e.target.value)}
-              className="min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-mono"
-            />
+            <label className="text-xs font-semibold text-[var(--text-secondary)]">
+              Month *
+              <input
+                type="month"
+                required
+                aria-label="Payroll Month *"
+                value={monthYear}
+                onChange={(e) => setMonthYear(e.target.value)}
+                className="ml-2 min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-mono text-[var(--text-primary)]"
+              />
+            </label>
             <button
               type="button"
               onClick={() => setGenerateConfirmOpen(true)}

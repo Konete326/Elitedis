@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Delete, Check, Plus, Minus } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
 
 const DIGITS = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
 
 /**
- * Mobile touch numeric keypad modal (0-9, +, -, Clear, OK) with >=48px targets
- * for Booker, Salesman, POS, and Physical Stock Count quantity entry.
+ * Portal-mounted (z-[100]) mobile touch numeric keypad modal (0-9, +, -, Clear, OK)
+ * with >=48px targets for Booker, Salesman, POS, and Physical Stock Count entry.
  */
 export function TouchKeypadModal({
   isOpen,
@@ -94,14 +95,14 @@ export function TouchKeypadModal({
     onClose?.();
   };
 
-  if (!active) return null;
+  if (!active || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
@@ -125,7 +126,7 @@ export function TouchKeypadModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-3.5 sm:p-4 space-y-3">
           {units.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {units.map((u) => (
@@ -245,7 +246,8 @@ export function TouchKeypadModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

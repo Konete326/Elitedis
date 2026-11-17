@@ -53,7 +53,31 @@
     background-color: var(--bg-canvas);
     color: var(--text-primary);
     accent-color: var(--accent-primary);
-    transition: background-color 200ms ease-out, color 200ms ease-out, border-color 200ms ease-out;
+    transition:
+      background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  header,
+  aside,
+  main,
+  nav,
+  table,
+  thead,
+  tbody,
+  tr,
+  th,
+  td,
+  input,
+  select,
+  textarea,
+  button {
+    transition:
+      background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   h1,
@@ -82,66 +106,40 @@
   }
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @keyframes eliteFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes eliteSlideUp {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes eliteScaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translate3d(0, 4px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translate3d(0, 0, 0);
-  }
+  from { opacity: 0; transform: scale(0.96) translate3d(0, 4px, 0); }
+  to { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
 }
 
 @keyframes eliteDrawerLeft {
-  from {
-    opacity: 0.7;
-    transform: translate3d(-100%, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+  from { opacity: 0.7; transform: translate3d(-100%, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes eliteDrawerRight {
-  from {
-    opacity: 0.7;
-    transform: translate3d(100%, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
+  from { opacity: 0.7; transform: translate3d(100%, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes eliteShimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @layer utilities {
@@ -152,8 +150,8 @@
 
   .theme-transition {
     transition-property: background-color, border-color, color, fill, stroke, box-shadow;
-    transition-duration: 200ms;
-    transition-timing-function: ease-out;
+    transition-duration: 220ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .animate-fade-in {
@@ -197,6 +195,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
   }
 }
 

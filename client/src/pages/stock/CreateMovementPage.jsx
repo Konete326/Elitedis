@@ -175,6 +175,7 @@ export default function CreateMovementPage() {
 
       {missingPrereqs && (
         <SetupGuideBanner
+          isLoading={warehousesQuery.isLoading || productsQuery.isLoading}
           missingMessage="Create at least one Warehouse and one Product SKU before posting Stock Movements."
           steps={[
             { label: 'Warehouse', done: warehouses.length > 0, to: '/stock/warehouses', actionLabel: 'Warehouses' },
@@ -186,13 +187,13 @@ export default function CreateMovementPage() {
       <form onSubmit={handleSubmit} className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 lg:overflow-hidden">
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Task / Reference Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Task / Reference Name <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <input value={taskName} onChange={(e) => setTaskName(e.target.value)} placeholder={`New ${movementType.toLowerCase()} batch`} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
 
           {movementType !== 'PURCHASE' && (
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">From Warehouse</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">From Warehouse <span className="text-[var(--status-danger)]">*</span></label>
               <select required value={fromWarehouseId} onChange={(e) => setFromWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select source...</option>
                 {warehouses.map((w) => (
@@ -206,7 +207,7 @@ export default function CreateMovementPage() {
 
           {(movementType === 'PURCHASE' || movementType === 'TRANSFER') && (
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Destination Warehouse</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Destination Warehouse <span className="text-[var(--status-danger)]">*</span></label>
               <select required value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select destination...</option>
                 {warehouses.map((w) => (
@@ -220,7 +221,7 @@ export default function CreateMovementPage() {
 
           {(movementType === 'PURCHASE' || movementType === 'EXPIRY_DAMAGE_BACK') && (
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Supplier Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select value={supplierCompanyId} onChange={(e) => setSupplierCompanyId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Optional...</option>
                 {(companiesQuery.data || []).map((c) => (
@@ -233,7 +234,7 @@ export default function CreateMovementPage() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Commit Mode</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Commit Mode <span className="text-[var(--status-danger)]">*</span></label>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="COMPLETED">Approve &amp; Post Stock Immediately</option>
               <option value="PENDING">Save as Pending Verification</option>

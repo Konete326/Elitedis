@@ -1,21 +1,29 @@
 import {
-  Product,
-  StockBatch,
-  StockMovement,
-  Customer,
-  Order,
-  DispatchSheet,
-  SaleInvoice,
-  Recovery,
-  PendingTask,
-  AccountLedger,
-  Notification,
+  Product as _Product,
+  StockBatch as _StockBatch,
+  StockMovement as _StockMovement,
+  Customer as _Customer,
+  Order as _Order,
+  DispatchSheet as _DispatchSheet,
+  SaleInvoice as _SaleInvoice,
+  Recovery as _Recovery,
+  PendingTask as _PendingTask,
+  AccountLedger as _AccountLedger,
+  Notification as _Notification,
 } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery } from '../middlewares/tenantMiddleware.js';
 import { evaluateLowStockAndExpiryAlerts } from '../services/automationAlert.service.js';
 
+const m = () => getTenantModels({
+  Product: _Product, StockBatch: _StockBatch, StockMovement: _StockMovement, Customer: _Customer,
+  Order: _Order, DispatchSheet: _DispatchSheet, SaleInvoice: _SaleInvoice, Recovery: _Recovery,
+  PendingTask: _PendingTask, AccountLedger: _AccountLedger, Notification: _Notification,
+});
+
 export const getModuleDashboard = asyncHandler(async (req, res) => {
+  const { Product, StockBatch, StockMovement, Customer, Order, SaleInvoice, Recovery, PendingTask, Notification } = m();
   const distributorId = req.distributorId;
   const slug = String(req.params.moduleSlug || 'executive').toLowerCase();
 
@@ -105,6 +113,7 @@ export const getModuleDashboard = asyncHandler(async (req, res) => {
 });
 
 export const getReport = asyncHandler(async (req, res) => {
+  const { Product, StockBatch, StockMovement, SaleInvoice, Recovery, PendingTask, AccountLedger } = m();
   const distributorId = req.distributorId;
   const slug = String(req.params.reportSlug || '').toLowerCase();
   const { skip, limit, buildPaginationMeta } = buildPaginationQuery(req, { defaultLimit: 25 });
@@ -182,6 +191,7 @@ export const getReport = asyncHandler(async (req, res) => {
 });
 
 export const listNotifications = asyncHandler(async (req, res) => {
+  const { Notification } = m();
   const { skip, limit, buildPaginationMeta } = buildPaginationQuery(req, { defaultLimit: 15 });
   const filter = { distributorId: req.distributorId };
   if (req.query.unreadOnly === 'true') filter.isRead = false;
@@ -196,6 +206,7 @@ export const listNotifications = asyncHandler(async (req, res) => {
 });
 
 export const markNotificationRead = asyncHandler(async (req, res) => {
+  const { Notification } = m();
   if (req.params.id === 'all') {
     await Notification.updateMany(
       { distributorId: req.distributorId, isRead: false },
@@ -222,6 +233,7 @@ export const runAutomationSweep = asyncHandler(async (req, res) => {
 });
 
 export const getDailySalesReport = asyncHandler(async (req, res) => {
+  const { Order, DispatchSheet, SaleInvoice, Recovery } = m();
   const distributorId = req.distributorId;
   const now = new Date();
   const startDate = req.query.startDate

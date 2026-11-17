@@ -52,6 +52,7 @@ export default function TerritoriesPage() {
         : apiClient.post('/crm/territories', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['territories'] });
+      queryClient.invalidateQueries({ queryKey: ['territories-options'] });
       addToast({ type: 'success', message: editingId ? 'Territory updated.' : 'Territory created.' });
       setModalOpen(false);
     },
@@ -64,6 +65,7 @@ export default function TerritoriesPage() {
     mutationFn: (id) => apiClient.delete(`/crm/territories/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['territories'] });
+      queryClient.invalidateQueries({ queryKey: ['territories-options'] });
       addToast({ type: 'success', message: 'Territory deleted.' });
       setDeleteTarget(null);
     },
@@ -109,15 +111,15 @@ export default function TerritoriesPage() {
         }
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Add your market Areas, Routes, and Customer Shops first so territories can group them properly."
-          steps={[
-            { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
-            { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        optional
+        isLoading={!prereqReady}
+        missingMessage="Add your market Areas, Routes, and Customer Shops first so territories can group them properly."
+        steps={[
+          { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
+          { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
+        ]}
+      />
 
       <FilterToolbar
         searchValue={table.search}
@@ -194,7 +196,7 @@ export default function TerritoriesPage() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Code</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Code *</label>
             <input
               required
               value={form.territoryCode}
@@ -204,7 +206,7 @@ export default function TerritoriesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Name *</label>
             <input
               required
               value={form.territoryName}
@@ -214,7 +216,7 @@ export default function TerritoriesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Type</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Type (Optional)</label>
             <select
               value={form.territoryType}
               onChange={(e) => setForm((p) => ({ ...p, territoryType: e.target.value }))}
@@ -227,7 +229,7 @@ export default function TerritoriesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status (Optional)</label>
             <select
               value={form.status}
               onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}

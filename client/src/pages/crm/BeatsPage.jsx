@@ -66,6 +66,7 @@ export default function BeatsPage() {
         : apiClient.post('/crm/beats', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['beats'] });
+      queryClient.invalidateQueries({ queryKey: ['booker-beats'] });
       addToast({ type: 'success', message: editingId ? 'Beat plan updated.' : 'Beat plan created.' });
       setModalOpen(false);
     },
@@ -78,6 +79,7 @@ export default function BeatsPage() {
     mutationFn: (id) => apiClient.post(`/crm/beats/${id}/duplicate`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['beats'] });
+      queryClient.invalidateQueries({ queryKey: ['booker-beats'] });
       addToast({ type: 'success', message: 'Beat duplicated cleanly for reassignment.' });
     },
   });
@@ -86,6 +88,7 @@ export default function BeatsPage() {
     mutationFn: (id) => apiClient.delete(`/crm/beats/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['beats'] });
+      queryClient.invalidateQueries({ queryKey: ['booker-beats'] });
       addToast({ type: 'success', message: 'Beat plan deleted.' });
       setDeleteTarget(null);
     },
@@ -122,15 +125,15 @@ export default function BeatsPage() {
         }
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Set up Areas, Routes, and Customer Shops first before assigning weekly booker beats."
-          steps={[
-            { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
-            { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        optional
+        isLoading={!prereqReady}
+        missingMessage="Set up Areas, Routes, and Customer Shops first before assigning weekly booker beats."
+        steps={[
+          { label: 'Create Areas & Routes', done: hasAreasAndRoutes, to: '/crm/areas-routes', actionLabel: 'Setup Areas' },
+          { label: 'Add Customer Shops', done: hasCustomers, to: '/crm/customers', actionLabel: 'Add Customers' },
+        ]}
+      />
 
       <FilterToolbar
         searchValue={table.search}
@@ -226,7 +229,7 @@ export default function BeatsPage() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Code</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Code *</label>
             <input
               required
               value={form.beatCode}
@@ -236,7 +239,7 @@ export default function BeatsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Name *</label>
             <input
               required
               value={form.beatName}
@@ -246,7 +249,7 @@ export default function BeatsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Day</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Day (Optional)</label>
             <select
               value={form.beatDay}
               onChange={(e) => setForm((p) => ({ ...p, beatDay: e.target.value }))}
@@ -260,7 +263,7 @@ export default function BeatsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Assign Booker</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Assign Booker (Optional)</label>
             <select
               value={form.assignedBookerId}
               onChange={(e) => setForm((p) => ({ ...p, assignedBookerId: e.target.value }))}

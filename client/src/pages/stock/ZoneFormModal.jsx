@@ -59,7 +59,7 @@ export default function ZoneFormModal({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {!isEditing && (
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse <span className="text-[var(--status-danger)]">*</span></label>
             <select
               required
               value={form.warehouseId}
@@ -77,7 +77,7 @@ export default function ZoneFormModal({
         )}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold text-[var(--text-secondary)]">Zone Code</label>
+            <label className="text-xs font-semibold text-[var(--text-secondary)]">Zone Code <span className="text-[var(--status-danger)]">*</span></label>
             <button
               type="button"
               onClick={() => setForm((p) => ({ ...p, zoneCode: suggestCode('ZN', existingCount, existingCodes) }))}
@@ -97,7 +97,7 @@ export default function ZoneFormModal({
           {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Name</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Name <span className="text-[var(--status-danger)]">*</span></label>
           <input
             required
             value={form.zoneName}
@@ -109,7 +109,7 @@ export default function ZoneFormModal({
           {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Type</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone Type <span className="text-[var(--status-danger)]">*</span></label>
           <select value={form.zoneType} onChange={(e) => setForm((p) => ({ ...p, zoneType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
             <option value="NORMAL">Normal</option>
             <option value="MIX">Mix</option>
@@ -118,7 +118,7 @@ export default function ZoneFormModal({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Storage Purpose</label>
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Storage Purpose <span className="text-[var(--status-danger)]">*</span></label>
           <select value={form.storageType} onChange={(e) => setForm((p) => ({ ...p, storageType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
             <option value="NORMAL">Normal</option>
             <option value="DAMAGE">Damage</option>
@@ -129,7 +129,7 @@ export default function ZoneFormModal({
         <div className="sm:col-span-2 grid grid-cols-3 gap-2 pt-1">
           {['width', 'length', 'height'].map((dim) => (
             <div key={dim}>
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1 capitalize">{dim} (Ft)</label>
+              <label className="block text-[11px] text-[var(--text-muted)] mb-1 capitalize">{dim} (Ft) (Optional)</label>
               <input
                 type="number"
                 value={form.dimensions?.[dim] || 0}

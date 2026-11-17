@@ -1,10 +1,14 @@
-import { StockMovement, StockBatch, AccountLedger, Product, PendingTask } from '../models/index.js';
+import { StockMovement as _StockMovement, StockBatch as _StockBatch, AccountLedger as _AccountLedger, Product as _Product, PendingTask as _PendingTask } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { deriveBatchStatus, getProductUnitMeta, runWithTransaction } from '../services/stockLedger.service.js';
 import { postDoubleEntry } from '../services/accountingPost.service.js';
 
+const m = () => getTenantModels({ StockMovement: _StockMovement, StockBatch: _StockBatch, AccountLedger: _AccountLedger, Product: _Product, PendingTask: _PendingTask });
+
 export const listPurchaseOrders = asyncHandler(async (req, res) => {
+  const { StockMovement } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = { movementType: 'PURCHASE' };
   if (req.query.status) extra.status = req.query.status;
@@ -29,6 +33,7 @@ export const listPurchaseOrders = asyncHandler(async (req, res) => {
 });
 
 export const createPurchaseOrder = asyncHandler(async (req, res) => {
+  const { Product, StockMovement } = m();
   const { supplierCompanyId, toWarehouseId, items = [], status = 'PENDING', taskName, notes } = req.body;
   if (!toWarehouseId || !Array.isArray(items) || items.length === 0) {
     throw new AppError('toWarehouseId and at least one product item are required.', 400, 'INVALID_PURCHASE_ORDER');
@@ -71,6 +76,7 @@ export const createPurchaseOrder = asyncHandler(async (req, res) => {
 });
 
 export const convertRequestToOrder = asyncHandler(async (req, res) => {
+  const { StockMovement } = m();
   const po = await StockMovement.findOne({
     _id: req.params.id,
     distributorId: req.distributorId,
@@ -90,6 +96,7 @@ export const convertRequestToOrder = asyncHandler(async (req, res) => {
 });
 
 export const receivePurchaseOrder = asyncHandler(async (req, res) => {
+  const { StockMovement, Product, StockBatch, PendingTask } = m();
   const received = await runWithTransaction(async (session) => {
     const po = await StockMovement.findOne({
       _id: req.params.id,
@@ -192,6 +199,7 @@ export const receivePurchaseOrder = asyncHandler(async (req, res) => {
 });
 
 export const listSupplierPayments = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const { skip, limit, sort, buildPaginationMeta } = buildPaginationQuery(req, { defaultSortBy: 'transactionDate' });
   const extra = { voucherType: 'PAYMENT', partyType: 'SUPPLIER', accountCode: '2010' };
   if (req.query.supplierCompanyId) extra.partyId = req.query.supplierCompanyId;
@@ -236,6 +244,7 @@ export const recordSupplierPayment = asyncHandler(async (req, res) => {
 });
 
 export const getProcurementSummary = asyncHandler(async (req, res) => {
+  const { StockMovement, AccountLedger } = m();
   const distributorId = req.distributorId;
   const [draftCount, openCount, completedCount, payableAgg] = await Promise.all([
     StockMovement.countDocuments({ distributorId, movementType: 'PURCHASE', status: 'DRAFT' }),

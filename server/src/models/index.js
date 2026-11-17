@@ -1,4 +1,5 @@
 import { User } from './User.model.js';
+import { Distributor } from './Distributor.model.js';
 import { Company } from './Company.model.js';
 import { Brand } from './Brand.model.js';
 import { Category } from './Category.model.js';
@@ -23,6 +24,7 @@ import { AuditLog } from './AuditLog.model.js';
 
 export {
   User,
+  Distributor,
   Company,
   Brand,
   Category,
@@ -48,6 +50,7 @@ export {
 
 export default {
   User,
+  Distributor,
   Company,
   Brand,
   Category,

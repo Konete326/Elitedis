@@ -137,23 +137,23 @@ export default function AccountLedgersPage() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Voucher No</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Voucher No (Optional)</label>
             <input value={form.voucherNo} onChange={(e) => setForm((p) => ({ ...p, voucherNo: e.target.value.toUpperCase() }))} placeholder="Auto if blank" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Amount (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Amount (PKR) *</label>
             <input required type="number" min="1" value={form.amountPkr} onChange={(e) => setForm((p) => ({ ...p, amountPkr: Number(e.target.value) }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Debit Account Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Debit Account Name *</label>
             <input required value={form.debitName} onChange={(e) => setForm((p) => ({ ...p, debitName: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Account Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Account Name *</label>
             <input required value={form.creditName} onChange={(e) => setForm((p) => ({ ...p, creditName: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Narration</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Narration *</label>
             <input required value={form.narration} onChange={(e) => setForm((p) => ({ ...p, narration: e.target.value }))} placeholder="Reason for entry" className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm" />
           </div>
         </div>

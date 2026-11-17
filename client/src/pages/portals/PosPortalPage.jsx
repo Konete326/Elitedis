@@ -167,7 +167,7 @@ export default function PosPortalPage() {
                 <input
                   value={walkInCustomerName}
                   onChange={(e) => setWalkInCustomerName(e.target.value)}
-                  placeholder="Customer name"
+                  placeholder="Customer name (Optional)"
                   className="w-full min-h-[38px] sm:h-8 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
                 />
               )}

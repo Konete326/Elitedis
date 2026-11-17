@@ -1,11 +1,15 @@
-import { SaleInvoice, Recovery, Customer, PendingTask, StockMovement } from '../models/index.js';
+import { SaleInvoice as _SaleInvoice, Recovery as _Recovery, Customer as _Customer, PendingTask as _PendingTask, StockMovement as _StockMovement } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { runWithTransaction } from '../services/stockLedger.service.js';
 import { postDoubleEntry } from '../services/accountingPost.service.js';
 import { checkCustomerCreditAlert } from '../services/automationAlert.service.js';
 
+const m = () => getTenantModels({ SaleInvoice: _SaleInvoice, Recovery: _Recovery, Customer: _Customer, PendingTask: _PendingTask, StockMovement: _StockMovement });
+
 export const listSales = asyncHandler(async (req, res) => {
+  const { SaleInvoice } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
   for (const key of ['paymentStatus', 'status', 'invoiceMode', 'source', 'customerId', 'salesmanId']) {
@@ -34,6 +38,7 @@ export const listSales = asyncHandler(async (req, res) => {
 });
 
 export const getSaleById = asyncHandler(async (req, res) => {
+  const { SaleInvoice } = m();
   const sale = await SaleInvoice.findOne({ _id: req.params.id, distributorId: req.distributorId })
     .populate('customerId')
     .populate('orderId dispatchSheetId')
@@ -45,6 +50,7 @@ export const getSaleById = asyncHandler(async (req, res) => {
 });
 
 export const listRecoveries = asyncHandler(async (req, res) => {
+  const { Recovery } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
   for (const key of ['status', 'paymentMode', 'customerId', 'collectedById']) {
@@ -69,6 +75,7 @@ export const listRecoveries = asyncHandler(async (req, res) => {
 });
 
 export const assignRecoveryTask = asyncHandler(async (req, res) => {
+  const { SaleInvoice, PendingTask } = m();
   const { saleInvoiceIds = [], assignedToId, title = 'Payment Recovery Sheet', dueAt = null, priority = 'NORMAL' } = req.body;
   if (!assignedToId || !Array.isArray(saleInvoiceIds) || saleInvoiceIds.length === 0) {
     throw new AppError('assignedToId and saleInvoiceIds are required.', 400, 'INVALID_RECOVERY_ASSIGNMENT');
@@ -110,6 +117,7 @@ export const assignRecoveryTask = asyncHandler(async (req, res) => {
 });
 
 export const collectRecovery = asyncHandler(async (req, res) => {
+  const { Recovery, SaleInvoice, Customer } = m();
   const {
     customerId,
     saleInvoiceId = null,
@@ -220,6 +228,7 @@ export const collectRecovery = asyncHandler(async (req, res) => {
 });
 
 export const recordExtraReturn = asyncHandler(async (req, res) => {
+  const { StockMovement, PendingTask, SaleInvoice } = m();
   const { customerId, saleInvoiceId = null, items = [], warehouseId = null, assignedStorekeeperId = null } = req.body;
   if (!customerId || items.length === 0) {
     throw new AppError('customerId and returned items are required.', 400, 'INVALID_RETURN');

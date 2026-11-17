@@ -4,6 +4,13 @@ import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import ProductUnitPanels from './ProductUnitPanels';
 import { suggestCode, validateField } from '../../utils/validation';
 
+export const PRODUCT_RATE_LIST_COLUMNS = [
+  { key: 'skuCode', header: 'SKU', numeric: true },
+  { key: 'productName', header: 'Product Name' },
+  { key: 'wholesale', header: 'Wholesale Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.wholesaleSaleRate || r.baseUnit?.wholesaleSaleRate || 0 },
+  { key: 'retail', header: 'POS End Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.posRetailEndRate || r.baseUnit?.posRetailEndRate || 0 },
+];
+
 export function buildEmptyProduct() {
   return {
     skuCode: '',
@@ -62,6 +69,9 @@ export function computePackingMath(baseWeightKg, pack0) {
 export function buildProductPayload(form, baseWeightKg, pack0, packingMath) {
   return {
     ...form,
+    companyId: form.companyId || null,
+    brandId: form.brandId || null,
+    categoryId: form.categoryId || null,
     subCategoryId: form.subCategoryId || null,
     baseUnit: {
       ...form.baseUnit,
@@ -186,18 +196,20 @@ export default function ProductFormModal({
       <div className="space-y-5">
         {(companies.length === 0 || brands.length === 0 || categories.length === 0) && (
           <SetupGuideBanner
-            missingMessage="Products require a Company, Brand, and Category before saving."
+            isOptional
+            title="Optional Catalog Grouping"
+            missingMessage="You can create Products right away! Companies, Brands, and Categories are optional — add them anytime if you want catalog filtering."
             steps={[
-              { label: 'Company', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
-              { label: 'Brand', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
-              { label: 'Category', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
+              { label: 'Company (Optional)', done: companies.length > 0, to: '/inventory/companies', actionLabel: 'Companies' },
+              { label: 'Brand (Optional)', done: brands.length > 0, to: '/inventory/brands', actionLabel: 'Brands' },
+              { label: 'Category (Optional)', done: categories.length > 0, to: '/inventory/categories', actionLabel: 'Categories' },
             ]}
           />
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-[var(--text-secondary)]">SKU Code</label>
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">SKU Code <span className="text-[var(--status-danger)]">*</span></label>
               <button
                 type="button"
                 onClick={() => setForm((p) => ({ ...p, skuCode: suggestCode('SKU', existingCount, existingCodes) }))}
@@ -217,7 +229,7 @@ export default function ProductFormModal({
             {skuError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{skuError}</p>}
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Product Name <span className="text-[var(--status-danger)]">*</span></label>
             <input
               required
               value={form.productName}
@@ -229,7 +241,7 @@ export default function ProductFormModal({
             {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <input
               value={form.barcode}
               onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
@@ -240,9 +252,9 @@ export default function ProductFormModal({
             {barcodeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{barcodeError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company</label>
-            <select required value={form.companyId} onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value, brandId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Select company...</option>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+            <select value={form.companyId} onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value, brandId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="">None / Optional...</option>
               {companies.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.companyName}
@@ -251,9 +263,9 @@ export default function ProductFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand</label>
-            <select required value={form.brandId} onChange={(e) => setForm((p) => ({ ...p, brandId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Select brand...</option>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+            <select value={form.brandId} onChange={(e) => setForm((p) => ({ ...p, brandId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="">None / Optional...</option>
               {filteredBrands.map((b) => (
                 <option key={b._id} value={b._id}>
                   {b.brandName}
@@ -262,9 +274,9 @@ export default function ProductFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category</label>
-            <select required value={form.categoryId} onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value, subCategoryId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Select category...</option>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+            <select value={form.categoryId} onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value, subCategoryId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="">None / Optional...</option>
               {categories.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.name}
@@ -273,9 +285,9 @@ export default function ProductFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <select value={form.subCategoryId} onChange={(e) => setForm((p) => ({ ...p, subCategoryId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Optional...</option>
+              <option value="">None / Optional...</option>
               {filteredSubCategories.map((s) => (
                 <option key={s._id} value={s._id}>
                   {s.name}
@@ -284,7 +296,7 @@ export default function ProductFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
             <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>

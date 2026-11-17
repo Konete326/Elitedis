@@ -1,10 +1,14 @@
-import { PendingTask, DispatchSheet, StockMovement, StockBatch, Product } from '../models/index.js';
+import { PendingTask as _PendingTask, DispatchSheet as _DispatchSheet, StockMovement as _StockMovement, StockBatch as _StockBatch, Product as _Product } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { deriveBatchStatus, getProductUnitMeta, runWithTransaction } from '../services/stockLedger.service.js';
 import { recordAuditLog } from '../services/accountingPost.service.js';
 
+const m = () => getTenantModels({ PendingTask: _PendingTask, DispatchSheet: _DispatchSheet, StockMovement: _StockMovement, StockBatch: _StockBatch, Product: _Product });
+
 export const listMyTasks = asyncHandler(async (req, res) => {
+  const { PendingTask } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req, {
     defaultSortBy: 'dueAt',
     defaultSortOrder: 'asc',
@@ -38,6 +42,7 @@ export const listMyTasks = asyncHandler(async (req, res) => {
 });
 
 export const getTaskById = asyncHandler(async (req, res) => {
+  const { PendingTask, DispatchSheet, StockMovement } = m();
   const task = await PendingTask.findOne({ _id: req.params.id, distributorId: req.distributorId })
     .populate('assignedToId assignedById', 'fullName profileId')
     .populate('warehouseId', 'warehouseCode warehouseName zones')
@@ -57,6 +62,7 @@ export const getTaskById = asyncHandler(async (req, res) => {
 });
 
 export const startOrDraftTask = asyncHandler(async (req, res) => {
+  const { PendingTask } = m();
   const task = await PendingTask.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!task) throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
 
@@ -69,6 +75,7 @@ export const startOrDraftTask = asyncHandler(async (req, res) => {
 });
 
 export const executeDispatchTask = asyncHandler(async (req, res) => {
+  const { PendingTask, DispatchSheet } = m();
   const { checklistItems, extraDispatchItems = [], complete = true } = req.body;
 
   const task = await runWithTransaction(async (session) => {
@@ -101,6 +108,7 @@ export const executeDispatchTask = asyncHandler(async (req, res) => {
 });
 
 export const executePutAwayTask = asyncHandler(async (req, res) => {
+  const { PendingTask, Product, StockBatch, StockMovement } = m();
   const { placements = [], complete = true } = req.body;
 
   const task = await runWithTransaction(async (session) => {
@@ -175,6 +183,7 @@ export const executePutAwayTask = asyncHandler(async (req, res) => {
 });
 
 export const executeStockCountTask = asyncHandler(async (req, res) => {
+  const { PendingTask, StockBatch } = m();
   const { counts = [], complete = true } = req.body;
 
   const task = await runWithTransaction(async (session) => {
@@ -213,6 +222,7 @@ export const executeStockCountTask = asyncHandler(async (req, res) => {
 });
 
 export const completeTask = asyncHandler(async (req, res) => {
+  const { PendingTask } = m();
   const task = await PendingTask.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!task) throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
 
@@ -225,6 +235,7 @@ export const completeTask = asyncHandler(async (req, res) => {
 });
 
 export const cancelTask = asyncHandler(async (req, res) => {
+  const { PendingTask } = m();
   const task = await PendingTask.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!task) throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
   if (!['FRESH', 'DRAFT', 'PENDING'].includes(task.status)) {

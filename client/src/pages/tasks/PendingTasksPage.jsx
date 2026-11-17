@@ -153,7 +153,7 @@ export default function PendingTasksPage() {
         <input
           value={cancelReason}
           onChange={(e) => setCancelReason(e.target.value)}
-          placeholder="Optional reason for cancelling..."
+          placeholder="Reason for cancelling (Optional)"
           className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-xs"
         />
       </ConfirmModal>

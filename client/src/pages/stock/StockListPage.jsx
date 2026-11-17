@@ -220,7 +220,7 @@ export default function StockListPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Minimum Stock (Pack)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Minimum Stock (Pack) <span className="text-[var(--status-danger)]">*</span></label>
             <input
               type="number"
               value={ruleForm.minStockPack}
@@ -229,7 +229,7 @@ export default function StockListPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Maximum Stock (Pack)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Maximum Stock (Pack) <span className="text-[var(--status-danger)]">*</span></label>
             <input
               type="number"
               value={ruleForm.maxStockPack}
@@ -238,7 +238,7 @@ export default function StockListPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Expiry Alert Window (Days)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Expiry Alert Window (Days) <span className="text-[var(--status-danger)]">*</span></label>
             <input
               type="number"
               value={ruleForm.expiryAlertDays}

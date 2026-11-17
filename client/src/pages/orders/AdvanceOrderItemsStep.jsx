@@ -34,7 +34,7 @@ export default function AdvanceOrderItemsStep({
             className="rounded-xl border p-3 bg-[var(--bg-canvas)] space-y-2.5 md:space-y-0 md:grid md:grid-cols-6 md:gap-2 md:items-end"
           >
             <div className="md:col-span-2">
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1">Product #{idx + 1}</label>
+              <label className="block text-[11px] text-[var(--text-muted)] mb-1">Product #{idx + 1} *</label>
               <select
                 value={row.productId}
                 onChange={(e) => {
@@ -59,7 +59,7 @@ export default function AdvanceOrderItemsStep({
             </div>
             <div className="grid grid-cols-2 md:contents gap-2">
               <div>
-                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Qty</label>
+                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Qty *</label>
                 <input
                   type="number"
                   min="1"
@@ -69,7 +69,7 @@ export default function AdvanceOrderItemsStep({
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Sale Rate (PKR)</label>
+                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Sale Rate (PKR) *</label>
                 <input
                   type="number"
                   min="0"

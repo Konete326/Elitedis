@@ -21,6 +21,7 @@ import * as hrmCtrl from '../controllers/hrm.controller.js';
 import * as accCtrl from '../controllers/accounting.controller.js';
 import * as dashCtrl from '../controllers/dashboardReport.controller.js';
 import * as procCtrl from '../controllers/procurement.controller.js';
+import * as superAdminCtrl from '../controllers/superAdmin.controller.js';
 
 const router = express.Router();
 
@@ -41,7 +42,20 @@ authRouter.post('/register', authCtrl.register);
 authRouter.post('/refresh', authCtrl.refresh);
 authRouter.post('/logout', protect, authCtrl.logout);
 authRouter.get('/me', protect, authCtrl.getMe);
+authRouter.get('/agency-profile', protect, enforceTenant, authCtrl.getAgencyProfile);
+authRouter.put('/agency-profile', protect, enforceTenant, requireRole('ADMIN'), authCtrl.updateAgencyProfile);
+authRouter.post('/agency-profile/skip', protect, enforceTenant, requireRole('ADMIN'), authCtrl.skipAgencyOnboarding);
 router.use('/auth', authRouter);
+
+// Super Admin Platform Control Plane (/api/v1/super-admin)
+const superAdminRouter = express.Router();
+superAdminRouter.use(protect, requireRole('SUPER_ADMIN'));
+superAdminRouter.post('/distributors/test-uri', superAdminCtrl.testDistributorMongoUri);
+superAdminRouter.get('/distributors', superAdminCtrl.listDistributors);
+superAdminRouter.post('/distributors', superAdminCtrl.createDistributor);
+superAdminRouter.put('/distributors/:id', superAdminCtrl.updateDistributor);
+superAdminRouter.delete('/distributors/:id', superAdminCtrl.deleteDistributor);
+router.use('/super-admin', superAdminRouter);
 
 // Authenticated + Tenant-Scoped APIs
 router.use(protect, enforceTenant);

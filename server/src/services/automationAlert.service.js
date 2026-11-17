@@ -3,49 +3,19 @@ import { Notification } from '../models/Notification.model.js';
 import { StockBatch } from '../models/StockBatch.model.js';
 import { StockMovement } from '../models/StockMovement.model.js';
 import { Customer } from '../models/Customer.model.js';
+import { getTenantDb, getTenantModel } from '../config/tenantDb.js';
 
 const DEFAULT_RULES = [
-  {
-    ruleKey: 'LOW_STOCK_AUTO_PURCHASE',
-    ruleName: 'Low Stock Auto-Purchase Requirement',
-    triggerEvent: 'LOW_STOCK',
-    actionType: 'CREATE_PURCHASE_DRAFT',
-    thresholdValue: 0,
-    isEnabled: true,
-    description: 'Flags low stock batches and creates one idempotent Purchase Requirement draft.',
-  },
-  {
-    ruleKey: 'EXPIRY_WINDOW_WARNING',
-    ruleName: 'Batch Expiry Window Alert',
-    triggerEvent: 'EXPIRY_WINDOW',
-    actionType: 'NOTIFY_WAREHOUSE',
-    thresholdValue: 90,
-    isEnabled: true,
-    description: 'Fires expiry notifications when batch expiry falls within threshold days.',
-  },
-  {
-    ruleKey: 'CUSTOMER_CREDIT_LIMIT',
-    ruleName: 'Customer Credit Limit Overdue Alert',
-    triggerEvent: 'CREDIT_EXCEEDED',
-    actionType: 'NOTIFY_ADMIN',
-    thresholdValue: 100,
-    isEnabled: true,
-    description: 'Notifies admin when customer balance exceeds credit limit.',
-  },
-  {
-    ruleKey: 'BOUNCED_CHEQUE_ALERT',
-    ruleName: 'Bounced Cheque Critical Alert',
-    triggerEvent: 'CHEQUE_BOUNCED',
-    actionType: 'NOTIFY_ACCOUNTS',
-    thresholdValue: 0,
-    isEnabled: true,
-    description: 'Alerts accounts and restores customer balance when a cheque bounces.',
-  },
+  { ruleKey: 'LOW_STOCK_AUTO_PURCHASE', ruleName: 'Low Stock Auto-Purchase Requirement', triggerEvent: 'LOW_STOCK', actionType: 'CREATE_PURCHASE_DRAFT', thresholdValue: 0, isEnabled: true, description: 'Flags low stock batches and creates one idempotent Purchase Requirement draft.' },
+  { ruleKey: 'EXPIRY_WINDOW_WARNING', ruleName: 'Batch Expiry Window Alert', triggerEvent: 'EXPIRY_WINDOW', actionType: 'NOTIFY_WAREHOUSE', thresholdValue: 90, isEnabled: true, description: 'Fires expiry notifications when batch expiry falls within threshold days.' },
+  { ruleKey: 'CUSTOMER_CREDIT_LIMIT', ruleName: 'Customer Credit Limit Overdue Alert', triggerEvent: 'CREDIT_EXCEEDED', actionType: 'NOTIFY_ADMIN', thresholdValue: 100, isEnabled: true, description: 'Notifies admin when customer balance exceeds credit limit.' },
+  { ruleKey: 'BOUNCED_CHEQUE_ALERT', ruleName: 'Bounced Cheque Critical Alert', triggerEvent: 'CHEQUE_BOUNCED', actionType: 'NOTIFY_ACCOUNTS', thresholdValue: 0, isEnabled: true, description: 'Alerts accounts and restores customer balance when a cheque bounces.' },
 ];
 
 function getAutomationCol() {
-  if (!mongoose.connection?.db) throw new Error('Database is not connected.');
-  return mongoose.connection.db.collection('automation_rules');
+  const db = getTenantDb();
+  if (!db) throw new Error('Database is not connected.');
+  return db.collection('automation_rules');
 }
 
 export async function listAutomationRules(distributorId) {
@@ -121,12 +91,13 @@ export async function createNotificationIfAbsent({
   referenceId = null,
   session = null,
 }) {
+  const NotificationM = getTenantModel('Notification', Notification);
   if (idempotencyKey) {
-    const exists = await Notification.exists({ distributorId, idempotencyKey }).session(session);
+    const exists = await NotificationM.exists({ distributorId, idempotencyKey }).session(session);
     if (exists) return null;
   }
 
-  const [created] = await Notification.create(
+  const [created] = await NotificationM.create(
     [
       {
         distributorId,
@@ -164,10 +135,12 @@ export async function evaluateLowStockAndExpiryAlerts({
     if (prRule && prRule.isEnabled === false) autoPurchaseEnabled = false;
   }
 
+  const StockBatchM = getTenantModel('StockBatch', StockBatch);
+  const StockMovementM = getTenantModel('StockMovement', StockMovement);
   const batchFilter = { distributorId };
   if (warehouseId) batchFilter.warehouseId = warehouseId;
 
-  const batches = await StockBatch.find(batchFilter)
+  const batches = await StockBatchM.find(batchFilter)
     .populate('productId', 'skuCode productName companyId baseUnit packingUnits')
     .session(session)
     .lean();
@@ -243,7 +216,7 @@ export async function evaluateLowStockAndExpiryAlerts({
 
   let draftedPurchase = null;
   if (autoPurchaseEnabled && purchaseDraftItems.length > 0) {
-    const activePurchaseMovements = await StockMovement.find({
+    const activePurchaseMovements = await StockMovementM.find({
       distributorId,
       movementType: 'PURCHASE',
       status: { $in: ['DRAFT', 'PENDING', 'APPROVED'] },
@@ -265,7 +238,7 @@ export async function evaluateLowStockAndExpiryAlerts({
     });
 
     if (newItems.length > 0) {
-      const [draft] = await StockMovement.create(
+      const [draft] = await StockMovementM.create(
         [
           {
             distributorId,
@@ -314,7 +287,8 @@ export async function evaluateLowStockAndExpiryAlerts({
  */
 export async function checkCustomerCreditAlert({ distributorId, customerId, session = null }) {
   if (!customerId) return null;
-  const customer = await Customer.findOne({ _id: customerId, distributorId }).session(session).lean();
+  const CustomerM = getTenantModel('Customer', Customer);
+  const customer = await CustomerM.findOne({ _id: customerId, distributorId }).session(session).lean();
   if (!customer) return null;
 
   const limit = Number(customer.financialTerms?.creditLimitPkr) || 0;

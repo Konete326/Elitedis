@@ -1,14 +1,15 @@
-import mongoose from 'mongoose';
 import { StockBatch } from '../models/StockBatch.model.js';
 import { Product } from '../models/Product.model.js';
 import { AppError } from '../middlewares/errorMiddleware.js';
+import { getActiveConnection, getTenantModel } from '../config/tenantDb.js';
 
 /**
  * Executes a callback inside a Mongoose ACID transaction when supported (Atlas Replica Set),
  * falling back cleanly on standalone local mongod instances without replica sets.
  */
 export async function runWithTransaction(workFn) {
-  const session = await mongoose.startSession();
+  const conn = getActiveConnection();
+  const session = await conn.startSession();
   try {
     let result;
     try {
@@ -123,7 +124,8 @@ export async function assertZeroStockBeforeDelete({ distributorId, warehouseId, 
   if (zoneId) query.zoneId = zoneId;
   if (areaId) query.areaId = areaId;
 
-  const stockedBatches = await StockBatch.find(query)
+  const StockBatchM = getTenantModel('StockBatch', StockBatch);
+  const stockedBatches = await StockBatchM.find(query)
     .select('batchNo productId currentBaseQty')
     .limit(10)
     .lean();
@@ -147,7 +149,8 @@ async function resolveBaseQtyForLine(distributorId, item) {
   if (item.conversionQty && Number(item.conversionQty) > 0) {
     return rawQty * Number(item.conversionQty);
   }
-  const product = await Product.findOne({ _id: item.productId, distributorId })
+  const ProductM = getTenantModel('Product', Product);
+  const product = await ProductM.findOne({ _id: item.productId, distributorId })
     .select('baseUnit packingUnits')
     .lean();
   const meta = getProductUnitMeta(product, item.unitName);
@@ -159,6 +162,7 @@ async function resolveBaseQtyForLine(distributorId, item) {
  * Atomically reserves stock (availableBaseQty -> reservedBaseQty) when an order is APPROVED.
  */
 export async function reserveStockForOrder({ distributorId, lineItems = [], session = null }) {
+  const StockBatchM = getTenantModel('StockBatch', StockBatch);
   const allocations = [];
 
   for (const item of lineItems) {
@@ -167,7 +171,7 @@ export async function reserveStockForOrder({ distributorId, lineItems = [], sess
     if (neededBaseQty <= 0) continue;
 
     if (item.batchId) {
-      const batch = await StockBatch.findOne({
+      const batch = await StockBatchM.findOne({
         _id: item.batchId,
         distributorId,
         condition: 'NORMAL',
@@ -190,7 +194,7 @@ export async function reserveStockForOrder({ distributorId, lineItems = [], sess
       allocations.push({ batchId: batch._id, productId: item.productId, baseQty: neededBaseQty });
     } else {
       let remaining = neededBaseQty;
-      const candidateBatches = await StockBatch.find({
+      const candidateBatches = await StockBatchM.find({
         distributorId,
         productId: item.productId,
         condition: 'NORMAL',
@@ -228,9 +232,10 @@ export async function reserveStockForOrder({ distributorId, lineItems = [], sess
  * Releases reserved stock back to available stock when an approved order is CANCELLED.
  */
 export async function releaseReservedStock({ distributorId, allocations = [], session = null }) {
+  const StockBatchM = getTenantModel('StockBatch', StockBatch);
   for (const alloc of allocations) {
     if (!alloc?.batchId || !alloc?.baseQty) continue;
-    const batch = await StockBatch.findOne({ _id: alloc.batchId, distributorId }).session(session);
+    const batch = await StockBatchM.findOne({ _id: alloc.batchId, distributorId }).session(session);
     if (!batch) continue;
     batch.reservedBaseQty = Math.max(0, batch.reservedBaseQty - Number(alloc.baseQty));
     batch.availableBaseQty = Math.max(0, batch.currentBaseQty - batch.reservedBaseQty);
@@ -243,15 +248,16 @@ export async function releaseReservedStock({ distributorId, allocations = [], se
  * Deducts delivered stock from currentBaseQty and reservedBaseQty (or available stock for direct POS/extra sales).
  */
 export async function deductDeliveredStock({ distributorId, allocations = [], fromReserved = true, session = null }) {
+  const StockBatchM = getTenantModel('StockBatch', StockBatch);
   for (const alloc of allocations) {
     const qty = Math.max(0, Number(alloc.baseQty) || 0);
     if (!qty) continue;
 
     let batch = null;
     if (alloc.batchId) {
-      batch = await StockBatch.findOne({ _id: alloc.batchId, distributorId }).session(session);
+      batch = await StockBatchM.findOne({ _id: alloc.batchId, distributorId }).session(session);
     } else if (alloc.productId) {
-      batch = await StockBatch.findOne({
+      batch = await StockBatchM.findOne({
         distributorId,
         productId: alloc.productId,
         condition: 'NORMAL',

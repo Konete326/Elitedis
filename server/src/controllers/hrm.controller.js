@@ -1,11 +1,43 @@
 import bcrypt from 'bcryptjs';
-import { User, AttendancePayroll, PendingTask, Order, SaleInvoice, Recovery } from '../models/index.js';
+import {
+  User,
+  AttendancePayroll as _AttendancePayroll,
+  PendingTask as _PendingTask,
+  Order as _Order,
+  SaleInvoice as _SaleInvoice,
+  Recovery as _Recovery,
+} from '../models/index.js';
 import { destroyImage } from '../config/cloudinary.js';
+import { getCurrentTenantContext, getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { assertNotTargetingSuperAdmin } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { postDoubleEntry } from '../services/accountingPost.service.js';
 import { runWithTransaction } from '../services/stockLedger.service.js';
+
+const m = () =>
+  getTenantModels({
+    AttendancePayroll: _AttendancePayroll,
+    PendingTask: _PendingTask,
+    Order: _Order,
+    SaleInvoice: _SaleInvoice,
+    Recovery: _Recovery,
+  });
+
+async function syncUserToCustomTenant(userDoc, remove = false) {
+  const ctx = getCurrentTenantContext();
+  if (!ctx?.connection) return;
+  const TenantUser = ctx.connection.models.User || ctx.connection.model('User', User.schema, 'users');
+  if (remove) {
+    await TenantUser.deleteOne({ _id: userDoc._id }).catch(() => {});
+  } else {
+    await TenantUser.updateOne(
+      { _id: userDoc._id },
+      { $set: userDoc.toObject({ transform: false }) },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
 
 export const listEmployees = asyncHandler(async (req, res) => {
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
@@ -24,13 +56,7 @@ export const listEmployees = asyncHandler(async (req, res) => {
 
   const filter = buildScopedFilter(req, extra, ['profileId', 'fullName', 'email', 'phone'], searchRegex);
   const [employees, totalRecords] = await Promise.all([
-    User.find(filter)
-      .select('-passwordHash -refreshTokenHash')
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .populate('linkedWarehouseId', 'warehouseCode warehouseName')
-      .lean(),
+    User.find(filter).select('-passwordHash -refreshTokenHash').sort(sort).skip(skip).limit(limit).populate('linkedWarehouseId', 'warehouseCode warehouseName').lean(),
     User.countDocuments(filter),
   ]);
 
@@ -44,8 +70,9 @@ export const createEmployee = asyncHandler(async (req, res) => {
     throw new AppError('Employee password (min 6 characters) is required.', 400, 'INVALID_PASSWORD');
   }
   const normalizedEmail = String(email || '').toLowerCase().trim();
-  const exists = await User.exists({ email: normalizedEmail });
-  if (exists) throw new AppError('An employee with this email already exists.', 409, 'EMAIL_EXISTS');
+  if (await User.exists({ email: normalizedEmail })) {
+    throw new AppError('An employee with this email already exists.', 409, 'EMAIL_EXISTS');
+  }
 
   const passwordHash = await bcrypt.hash(password, 12);
   const created = await User.create({
@@ -56,6 +83,7 @@ export const createEmployee = asyncHandler(async (req, res) => {
     email: normalizedEmail,
     passwordHash,
   });
+  await syncUserToCustomTenant(created);
 
   res.status(201).json({ success: true, data: created.toJSON() });
 });
@@ -69,14 +97,11 @@ export const updateEmployee = asyncHandler(async (req, res) => {
   const oldAvatarId = emp.avatar?.publicId;
   const { password, distributorId: _ignore, ...updates } = req.body;
   Object.assign(emp, updates);
-  if (password && String(password).length >= 6) {
-    emp.passwordHash = await bcrypt.hash(password, 12);
-  }
+  if (password && String(password).length >= 6) emp.passwordHash = await bcrypt.hash(password, 12);
   await emp.save();
+  await syncUserToCustomTenant(emp);
 
-  if (oldAvatarId && emp.avatar?.publicId !== oldAvatarId) {
-    await destroyImage(oldAvatarId).catch(() => {});
-  }
+  if (oldAvatarId && emp.avatar?.publicId !== oldAvatarId) await destroyImage(oldAvatarId).catch(() => {});
   res.status(200).json({ success: true, data: emp.toJSON() });
 });
 
@@ -90,6 +115,7 @@ export const deleteEmployee = asyncHandler(async (req, res) => {
 
   const oldAvatarId = emp.avatar?.publicId;
   await emp.deleteOne();
+  await syncUserToCustomTenant(emp, true);
   if (oldAvatarId) await destroyImage(oldAvatarId).catch(() => {});
 
   res.status(200).json({ success: true, message: 'Employee removed successfully.' });
@@ -103,18 +129,18 @@ export const updateWorkAssignment = asyncHandler(async (req, res) => {
 
   const { primaryRole, workParts, linkedWarehouseId, assignedCompanyIds, assignedBrandIds } = req.body;
   if (primaryRole) emp.primaryRole = primaryRole;
-  if (workParts && typeof workParts === 'object') {
-    emp.workParts = { ...emp.workParts.toObject?.(), ...emp.workParts, ...workParts };
-  }
+  if (workParts && typeof workParts === 'object') emp.workParts = { ...emp.workParts.toObject?.(), ...emp.workParts, ...workParts };
   if (linkedWarehouseId !== undefined) emp.linkedWarehouseId = linkedWarehouseId;
   if (Array.isArray(assignedCompanyIds)) emp.assignedCompanyIds = assignedCompanyIds;
   if (Array.isArray(assignedBrandIds)) emp.assignedBrandIds = assignedBrandIds;
 
   await emp.save();
+  await syncUserToCustomTenant(emp);
   res.status(200).json({ success: true, data: emp.toJSON() });
 });
 
 export const listAttendance = asyncHandler(async (req, res) => {
+  const { AttendancePayroll } = m();
   const { skip, limit, sort, buildPaginationMeta } = buildPaginationQuery(req, { defaultSortBy: 'date' });
   const extra = { recordType: { $in: ['ATTENDANCE', 'LEAVE'] } };
   if (req.query.employeeId) extra.employeeId = req.query.employeeId;
@@ -123,19 +149,14 @@ export const listAttendance = asyncHandler(async (req, res) => {
 
   const filter = buildScopedFilter(req, extra);
   const [records, totalRecords] = await Promise.all([
-    AttendancePayroll.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .populate('employeeId approvedById', 'fullName profileId primaryRole')
-      .lean(),
+    AttendancePayroll.find(filter).sort(sort).skip(skip).limit(limit).populate('employeeId approvedById', 'fullName profileId primaryRole').lean(),
     AttendancePayroll.countDocuments(filter),
   ]);
-
   res.status(200).json({ success: true, data: records, pagination: buildPaginationMeta(totalRecords) });
 });
 
 export const recordAttendanceOrLeave = asyncHandler(async (req, res) => {
+  const { AttendancePayroll } = m();
   const created = await AttendancePayroll.create({
     ...req.body,
     distributorId: req.distributorId,
@@ -146,6 +167,7 @@ export const recordAttendanceOrLeave = asyncHandler(async (req, res) => {
 });
 
 export const listPayroll = asyncHandler(async (req, res) => {
+  const { AttendancePayroll } = m();
   const { skip, limit, sort, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = { recordType: 'PAYROLL' };
   if (req.query.employeeId) extra.employeeId = req.query.employeeId;
@@ -154,19 +176,14 @@ export const listPayroll = asyncHandler(async (req, res) => {
 
   const filter = buildScopedFilter(req, extra);
   const [records, totalRecords] = await Promise.all([
-    AttendancePayroll.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .populate('employeeId approvedById', 'fullName profileId primaryRole basicSalaryPkr commissionPct')
-      .lean(),
+    AttendancePayroll.find(filter).sort(sort).skip(skip).limit(limit).populate('employeeId approvedById', 'fullName profileId primaryRole basicSalaryPkr commissionPct').lean(),
     AttendancePayroll.countDocuments(filter),
   ]);
-
   res.status(200).json({ success: true, data: records, pagination: buildPaginationMeta(totalRecords) });
 });
 
 export const generateMonthlyPayroll = asyncHandler(async (req, res) => {
+  const { AttendancePayroll, SaleInvoice } = m();
   const { monthYear, employeeId = null } = req.body;
   if (!monthYear) throw new AppError('monthYear (e.g. 2026-11) is required.', 400, 'MONTH_REQUIRED');
 
@@ -180,57 +197,29 @@ export const generateMonthlyPayroll = asyncHandler(async (req, res) => {
 
   const createdPayrolls = [];
   for (const emp of employees) {
-    const existing = await AttendancePayroll.findOne({
-      distributorId: req.distributorId,
-      employeeId: emp._id,
-      recordType: 'PAYROLL',
-      monthYear,
-    });
-    if (existing) {
-      createdPayrolls.push(existing);
-      continue;
-    }
+    const existing = await AttendancePayroll.findOne({ distributorId: req.distributorId, employeeId: emp._id, recordType: 'PAYROLL', monthYear });
+    if (existing) { createdPayrolls.push(existing); continue; }
 
     const salesAgg = await SaleInvoice.aggregate([
-      {
-        $match: {
-          distributorId: req.distributorId,
-          salesmanId: emp._id,
-          status: { $ne: 'CANCELLED' },
-          createdAt: { $gte: start, $lt: end },
-        },
-      },
+      { $match: { distributorId: req.distributorId, salesmanId: emp._id, status: { $ne: 'CANCELLED' }, createdAt: { $gte: start, $lt: end } } },
       { $group: { _id: null, total: { $sum: '$grandSummary.netPayableAmount' } } },
     ]);
-
-    const totalSales = salesAgg[0]?.total || 0;
-    const commissionPkr = Number(((totalSales * (emp.commissionPct || 0)) / 100).toFixed(2));
-
+    const commissionPkr = Number((((salesAgg[0]?.total || 0) * (emp.commissionPct || 0)) / 100).toFixed(2));
     const payroll = await AttendancePayroll.create({
-      distributorId: req.distributorId,
-      employeeId: emp._id,
-      recordType: 'PAYROLL',
-      monthYear,
-      basicSalaryPkr: emp.basicSalaryPkr || 0,
-      commissionPkr,
-      allowancesPkr: Number(req.body.allowancesPkr) || 0,
-      deductionsPkr: Number(req.body.deductionsPkr) || 0,
-      paymentStatus: 'PENDING',
-      approvedById: req.user._id,
+      distributorId: req.distributorId, employeeId: emp._id, recordType: 'PAYROLL', monthYear,
+      basicSalaryPkr: emp.basicSalaryPkr || 0, commissionPkr,
+      allowancesPkr: Number(req.body.allowancesPkr) || 0, deductionsPkr: Number(req.body.deductionsPkr) || 0,
+      paymentStatus: 'PENDING', approvedById: req.user._id,
     });
     createdPayrolls.push(payroll);
   }
-
   res.status(201).json({ success: true, data: createdPayrolls });
 });
 
 export const payPayroll = asyncHandler(async (req, res) => {
+  const { AttendancePayroll } = m();
   const payroll = await runWithTransaction(async (session) => {
-    const doc = await AttendancePayroll.findOne({
-      _id: req.params.id,
-      distributorId: req.distributorId,
-      recordType: 'PAYROLL',
-    }).session(session);
+    const doc = await AttendancePayroll.findOne({ _id: req.params.id, distributorId: req.distributorId, recordType: 'PAYROLL' }).session(session);
     if (!doc) throw new AppError('Payroll record not found.', 404, 'PAYROLL_NOT_FOUND');
     if (doc.paymentStatus === 'PAID') throw new AppError('Payroll already paid.', 400, 'ALREADY_PAID');
 
@@ -244,77 +233,34 @@ export const payPayroll = asyncHandler(async (req, res) => {
         voucherNo: `PAY-${doc.monthYear}-${doc._id.toString().slice(-4)}`,
         voucherType: 'PAYROLL',
         entries: [
-          {
-            accountCode: '5050',
-            accountName: 'Salaries & Commission Expense',
-            accountCategory: 'EXPENSE',
-            partyType: 'EMPLOYEE',
-            partyId: doc.employeeId,
-            debitPkr: doc.netPayablePkr,
-            creditPkr: 0,
-            narration: `Payroll ${doc.monthYear}`,
-          },
-          {
-            accountCode: '1010',
-            accountName: 'Cash in Hand',
-            accountCategory: 'ASSET',
-            debitPkr: 0,
-            creditPkr: doc.netPayablePkr,
-            narration: `Salary disbursement ${doc.monthYear}`,
-          },
+          { accountCode: '5050', accountName: 'Salaries & Commission Expense', accountCategory: 'EXPENSE', partyType: 'EMPLOYEE', partyId: doc.employeeId, debitPkr: doc.netPayablePkr, creditPkr: 0, narration: `Payroll ${doc.monthYear}` },
+          { accountCode: '1010', accountName: 'Cash in Hand', accountCategory: 'ASSET', debitPkr: 0, creditPkr: doc.netPayablePkr, narration: `Salary disbursement ${doc.monthYear}` },
         ],
-        referenceModel: 'AttendancePayroll',
-        referenceId: doc._id,
-        preparedById: req.user._id,
-        approvedById: req.user._id,
-        session,
+        referenceModel: 'AttendancePayroll', referenceId: doc._id, preparedById: req.user._id, approvedById: req.user._id, session,
       });
     }
-
     return doc;
   });
-
   res.status(200).json({ success: true, data: payroll });
 });
 
 export const getEmployeePerformanceReport = asyncHandler(async (req, res) => {
+  const { PendingTask, Order, Recovery } = m();
   const distributorId = req.distributorId;
   const empFilter = req.user.primaryRole === 'SUPER_ADMIN' ? { distributorId } : { distributorId, primaryRole: { $ne: 'SUPER_ADMIN' } };
   const [employees, taskStats, orderStats, recoveryStats] = await Promise.all([
     User.find(empFilter).select('profileId fullName primaryRole status').lean(),
-    PendingTask.aggregate([
-      { $match: { distributorId } },
-      {
-        $group: {
-          _id: '$assignedToId',
-          totalTasks: { $sum: 1 },
-          completedTasks: { $sum: { $cond: [{ $eq: ['$status', 'COMPLETE'] }, 1, 0] } },
-        },
-      },
-    ]),
-    Order.aggregate([
-      { $match: { distributorId } },
-      { $group: { _id: '$bookerId', bookedOrders: { $sum: 1 }, bookedValuePkr: { $sum: '$grandSummary.netPayableAmount' } } },
-    ]),
-    Recovery.aggregate([
-      { $match: { distributorId, status: 'APPROVED' } },
-      { $group: { _id: '$collectedById', recoveredPkr: { $sum: '$amountPkr' } } },
-    ]),
+    PendingTask.aggregate([{ $match: { distributorId } }, { $group: { _id: '$assignedToId', totalTasks: { $sum: 1 }, completedTasks: { $sum: { $cond: [{ $eq: ['$status', 'COMPLETE'] }, 1, 0] } } } }]),
+    Order.aggregate([{ $match: { distributorId } }, { $group: { _id: '$bookerId', bookedOrders: { $sum: 1 }, bookedValuePkr: { $sum: '$grandSummary.netPayableAmount' } } }]),
+    Recovery.aggregate([{ $match: { distributorId, status: 'APPROVED' } }, { $group: { _id: '$collectedById', recoveredPkr: { $sum: '$amountPkr' } } }]),
   ]);
 
   const tMap = new Map(taskStats.map((x) => [String(x._id), x]));
   const oMap = new Map(orderStats.map((x) => [String(x._id), x]));
   const rMap = new Map(recoveryStats.map((x) => [String(x._id), x]));
-
   const report = employees.map((e) => {
     const id = String(e._id);
-    return {
-      ...e,
-      tasks: tMap.get(id) || { totalTasks: 0, completedTasks: 0 },
-      orders: oMap.get(id) || { bookedOrders: 0, bookedValuePkr: 0 },
-      recoveries: rMap.get(id) || { recoveredPkr: 0 },
-    };
+    return { ...e, tasks: tMap.get(id) || { totalTasks: 0, completedTasks: 0 }, orders: oMap.get(id) || { bookedOrders: 0, bookedValuePkr: 0 }, recoveries: rMap.get(id) || { recoveredPkr: 0 } };
   });
-
   res.status(200).json({ success: true, data: report });
 });

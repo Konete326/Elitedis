@@ -102,7 +102,7 @@ export default function EmployeeFormModal({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Full Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Full Name *</label>
               <input
                 required
                 value={form.fullName}
@@ -117,7 +117,7 @@ export default function EmployeeFormModal({
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Profile ID</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Profile ID *</label>
                 <button
                   type="button"
                   onClick={() =>
@@ -141,7 +141,7 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Email Address</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Email Address *</label>
               <input
                 required
                 type="email"
@@ -156,7 +156,7 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Mobile Number</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Mobile Number *</label>
               <input
                 required
                 value={form.phone}
@@ -171,7 +171,7 @@ export default function EmployeeFormModal({
 
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
-                {editingId ? 'New Password (Optional)' : 'Login Password'}
+                {editingId ? 'New Password (Optional)' : 'Login Password *'}
               </label>
               <input
                 required={!editingId}
@@ -187,7 +187,7 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Staff Role</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Staff Role (Optional)</label>
               <select
                 value={form.primaryRole}
                 disabled={form.primaryRole === 'SUPER_ADMIN'}
@@ -204,7 +204,7 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Assigned Warehouse</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Assigned Warehouse (Optional)</label>
               <select
                 value={form.linkedWarehouseId}
                 onChange={(e) => setForm((p) => ({ ...p, linkedWarehouseId: e.target.value }))}
@@ -220,7 +220,7 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Basic Salary (PKR)</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Basic Salary PKR (Optional)</label>
               <input
                 type="number"
                 min="0"
@@ -232,7 +232,7 @@ export default function EmployeeFormModal({
           </div>
 
           <ImageDropzone
-            label="Staff Photo"
+            label="Staff Photo (Optional)"
             folder="employees"
             value={form.avatar}
             isSubmitting={isSubmitting}
@@ -242,7 +242,7 @@ export default function EmployeeFormModal({
 
         <div className="rounded-xl border p-3.5 space-y-2">
           <span className="text-xs font-bold uppercase text-[var(--accent-primary)]">
-            Allowed Jobs &amp; Portals (Check to Enable)
+            Allowed Jobs &amp; Portals (Optional)
           </span>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
             {WORK_PART_LABELS.map((wp) => (

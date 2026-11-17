@@ -180,9 +180,10 @@ export default function SalesMasterPage() {
             <strong className="font-mono tabular-nums">{formatCurrency(payTarget?.balanceDuePkr)}</strong>
           </p>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Received (PKR)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Received (PKR) *</label>
             <input
               type="number"
+              required
               min="1"
               max={payTarget?.balanceDuePkr}
               value={cashAmount}

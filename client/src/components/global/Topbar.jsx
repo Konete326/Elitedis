@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Search, Plus, Bell, Sun, Moon, ChevronRight, X, ClipboardList } from 'lucide-react';
+import { Menu, Search, Plus, Bell, Sun, Moon, ChevronRight, X, ClipboardList, Building2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
@@ -10,14 +10,14 @@ const formatBreadcrumb = (seg) => seg.split('-').map((w) => w.charAt(0).toUpperC
 
 /**
  * Sticky Topbar (z-20, h-14) with sidebar toggle, breadcrumbs, desktop Ctrl+K & mobile
- * Quick Jump search, role-filtered Quick Action launcher, Notification Bell (z-40), and Theme toggle.
+ * Quick Jump search, role-filtered Quick Action launcher, Agency Branding trigger, Notification Bell, and Theme toggle.
  */
 export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const { hasRole, hasWorkPart } = useAuth();
-  const { toggleSidebar, isMobileDrawerOpen, openMobileDrawer, closeMobileDrawer } = useShell();
+  const { toggleSidebar, isMobileDrawerOpen, openMobileDrawer, closeMobileDrawer, openAgencyProfileModal } = useShell();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -74,12 +74,8 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
   }, [customBreadcrumbs, location.pathname]);
 
   const roleRoutes = useMemo(() => {
-    const flatGroupItems = NAV_GROUPS.flatMap((g) =>
-      g.items.filter((i) => !i.soon).map((i) => ({ ...i, group: g.key }))
-    );
-    return [...flatGroupItems, ...EXTRA_QUICK_ROUTES].filter((item) =>
-      canAccessNavItem(item, hasRole, hasWorkPart)
-    );
+    const flatGroupItems = NAV_GROUPS.flatMap((g) => g.items.filter((i) => !i.soon).map((i) => ({ ...i, group: g.key })));
+    return [...flatGroupItems, ...EXTRA_QUICK_ROUTES].filter((item) => canAccessNavItem(item, hasRole, hasWorkPart));
   }, [hasRole, hasWorkPart]);
 
   const matchedRoutes = useMemo(() => {
@@ -91,6 +87,7 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
   }, [roleRoutes, searchQuery]);
 
   const allowedQuickActions = QUICK_ACTIONS.filter((a) => canAccessNavItem(a, hasRole, hasWorkPart));
+  const isAdminOrSuper = hasRole('SUPER_ADMIN', 'ADMIN');
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const navigateRoute = (to) => {
@@ -222,7 +219,7 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
             </button>
 
             {quickOpen && (
-              <div className="animate-scale-in absolute right-0 mt-1.5 w-48 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-xl z-40 p-1.5">
+              <div className="animate-scale-in absolute right-0 mt-1.5 w-52 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-xl z-40 p-1.5">
                 {(allowedQuickActions.length > 0 ? allowedQuickActions : [{ label: 'Pending Tasks', to: '/tasks/pending', icon: ClipboardList }]).map((action) => {
                   const Icon = action.icon;
                   return (
@@ -237,6 +234,16 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
                     </button>
                   );
                 })}
+                {isAdminOrSuper && (
+                  <button
+                    type="button"
+                    onClick={() => { setQuickOpen(false); openAgencyProfileModal?.(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-[var(--border-subtle)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
+                  >
+                    <Building2 className="w-4 h-4 text-[var(--accent-primary)]" strokeWidth={1.75} />
+                    <span>Agency &amp; Bill Profile</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -307,23 +314,13 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
                 className="w-full min-h-[42px] pl-9 pr-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setMobileSearchOpen(false)}
-              aria-label="Close mobile search"
-              className="w-10 h-10 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)]"
-            >
+            <button type="button" onClick={() => setMobileSearchOpen(false)} aria-label="Close mobile search" className="w-10 h-10 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="mt-2 max-h-56 overflow-y-auto divide-y divide-[var(--border-subtle)]">
             {matchedRoutes.map((route) => (
-              <button
-                key={route.to}
-                type="button"
-                onClick={() => navigateRoute(route.to)}
-                className="w-full flex items-center justify-between gap-2 px-2 py-2.5 text-left text-xs text-[var(--text-primary)]"
-              >
+              <button key={route.to} type="button" onClick={() => navigateRoute(route.to)} className="w-full flex items-center justify-between gap-2 px-2 py-2.5 text-left text-xs text-[var(--text-primary)]">
                 <span className="font-medium truncate">{route.label}</span>
                 <span className="text-[10px] text-[var(--text-muted)] shrink-0">{route.group}</span>
               </button>

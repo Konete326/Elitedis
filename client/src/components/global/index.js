@@ -8,6 +8,7 @@ export { FilterToolbar } from './FilterToolbar';
 export { ConfirmModal } from './ConfirmModal';
 export { FormModal } from './FormModal';
 export { ComingSoonModal } from './ComingSoonModal';
+export { OnboardingWizardModal } from './OnboardingWizardModal';
 export { PrintPreviewModal } from './PrintPreviewModal';
 export { TouchKeypadModal } from './TouchKeypadModal';
 export { ImageDropzone } from './ImageDropzone';

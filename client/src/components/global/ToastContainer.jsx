@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ShieldAlert, Info, X } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
 
@@ -31,18 +32,18 @@ const TOAST_STYLES = {
 };
 
 /**
- * z-60 bottom-right stacked toast notifications wired to ShellContext.
+ * Portal-mounted (z-[110]) bottom-right stacked toast notifications wired to ShellContext.
  */
 export function ToastContainer() {
   const { toasts = [], removeToast } = useShell();
 
-  if (!toasts.length) return null;
+  if (!toasts.length || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       aria-live="polite"
       aria-label="Notifications"
-      className="fixed bottom-3 right-3 left-3 sm:left-auto sm:bottom-4 sm:right-4 z-60 flex flex-col gap-2 sm:w-96 max-w-full pointer-events-none"
+      className="fixed bottom-3 right-3 left-3 sm:left-auto sm:bottom-4 sm:right-4 z-[110] flex flex-col gap-2 sm:w-96 max-w-full pointer-events-none"
     >
       {toasts.map((toast) => {
         const style = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
@@ -79,7 +80,8 @@ export function ToastContainer() {
           </div>
         );
       })}
-    </div>
+    </div>,
+    document.body
   );
 }
 

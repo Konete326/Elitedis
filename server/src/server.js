@@ -9,6 +9,7 @@ import mongoSanitize from 'express-mongo-sanitize';
 
 import { env } from './config/env.js';
 import { connectDB, disconnectDB, getDbStatus } from './config/db.js';
+import { closeAllTenantConnections } from './config/tenantDb.js';
 import { seedSuperAdmin } from './config/seedSuperAdmin.js';
 import apiRouter from './routes/index.js';
 import { notFoundHandler, globalErrorHandler } from './middlewares/errorMiddleware.js';
@@ -86,6 +87,7 @@ export async function startServer() {
     if (httpServer) {
       await new Promise((resolve) => httpServer.close(resolve));
     }
+    await closeAllTenantConnections();
     await disconnectDB();
     process.exit(0);
   };

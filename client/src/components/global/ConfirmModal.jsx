@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ShieldAlert, Info, Check } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
 
@@ -26,7 +27,7 @@ const TONE_MAP = {
 };
 
 /**
- * Custom confirmation / delete-guard modal (replaces native browser confirm dialog).
+ * Portal-mounted (z-[100]) confirmation / delete-guard modal (replaces native confirm dialog).
  */
 export function ConfirmModal({
   isOpen,
@@ -74,16 +75,16 @@ export function ConfirmModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, busy, handleClose]);
 
-  if (!active) return null;
+  if (!active || typeof document === 'undefined') return null;
 
   const bodyText = message || description;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in"
       onClick={() => !busy && handleClose?.()}
     >
       <div
@@ -152,7 +153,8 @@ export function ConfirmModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

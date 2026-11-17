@@ -1,4 +1,13 @@
-import { Order, CommercialRule, Customer, Product, DispatchSheet, SaleInvoice, PendingTask } from '../models/index.js';
+import {
+  Order as _Order,
+  CommercialRule as _CommercialRule,
+  Customer as _Customer,
+  Product as _Product,
+  DispatchSheet as _DispatchSheet,
+  SaleInvoice as _SaleInvoice,
+  PendingTask as _PendingTask,
+} from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { calculateTwoLevelInvoice } from '../services/invoiceCalc.service.js';
@@ -6,7 +15,19 @@ import { reserveStockForOrder, releaseReservedStock, runWithTransaction } from '
 import { recordAuditLog } from '../services/accountingPost.service.js';
 import { createNotificationIfAbsent } from '../services/automationAlert.service.js';
 
+const m = () =>
+  getTenantModels({
+    Order: _Order,
+    CommercialRule: _CommercialRule,
+    Customer: _Customer,
+    Product: _Product,
+    DispatchSheet: _DispatchSheet,
+    SaleInvoice: _SaleInvoice,
+    PendingTask: _PendingTask,
+  });
+
 async function loadRuleMap(distributorId, body = {}) {
+  const { CommercialRule } = m();
   const ids = new Set();
   for (const id of [body.grandDiscountRuleId, body.grandChargeRuleId, body.grandTaxRuleId, body.grandSchemeRuleId]) {
     if (id) ids.add(String(id));
@@ -22,6 +43,7 @@ async function loadRuleMap(distributorId, body = {}) {
 }
 
 export const listOrders = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
   if (req.query.status) extra['approvalInfo.status'] = req.query.status;
@@ -48,6 +70,7 @@ export const listOrders = asyncHandler(async (req, res) => {
 });
 
 export const getOrderById = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const order = await Order.findOne({ _id: req.params.id, distributorId: req.distributorId })
     .populate('customerId')
     .populate('bookerId assignedSalesmanId assignedStorekeeperId approvalInfo.approvedById', 'fullName profileId')
@@ -64,6 +87,7 @@ export const calculateOrderPreview = asyncHandler(async (req, res) => {
 });
 
 export const createOrder = asyncHandler(async (req, res) => {
+  const { Order, Customer, Product } = m();
   const distributorId = req.distributorId;
   if (!req.body.customerId) {
     throw new AppError('Please create and select a Customer first before creating an Order.', 400, 'PREREQUISITE_CUSTOMER_REQUIRED');
@@ -78,8 +102,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     throw new AppError('Please add at least one Product to the order before submitting.', 400, 'PREREQUISITE_PRODUCTS_REQUIRED');
   }
   const productIds = [...new Set(items.map((i) => i.productId).filter(Boolean).map(String))];
-  const existingCount = await Product.countDocuments({ _id: { $in: productIds }, distributorId });
-  if (existingCount !== productIds.length) {
+  if ((await Product.countDocuments({ _id: { $in: productIds }, distributorId })) !== productIds.length) {
     throw new AppError('One or more selected Products were not found. Please create a Product first.', 400, 'PREREQUISITE_PRODUCT_NOT_FOUND');
   }
 
@@ -122,6 +145,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 });
 
 export const updateOrder = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const order = await Order.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!order) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
   if (!['DRAFT', 'PENDING'].includes(order.approvalInfo?.status)) {
@@ -139,6 +163,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
 });
 
 export const approveOrdersBatch = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const { orderIds = [] } = req.body;
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
     throw new AppError('Select at least one pending order to approve.', 400, 'NO_ORDERS_SELECTED');
@@ -176,6 +201,7 @@ export const approveOrdersBatch = asyncHandler(async (req, res) => {
 });
 
 export const cancelOrder = asyncHandler(async (req, res) => {
+  const { Order } = m();
   const order = await runWithTransaction(async (session) => {
     const doc = await Order.findOne({ _id: req.params.id, distributorId: req.distributorId }).session(session);
     if (!doc) throw new AppError('Order not found.', 404, 'ORDER_NOT_FOUND');
@@ -199,6 +225,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
 });
 
 export const createDeliveryPlan = asyncHandler(async (req, res) => {
+  const { Order, Customer, DispatchSheet, SaleInvoice, PendingTask } = m();
   const { orderIds = [], recoveryInvoiceIds = [], salesmanId, storekeeperId = null, recoveryPersonId = null, vehicleInfo = {}, extraDispatchItems = [] } = req.body;
   if (!salesmanId || orderIds.length === 0) {
     throw new AppError('Please select a Salesman and at least one Approved Order before creating a Delivery Plan.', 400, 'INVALID_DELIVERY_PLAN');
@@ -214,38 +241,20 @@ export const createDeliveryPlan = asyncHandler(async (req, res) => {
     const opts = session ? { session } : {};
 
     const [dispatchSheet] = await DispatchSheet.create([{
-      distributorId: req.distributorId,
-      dispatchCode: `DSP-${Date.now().toString().slice(-6)}`,
-      salesmanId,
-      storekeeperId,
-      recoveryPersonId: recoveryPersonId || salesmanId,
-      vehicleInfo,
-      orderIds: orders.map((o) => o._id),
-      recoveryInvoiceIds,
-      extraDispatchItems,
-      totalWeightKg: Number(totalWeightKg.toFixed(3)),
-      totalVolumeCubic: Number(totalVolumeCubic.toFixed(3)),
-      totalLoadValuePkr: Number(totalLoadValuePkr.toFixed(2)),
-      status: 'PLANNED',
+      distributorId: req.distributorId, dispatchCode: `DSP-${Date.now().toString().slice(-6)}`,
+      salesmanId, storekeeperId, recoveryPersonId: recoveryPersonId || salesmanId, vehicleInfo,
+      orderIds: orders.map((o) => o._id), recoveryInvoiceIds, extraDispatchItems,
+      totalWeightKg: Number(totalWeightKg.toFixed(3)), totalVolumeCubic: Number(totalVolumeCubic.toFixed(3)),
+      totalLoadValuePkr: Number(totalLoadValuePkr.toFixed(2)), status: 'PLANNED',
     }], opts);
 
-    const invoices = [];
-    const checklistItems = [];
+    const invoices = [], checklistItems = [];
     for (const order of orders) {
       const [inv] = await SaleInvoice.create([{
-        distributorId: req.distributorId,
-        invoiceNo: `INV-${order.orderCode}-${Date.now().toString().slice(-4)}`,
-        orderId: order._id,
-        dispatchSheetId: dispatchSheet._id,
-        invoiceMode: order.orderMode === 'ADVANCE' ? 'ADVANCE' : 'NORMAL',
-        source: order.source === 'BOOKER' ? 'BOOKER' : 'ADMIN',
-        customerId: order.customerId,
-        salesmanId,
-        lineItems: order.lineItems,
-        grandSummary: order.grandSummary,
-        paidAmountPkr: 0,
-        paymentStatus: 'CREDIT',
-        status: 'ISSUED',
+        distributorId: req.distributorId, invoiceNo: `INV-${order.orderCode}-${Date.now().toString().slice(-4)}`,
+        orderId: order._id, dispatchSheetId: dispatchSheet._id, invoiceMode: order.orderMode === 'ADVANCE' ? 'ADVANCE' : 'NORMAL',
+        source: order.source === 'BOOKER' ? 'BOOKER' : 'ADMIN', customerId: order.customerId, salesmanId,
+        lineItems: order.lineItems, grandSummary: order.grandSummary, paidAmountPkr: 0, paymentStatus: 'CREDIT', status: 'ISSUED',
       }], opts);
       invoices.push(inv);
       if (order.customerId && inv.balanceDuePkr > 0) {
@@ -264,30 +273,17 @@ export const createDeliveryPlan = asyncHandler(async (req, res) => {
     const createdTasks = [];
     if (storekeeperId) {
       const [dt] = await PendingTask.create([{
-        distributorId: req.distributorId,
-        taskCode: `DSP-T-${Date.now().toString().slice(-5)}`,
-        taskType: 'DELIVERY_DISPATCH',
-        title: `Dispatch Picking (${dispatchSheet.dispatchCode})`,
-        assignedToId: storekeeperId,
-        assignedById: req.user._id,
-        referenceModel: 'DispatchSheet',
-        referenceId: dispatchSheet._id,
-        checklistItems,
-        status: 'FRESH',
+        distributorId: req.distributorId, taskCode: `DSP-T-${Date.now().toString().slice(-5)}`, taskType: 'DELIVERY_DISPATCH',
+        title: `Dispatch Picking (${dispatchSheet.dispatchCode})`, assignedToId: storekeeperId, assignedById: req.user._id,
+        referenceModel: 'DispatchSheet', referenceId: dispatchSheet._id, checklistItems, status: 'FRESH',
       }], opts);
       createdTasks.push(dt);
     }
     if (recoveryInvoiceIds.length > 0) {
       const [rt] = await PendingTask.create([{
-        distributorId: req.distributorId,
-        taskCode: `REC-T-${Date.now().toString().slice(-5)}`,
-        taskType: 'PAYMENT_RECOVERY',
-        title: `Route Recovery (${dispatchSheet.dispatchCode})`,
-        assignedToId: recoveryPersonId || salesmanId,
-        assignedById: req.user._id,
-        referenceModel: 'DispatchSheet',
-        referenceId: dispatchSheet._id,
-        status: 'FRESH',
+        distributorId: req.distributorId, taskCode: `REC-T-${Date.now().toString().slice(-5)}`, taskType: 'PAYMENT_RECOVERY',
+        title: `Route Recovery (${dispatchSheet.dispatchCode})`, assignedToId: recoveryPersonId || salesmanId, assignedById: req.user._id,
+        referenceModel: 'DispatchSheet', referenceId: dispatchSheet._id, status: 'FRESH',
       }], opts);
       createdTasks.push(rt);
     }

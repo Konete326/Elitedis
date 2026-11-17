@@ -122,7 +122,7 @@ export default function OrderOperationsPage() {
       {tab === 'dispatch' && (
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 items-end">
           <div>
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign Delivery Salesman</label>
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Assign Delivery Salesman *</label>
             <select value={salesmanId} onChange={(e) => setSalesmanId(e.target.value)} className="w-full h-10 sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs">
               <option value="">Choose salesman...</option>
               {(staffQuery.data || []).map((u) => (
@@ -144,7 +144,7 @@ export default function OrderOperationsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Vehicle Number / Route</label>
+            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Vehicle Number / Route (Optional)</label>
             <input
               value={vehicleNo}
               onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}

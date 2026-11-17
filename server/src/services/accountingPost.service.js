@@ -1,6 +1,7 @@
 import { AccountLedger } from '../models/AccountLedger.model.js';
 import { AuditLog } from '../models/AuditLog.model.js';
 import { AppError } from '../middlewares/errorMiddleware.js';
+import { getTenantModel } from '../config/tenantDb.js';
 
 export const CHART_OF_ACCOUNTS = Object.freeze({
   CASH_IN_HAND: { code: '1010', name: 'Cash in Hand', category: 'ASSET' },
@@ -39,7 +40,8 @@ export async function recordAuditLog({
   userAgent = '',
   session = null,
 }) {
-  const [created] = await AuditLog.create(
+  const AuditLogM = getTenantModel('AuditLog', AuditLog);
+  const [created] = await AuditLogM.create(
     [
       {
         distributorId,
@@ -102,9 +104,10 @@ export async function postDoubleEntry({
   const generatedVoucherNo =
     voucherNo || `VCH-${voucherType.slice(0, 3)}-${Date.now().toString().slice(-7)}`;
 
+  const AccountLedgerM = getTenantModel('AccountLedger', AccountLedger);
   const docs = [];
   for (const line of normalizedEntries) {
-    const prev = await AccountLedger.findOne({ distributorId, accountCode: line.accountCode, status: 'APPROVED' })
+    const prev = await AccountLedgerM.findOne({ distributorId, accountCode: line.accountCode, status: 'APPROVED' })
       .sort({ transactionDate: -1, createdAt: -1 })
       .select('runningBalancePkr')
       .session(session)
@@ -136,7 +139,7 @@ export async function postDoubleEntry({
     });
   }
 
-  const inserted = await AccountLedger.insertMany(docs, session ? { session } : {});
+  const inserted = await AccountLedgerM.insertMany(docs, session ? { session } : {});
 
   if (audit) {
     await recordAuditLog({

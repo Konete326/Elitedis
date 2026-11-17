@@ -46,6 +46,7 @@ export default function WarehousesPage() {
       editingId ? apiClient.put(`/warehouses/${editingId}`, payload) : apiClient.post('/warehouses', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: editingId ? 'Warehouse updated.' : 'Warehouse created.' });
       setModalOpen(false);
     },
@@ -58,6 +59,7 @@ export default function WarehousesPage() {
     mutationFn: (id) => apiClient.delete(`/warehouses/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: 'Warehouse deleted.' });
       setDeleteTarget(null);
       setGuardError('');
@@ -213,7 +215,7 @@ export default function WarehousesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-[var(--text-secondary)]">Warehouse Code</label>
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Warehouse Code <span className="text-[var(--status-danger)]">*</span></label>
               <button
                 type="button"
                 onClick={() =>
@@ -238,7 +240,7 @@ export default function WarehousesPage() {
             {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse Name <span className="text-[var(--status-danger)]">*</span></label>
             <input
               required
               value={form.warehouseName}
@@ -250,7 +252,7 @@ export default function WarehousesPage() {
             {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Type</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Type <span className="text-[var(--status-danger)]">*</span></label>
             <select
               value={form.warehouseType}
               onChange={(e) => setForm((p) => ({ ...p, warehouseType: e.target.value }))}
@@ -262,7 +264,7 @@ export default function WarehousesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">City <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <input
               value={form.address?.city || ''}
               onChange={(e) => setForm((p) => ({ ...p, address: { ...p.address, city: e.target.value } }))}
@@ -270,7 +272,7 @@ export default function WarehousesPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Full Address</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Full Address <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <input
               value={form.address?.fullAddress || ''}
               onChange={(e) => setForm((p) => ({ ...p, address: { ...p.address, fullAddress: e.target.value } }))}

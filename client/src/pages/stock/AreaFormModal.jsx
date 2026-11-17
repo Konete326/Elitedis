@@ -71,7 +71,7 @@ export default function AreaFormModal({
           {!isEditing && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse <span className="text-[var(--status-danger)]">*</span></label>
                 <select required value={form.warehouseId} onChange={(e) => setForm((p) => ({ ...p, warehouseId: e.target.value, zoneId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                   <option value="">Select warehouse...</option>
                   {warehouses.map((w) => (
@@ -82,7 +82,7 @@ export default function AreaFormModal({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone</label>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Zone <span className="text-[var(--status-danger)]">*</span></label>
                 <select required value={form.zoneId} onChange={(e) => setForm((p) => ({ ...p, zoneId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                   <option value="">Select zone...</option>
                   {availableZones.map((z) => (
@@ -96,7 +96,7 @@ export default function AreaFormModal({
           )}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-[var(--text-secondary)]">Area Code</label>
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Area Code <span className="text-[var(--status-danger)]">*</span></label>
               <button
                 type="button"
                 onClick={() =>
@@ -118,7 +118,7 @@ export default function AreaFormModal({
             {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name <span className="text-[var(--status-danger)]">*</span></label>
             <input
               required
               value={form.areaName}
@@ -130,7 +130,7 @@ export default function AreaFormModal({
             {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Type</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Type <span className="text-[var(--status-danger)]">*</span></label>
             <select value={form.areaType} onChange={(e) => setForm((p) => ({ ...p, areaType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="FLOOR">Floor</option>
               <option value="RACK">Rack</option>
@@ -138,7 +138,7 @@ export default function AreaFormModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Storage Purpose</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Storage Purpose <span className="text-[var(--status-danger)]">*</span></label>
             <select value={form.storagePurpose} onChange={(e) => setForm((p) => ({ ...p, storagePurpose: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="NORMAL">Normal</option>
               <option value="DAMAGE">Damage</option>
@@ -150,7 +150,7 @@ export default function AreaFormModal({
 
         <div className="rounded-xl border p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Allowed Products &amp; Capacity</span>
+            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Allowed Products &amp; Capacity (Optional)</span>
             <button type="button" onClick={addAllowedProduct} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">
               + Add Product Rule
             </button>

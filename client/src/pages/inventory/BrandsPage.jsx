@@ -57,10 +57,13 @@ export default function BrandsPage() {
   const nameError = touched.brandName ? validateField('required', form.brandName, { required: true, minLength: 2, label: 'Brand Name' }) : '';
 
   const saveMutation = useMutation({
-    mutationFn: (payload) =>
-      editingId ? apiClient.put(`/inventory/brands/${editingId}`, payload) : apiClient.post('/inventory/brands', payload),
+    mutationFn: (payload) => {
+      const clean = { ...payload, companyId: payload.companyId || null };
+      return editingId ? apiClient.put(`/inventory/brands/${editingId}`, clean) : apiClient.post('/inventory/brands', clean);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
+      queryClient.invalidateQueries({ queryKey: ['brands-options'] });
       addToast({ type: 'success', message: editingId ? 'Brand updated.' : 'Brand created.' });
       setModalOpen(false);
     },
@@ -73,6 +76,7 @@ export default function BrandsPage() {
     mutationFn: (id) => apiClient.delete(`/inventory/brands/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
+      queryClient.invalidateQueries({ queryKey: ['brands-options'] });
       addToast({ type: 'success', message: 'Brand deleted.' });
       setDeleteTarget(null);
     },
@@ -146,10 +150,13 @@ export default function BrandsPage() {
         }
       />
 
-      {!companiesQuery.isLoading && companies.length === 0 && (
+      {companies.length === 0 && (
         <SetupGuideBanner
-          missingMessage="Create at least one Company or Supplier first so every Brand belongs to a parent manufacturer."
-          steps={[{ label: 'Create Company / Supplier', done: false, to: '/inventory/companies', actionLabel: 'Go to Companies' }]}
+          isLoading={companiesQuery.isLoading}
+          isOptional
+          title="Optional Company Grouping"
+          missingMessage="You can add Brands right away, or optionally create a Company / Supplier first to group brands by manufacturer."
+          steps={[{ label: 'Create Company / Supplier (Optional)', done: false, to: '/inventory/companies', actionLabel: 'Go to Companies' }]}
         />
       )}
 
@@ -235,7 +242,7 @@ export default function BrandsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[var(--text-secondary)]">Brand Code</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Brand Code <span className="text-[var(--status-danger)]">*</span></label>
                 <button
                   type="button"
                   onClick={() =>
@@ -260,7 +267,7 @@ export default function BrandsPage() {
               {codeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{codeError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Name</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Name <span className="text-[var(--status-danger)]">*</span></label>
               <input
                 required
                 value={form.brandName}
@@ -272,14 +279,13 @@ export default function BrandsPage() {
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Company</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <select
-                required
                 value={form.companyId}
                 onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value }))}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
-                <option value="">Select company...</option>
+                <option value="">None / Standalone Brand...</option>
                 {(companiesQuery.data || []).map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.companyName}
@@ -288,7 +294,7 @@ export default function BrandsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Type</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Type <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input
                 value={form.brandType}
                 onChange={(e) => setForm((p) => ({ ...p, brandType: e.target.value }))}
@@ -297,7 +303,7 @@ export default function BrandsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Manager</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand Manager <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
               <input
                 value={form.brandManager}
                 onChange={(e) => setForm((p) => ({ ...p, brandManager: e.target.value }))}
@@ -305,7 +311,7 @@ export default function BrandsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -317,8 +323,8 @@ export default function BrandsPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <ImageDropzone label="Brand Logo" folder="brands" value={form.logo} onChange={(logo) => setForm((p) => ({ ...p, logo }))} />
-            <ImageDropzone label="Cover Image" folder="brands" value={form.coverImage} onChange={(coverImage) => setForm((p) => ({ ...p, coverImage }))} />
+            <ImageDropzone label="Brand Logo (Optional)" folder="brands" value={form.logo} onChange={(logo) => setForm((p) => ({ ...p, logo }))} />
+            <ImageDropzone label="Cover Image (Optional)" folder="brands" value={form.coverImage} onChange={(coverImage) => setForm((p) => ({ ...p, coverImage }))} />
           </div>
         </div>
       </FormModal>

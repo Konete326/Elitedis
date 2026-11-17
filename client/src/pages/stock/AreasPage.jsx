@@ -44,6 +44,7 @@ export default function AreasPage() {
         : apiClient.post(`/warehouses/${payload.warehouseId}/zones/${payload.zoneId}/areas`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: modalState.editing ? 'Area updated.' : 'Floor/Rack area created.' });
       setModalState({ open: false, editing: null, initial: null, key: 0 });
     },
@@ -57,6 +58,7 @@ export default function AreasPage() {
       apiClient.delete(`/warehouses/${row.warehouseId}/zones/${row.zoneId}/areas/${row._id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: 'Area deleted.' });
       setDeleteTarget(null);
       setGuardError('');
@@ -120,8 +122,9 @@ export default function AreasPage() {
         }
       />
 
-      {!warehousesQuery.isLoading && (!warehouses.length || !hasAnyZone) && (
+      {(!warehouses.length || !hasAnyZone) && (
         <SetupGuideBanner
+          isLoading={warehousesQuery.isLoading}
           missingMessage="Set up a Warehouse and at least one Zone before creating storage Floor/Rack Areas."
           steps={[
             { label: 'Create Warehouse', done: warehouses.length > 0, to: '/stock/warehouses', actionLabel: 'Warehouses' },

@@ -215,7 +215,7 @@ export default function RulesPage() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rule Name</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Rule Name *</label>
             <input
               required
               value={form.ruleName}
@@ -225,14 +225,14 @@ export default function RulesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Level</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Applies To (Optional)</label>
             <select value={form.level} onChange={(e) => setForm((p) => ({ ...p, level: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="PRODUCT_LEVEL">Product Level (Level 1)</option>
-              <option value="GRAND_LEVEL">Grand Invoice Level (Level 2)</option>
+              <option value="PRODUCT_LEVEL">Per Product (Item Level)</option>
+              <option value="GRAND_LEVEL">Whole Bill (Grand Level)</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Calculation Mode</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Calculation Mode (Optional)</label>
             <select value={form.calculationMode} onChange={(e) => setForm((p) => ({ ...p, calculationMode: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="GENERAL_FLAT">General Flat</option>
               <option value="PERCENTAGE">Percentage (%)</option>
@@ -245,7 +245,7 @@ export default function RulesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Compare Basis</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Compare Basis (Optional)</label>
             <select value={form.compareBasis} onChange={(e) => setForm((p) => ({ ...p, compareBasis: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="NONE">None</option>
               <option value="RATE">Rate</option>
@@ -255,15 +255,15 @@ export default function RulesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Threshold Value</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Threshold Value (Optional)</label>
             <input type="number" value={form.thresholdValue} onChange={(e) => setForm((p) => ({ ...p, thresholdValue: Number(e.target.value) }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Benefit Value (PKR / % / Free Qty)</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Benefit Value (PKR / % / Free Qty) (Optional)</label>
             <input type="number" step="0.01" value={form.benefitValue} onChange={(e) => setForm((p) => ({ ...p, benefitValue: Number(e.target.value) }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm tabular-nums" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status (Optional)</label>
             <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
@@ -273,7 +273,7 @@ export default function RulesPage() {
           {category === 'SCHEME' && (
             <div className="sm:col-span-2 grid grid-cols-2 gap-2.5 rounded-xl border p-3 bg-[var(--bg-canvas)]">
               <div>
-                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Paid Product</label>
+                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Paid Product (Optional)</label>
                 <select
                   value={form.schemeDetails?.paidProductId || ''}
                   onChange={(e) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, paidProductId: e.target.value } }))}
@@ -288,7 +288,7 @@ export default function RulesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Free Product</label>
+                <label className="block text-[11px] text-[var(--text-muted)] mb-1">Free Product (Optional)</label>
                 <select
                   value={form.schemeDetails?.freeProductId || ''}
                   onChange={(e) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, freeProductId: e.target.value } }))}

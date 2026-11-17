@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Printer, Download, FileText, Share2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 
 const FORMAT_WIDTHS = {
@@ -44,8 +46,8 @@ async function exportRowsToCsvChunked(filename, columns, rows) {
 }
 
 /**
- * z-50 A4 / Landscape / Thermal printable invoice, chillan, dispatch, and report viewer
- * with Print, PDF, Excel/CSV, and WhatsApp share controls.
+ * Portal-mounted (z-[100]) A4 / Landscape / Thermal print preview viewer synced
+ * with distributor agencyProfile branding and mobile-first (<640px) stacked preview cards.
  */
 export function PrintPreviewModal({
   isOpen,
@@ -70,6 +72,7 @@ export function PrintPreviewModal({
   children,
 }) {
   const active = isOpen ?? open ?? false;
+  const { agencyProfile } = useAuth();
   const { lockScroll, unlockScroll, addToast } = useShell();
   const [format, setFormat] = useState(layoutMode || defaultFormat || 'a4');
   const [exporting, setExporting] = useState(false);
@@ -90,7 +93,15 @@ export function PrintPreviewModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, onClose]);
 
-  if (!active) return null;
+  if (!active || typeof document === 'undefined') return null;
+
+  const bp = agencyProfile?.businessProfile || {};
+  const agencyTitle = templateConfig?.companyTitle || bp.companyTitle || agencyProfile?.distributorName || 'ELITE DIST Agency';
+  const agencyLogo = bp.showLogo !== false ? (templateConfig?.logo?.url || bp.logo?.url || '') : '';
+  const agencyPhone = bp.phonePrimary || agencyProfile?.phone || '';
+  const agencyAddress = [bp.fullAddress, bp.city].filter(Boolean).join(', ');
+  const agencyHeaderNote = templateConfig?.subjectLine || bp.headerNote || '';
+  const agencyFooterNote = templateConfig?.footerNote || bp.footerNote || '';
 
   const handlePrint = () => (onPrint ? onPrint(format) : window.print());
   const handlePdf = () => (onExportPdf ? onExportPdf(format) : window.print());
@@ -113,25 +124,25 @@ export function PrintPreviewModal({
 
   const handleWhatsApp = () => {
     if (onShareWhatsApp) return onShareWhatsApp(format);
-    const text = encodeURIComponent(shareText || `${title} — ELITE DIST ERP`);
+    const text = encodeURIComponent(shareText || `${title} — ${agencyTitle}`);
     const cleanPhone = whatsappPhone.replace(/[^0-9]/g, '');
     const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in"
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-6xl h-[95dvh] sm:h-[92dvh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden animate-scale-in"
       >
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2.5 px-3 sm:px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2.5 px-3 sm:px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] print:hidden">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate">{title}</h2>
@@ -167,7 +178,7 @@ export function PrintPreviewModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold transition"
+              className="inline-flex items-center gap-1.5 min-h-[38px] sm:h-9 px-3 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold transition"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print</span>
@@ -175,7 +186,7 @@ export function PrintPreviewModal({
             <button
               type="button"
               onClick={handlePdf}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] transition"
+              className="inline-flex items-center gap-1.5 min-h-[38px] sm:h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] transition"
             >
               <FileText className="w-3.5 h-3.5" />
               <span>PDF</span>
@@ -184,7 +195,7 @@ export function PrintPreviewModal({
               type="button"
               disabled={exporting}
               onClick={handleExcelCsv}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] disabled:opacity-50 transition"
+              className="inline-flex items-center gap-1.5 min-h-[38px] sm:h-9 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium text-[var(--text-primary)] disabled:opacity-50 transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{exporting ? 'Exporting...' : 'Excel / CSV'}</span>
@@ -192,7 +203,7 @@ export function PrintPreviewModal({
             <button
               type="button"
               onClick={handleWhatsApp}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--status-success)]/40 bg-[var(--status-success)]/10 text-xs font-semibold text-[var(--status-success)] hover:opacity-90 transition"
+              className="inline-flex items-center gap-1.5 min-h-[38px] sm:h-9 px-3 rounded-lg border border-[var(--status-success)]/40 bg-[var(--status-success)]/10 text-xs font-semibold text-[var(--status-success)] hover:opacity-90 transition"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>WhatsApp</span>
@@ -214,16 +225,26 @@ export function PrintPreviewModal({
               FORMAT_WIDTHS[format] || FORMAT_WIDTHS.a4
             } rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm p-4 sm:p-6`}
           >
-            <div className="flex items-start justify-between gap-4 pb-3 border-b border-[var(--border-subtle)]">
-              <div>
-                <p className="text-base font-bold tracking-tight">
-                  {templateConfig?.companyTitle || 'ELITE DIST Agency'}
-                </p>
-                {templateConfig?.subjectLine && (
-                  <p className="text-xs text-[var(--text-secondary)]">{templateConfig.subjectLine}</p>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
+              <div className="flex items-start gap-3 min-w-0">
+                {agencyLogo && (
+                  <img
+                    src={agencyLogo}
+                    alt={agencyTitle}
+                    className="w-12 h-12 rounded-lg object-contain border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shrink-0"
+                  />
                 )}
+                <div className="min-w-0">
+                  <p className="text-base font-bold tracking-tight truncate">{agencyTitle}</p>
+                  {agencyHeaderNote && <p className="text-xs text-[var(--text-secondary)]">{agencyHeaderNote}</p>}
+                  {(agencyPhone || agencyAddress || bp.ntn) && (
+                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                      {[agencyPhone && `Ph: ${agencyPhone}`, agencyAddress, bp.ntn && `NTN: ${bp.ntn}`].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="text-right text-xs text-[var(--text-muted)] tabular-nums">
+              <div className="sm:text-right text-xs text-[var(--text-muted)] tabular-nums shrink-0">
                 <p className="font-semibold text-[var(--text-primary)]">{title}</p>
                 <p>{new Date().toLocaleDateString()}</p>
               </div>
@@ -231,31 +252,43 @@ export function PrintPreviewModal({
 
             <div className="mt-4">
               {children || (
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-left">
-                      {columns.map((col) => (
-                        <th key={col.key} className="px-2 py-2 font-semibold">
-                          {col.header || col.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                <>
+                  <div className="sm:hidden print:hidden space-y-2.5">
                     {rows.map((row, idx) => (
-                      <tr key={row._id || idx}>
+                      <div key={row._id || idx} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-3 space-y-1.5 text-xs">
                         {columns.map((col) => (
-                          <td
-                            key={col.key}
-                            className={`px-2 py-1.5 ${col.numeric ? 'tabular-nums font-mono' : ''}`}
-                          >
-                            {typeof col.accessor === 'function' ? col.accessor(row) : row?.[col.key] ?? '—'}
-                          </td>
+                          <div key={col.key} className="flex items-center justify-between gap-2">
+                            <span className="text-[var(--text-muted)]">{col.header || col.label}</span>
+                            <span className={`font-semibold text-right ${col.numeric ? 'tabular-nums font-mono' : ''}`}>
+                              {typeof col.accessor === 'function' ? col.accessor(row) : row?.[col.key] ?? '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+
+                  <table className="hidden sm:table print:table w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-left">
+                        {columns.map((col) => (
+                          <th key={col.key} className="px-2 py-2 font-semibold">{col.header || col.label}</th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-subtle)]">
+                      {rows.map((row, idx) => (
+                        <tr key={row._id || idx}>
+                          {columns.map((col) => (
+                            <td key={col.key} className={`px-2 py-1.5 ${col.numeric ? 'tabular-nums font-mono' : ''}`}>
+                              {typeof col.accessor === 'function' ? col.accessor(row) : row?.[col.key] ?? '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
 
@@ -270,6 +303,12 @@ export function PrintPreviewModal({
               </div>
             )}
 
+            {agencyFooterNote && (
+              <p className="mt-4 text-[11px] text-[var(--text-secondary)] text-center italic">
+                {agencyFooterNote}
+              </p>
+            )}
+
             <div className="mt-6 pt-3 border-t border-dashed border-[var(--border-subtle)] grid grid-cols-3 gap-4 text-[11px] text-[var(--text-muted)]">
               <span>Prepared By: ____________</span>
               <span className="text-center">Checked By: ____________</span>
@@ -278,7 +317,8 @@ export function PrintPreviewModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

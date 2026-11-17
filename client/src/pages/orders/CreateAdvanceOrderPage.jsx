@@ -57,6 +57,7 @@ export default function CreateAdvanceOrderPage() {
     mutationFn: (payload) => apiClient.post('/orders', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
       setSubmitConfirmOpen(false);
       addToast({ type: 'success', message: 'Advance order created.' });
       navigate('/orders/master');
@@ -128,21 +129,20 @@ export default function CreateAdvanceOrderPage() {
         }))}
       />
 
-      {prereqReady && (
-        <SetupGuideBanner
-          missingMessage="Add at least one Customer Shop and one Product before creating an advance order."
-          steps={[
-            { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
-            { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
-          ]}
-        />
-      )}
+      <SetupGuideBanner
+        isLoading={!prereqReady}
+        missingMessage="Add at least one Customer Shop and one Product before creating an advance order."
+        steps={[
+          { label: 'Add at least 1 Customer Shop', done: customers.length > 0, to: '/crm/customers', actionLabel: 'Add Customer' },
+          { label: 'Add at least 1 Product', done: products.length > 0, to: '/inventory/products', actionLabel: 'Add Product' },
+        ]}
+      />
 
       <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto rounded-xl border bg-[var(--bg-surface)] p-4 sm:p-5">
         {step === 0 && (
           <div className="max-w-2xl space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Search &amp; Select Customer</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Search &amp; Select Customer *</label>
               <select
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
@@ -222,7 +222,7 @@ export default function CreateAdvanceOrderPage() {
 
         {step === 2 && (
           <div className="max-w-xl space-y-4">
-            <label className="block text-xs font-semibold text-[var(--text-secondary)]">Print Layout Style</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)]">Print Layout Style (Optional)</label>
             <select
               value={layoutType}
               onChange={(e) => setLayoutType(e.target.value)}
@@ -240,7 +240,7 @@ export default function CreateAdvanceOrderPage() {
                 onChange={(e) => setOriginalAndDuplicate(e.target.checked)}
                 className="accent-[var(--accent-primary)]"
               />
-              <span>Print Original &amp; Duplicate copies</span>
+              <span>Print Original &amp; Duplicate copies (Optional)</span>
             </label>
             <button type="button" onClick={() => setStep(3)} className="h-9 px-4 rounded-lg bg-[var(--accent-primary)] text-white text-xs font-semibold">
               Next: Review &amp; Submit
@@ -258,7 +258,7 @@ export default function CreateAdvanceOrderPage() {
               </p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Optional Direct Salesman Assignment</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Direct Salesman Assignment (Optional)</label>
               <select
                 value={assignedSalesmanId}
                 onChange={(e) => setAssignedSalesmanId(e.target.value)}

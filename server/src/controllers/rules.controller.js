@@ -1,4 +1,5 @@
-import { CommercialRule, PrintTemplate } from '../models/index.js';
+import { CommercialRule as _CommercialRule, PrintTemplate as _PrintTemplate } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import {
@@ -8,6 +9,8 @@ import {
   deleteAutomationRule,
   evaluateLowStockAndExpiryAlerts,
 } from '../services/automationAlert.service.js';
+
+const m = () => getTenantModels({ CommercialRule: _CommercialRule, PrintTemplate: _PrintTemplate });
 
 function resolveCategoryFromRequest(req, forcedCategory = null) {
   if (forcedCategory) return forcedCategory;
@@ -22,6 +25,7 @@ function resolveCategoryFromRequest(req, forcedCategory = null) {
 
 export const listRules = (forcedCategory = null) =>
   asyncHandler(async (req, res) => {
+    const { CommercialRule } = m();
     const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
     const extra = {};
     const category = resolveCategoryFromRequest(req, forcedCategory);
@@ -52,17 +56,15 @@ export const listRules = (forcedCategory = null) =>
 
 export const createRule = (forcedCategory = null) =>
   asyncHandler(async (req, res) => {
+    const { CommercialRule } = m();
     const ruleCategory = forcedCategory || req.body.ruleCategory;
     if (!ruleCategory) throw new AppError('ruleCategory is required.', 400, 'RULE_CATEGORY_REQUIRED');
-    const created = await CommercialRule.create({
-      ...req.body,
-      ruleCategory,
-      distributorId: req.distributorId,
-    });
+    const created = await CommercialRule.create({ ...req.body, ruleCategory, distributorId: req.distributorId });
     res.status(201).json({ success: true, data: created });
   });
 
 export const updateRule = asyncHandler(async (req, res) => {
+  const { CommercialRule } = m();
   const rule = await CommercialRule.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!rule) throw new AppError('Commercial rule not found.', 404, 'RULE_NOT_FOUND');
 
@@ -72,12 +74,14 @@ export const updateRule = asyncHandler(async (req, res) => {
 });
 
 export const deleteRule = asyncHandler(async (req, res) => {
+  const { CommercialRule } = m();
   const deleted = await CommercialRule.findOneAndDelete({ _id: req.params.id, distributorId: req.distributorId });
   if (!deleted) throw new AppError('Commercial rule not found.', 404, 'RULE_NOT_FOUND');
   res.status(200).json({ success: true, message: 'Commercial rule deleted successfully.' });
 });
 
 export const listTemplates = asyncHandler(async (req, res) => {
+  const { PrintTemplate } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
   if (req.query.documentType) extra.documentType = req.query.documentType;
@@ -94,6 +98,7 @@ export const listTemplates = asyncHandler(async (req, res) => {
 });
 
 export const createTemplate = asyncHandler(async (req, res) => {
+  const { PrintTemplate } = m();
   const templateCode = req.body.templateCode || `TPL-${Date.now().toString().slice(-5)}`;
   if (req.body.isDefault && req.body.documentType) {
     await PrintTemplate.updateMany(
@@ -106,6 +111,7 @@ export const createTemplate = asyncHandler(async (req, res) => {
 });
 
 export const updateTemplate = asyncHandler(async (req, res) => {
+  const { PrintTemplate } = m();
   const tpl = await PrintTemplate.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!tpl) throw new AppError('Print template not found.', 404, 'TEMPLATE_NOT_FOUND');
 
@@ -122,6 +128,7 @@ export const updateTemplate = asyncHandler(async (req, res) => {
 });
 
 export const deleteTemplate = asyncHandler(async (req, res) => {
+  const { PrintTemplate } = m();
   const deleted = await PrintTemplate.findOneAndDelete({ _id: req.params.id, distributorId: req.distributorId });
   if (!deleted) throw new AppError('Print template not found.', 404, 'TEMPLATE_NOT_FOUND');
   res.status(200).json({ success: true, message: 'Print template deleted successfully.' });
@@ -158,17 +165,6 @@ export const triggerAutomationEvaluation = asyncHandler(async (req, res) => {
 });
 
 export default {
-  listRules,
-  createRule,
-  updateRule,
-  deleteRule,
-  listTemplates,
-  createTemplate,
-  updateTemplate,
-  deleteTemplate,
-  getAutomationRules,
-  saveAutomationRule,
-  flipAutomationRule,
-  removeAutomationRule,
-  triggerAutomationEvaluation,
+  listRules, createRule, updateRule, deleteRule, listTemplates, createTemplate, updateTemplate, deleteTemplate,
+  getAutomationRules, saveAutomationRule, flipAutomationRule, removeAutomationRule, triggerAutomationEvaluation,
 };

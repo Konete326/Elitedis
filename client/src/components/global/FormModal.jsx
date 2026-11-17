@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
 
@@ -12,8 +13,8 @@ const SIZE_CLASSES = {
 };
 
 /**
- * Reusable z-50 slide-over drawer or centered modal with Esc close, smooth entrance animation,
- * mobile-friendly sizing, and ShellContext scroll lock cleanup.
+ * Portal-mounted (z-[100]) slide-over drawer or centered modal blurring the full viewport,
+ * with Esc close, smooth entrance animation, and ShellContext scroll lock cleanup.
  */
 export function FormModal({
   isOpen,
@@ -55,7 +56,7 @@ export function FormModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, isSubmitting, onClose]);
 
-  if (!active) return null;
+  if (!active || typeof document === 'undefined') return null;
 
   const widthClass = SIZE_CLASSES[size] || SIZE_CLASSES.lg;
 
@@ -111,13 +112,13 @@ export function FormModal({
     </>
   );
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
       onClick={() => closeOnBackdrop && !isSubmitting && onClose?.()}
-      className={`fixed inset-0 z-50 flex bg-[var(--bg-overlay)] backdrop-blur-sm animate-fade-in ${
+      className={`fixed inset-0 z-[100] flex bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in ${
         isDrawer ? 'justify-end' : 'items-center justify-center p-2.5 sm:p-5'
       }`}
     >
@@ -137,7 +138,8 @@ export function FormModal({
           content
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

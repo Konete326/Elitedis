@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Package, Building2, Tag, Layers, Warehouse,
   ArrowLeftRight, Users, MapPin, Compass, ShoppingCart, Receipt,
   SlidersHorizontal, Printer, ClipboardList, Smartphone, UserCheck,
-  Landmark, BarChart3, Share2,
+  Landmark, BarChart3, Share2, ShieldCheck,
 } from 'lucide-react';
 
 const ADM = ['SUPER_ADMIN', 'ADMIN'];
@@ -10,14 +10,20 @@ const WH = [...ADM, 'WAREHOUSE_MANAGER', 'STOREKEEPER'];
 
 export const NAV_GROUPS = [
   {
+    key: 'Super Admin',
+    items: [
+      { to: '/super-admin/distributors', label: 'Distributors (Tenants)', icon: ShieldCheck, roles: ['SUPER_ADMIN'], strictRoleOnly: true },
+    ],
+  },
+  {
     key: 'Inventory & Stock',
     items: [
-      { to: '/inventory/products', label: 'Product Master', icon: Package, roles: WH },
+      { to: '/inventory/products', label: 'Products', icon: Package, roles: WH },
       { to: '/inventory/companies', label: 'Companies', icon: Building2, roles: ADM },
       { to: '/inventory/brands', label: 'Brands', icon: Tag, roles: ADM },
       { to: '/inventory/categories', label: 'Categories', icon: Layers, roles: ADM },
       { to: '/inventory/sub-categories', label: 'Sub-Categories', icon: Layers, roles: ADM },
-      { to: '/stock/overview', label: 'Stock Dashboard', icon: LayoutDashboard, roles: WH, workPart: 'warehouseManager' },
+      { to: '/stock/overview', label: 'Stock Overview', icon: LayoutDashboard, roles: WH, workPart: 'warehouseManager' },
       { to: '/stock/list', label: 'Stock Batches', icon: Package, roles: WH, workPart: 'warehouseManager' },
       { to: '/stock/warehouses', label: 'Warehouses', icon: Warehouse, roles: [...ADM, 'WAREHOUSE_MANAGER'], workPart: 'warehouseManager' },
       { to: '/stock/zones', label: 'Zones', icon: Warehouse, roles: [...ADM, 'WAREHOUSE_MANAGER'], workPart: 'warehouseManager' },
@@ -29,7 +35,7 @@ export const NAV_GROUPS = [
     key: 'CRM & Beats',
     items: [
       { to: '/crm/dashboard', label: 'CRM Dashboard', icon: LayoutDashboard, roles: [...ADM, 'BOOKER'] },
-      { to: '/crm/customers', label: 'Customer Master', icon: Users, roles: [...ADM, 'BOOKER', 'SALESMAN', 'ACCOUNTANT'] },
+      { to: '/crm/customers', label: 'Customers', icon: Users, roles: [...ADM, 'BOOKER', 'SALESMAN', 'ACCOUNTANT'] },
       { to: '/crm/areas-routes', label: 'Areas & Routes', icon: MapPin, roles: [...ADM, 'BOOKER'] },
       { to: '/crm/territories', label: 'Territories', icon: Compass, roles: ADM },
       { to: '/crm/beats', label: 'Beat Plans', icon: ClipboardList, roles: [...ADM, 'BOOKER'], workPart: 'orderBooker' },
@@ -49,9 +55,9 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'Master Rules & Templates',
+    key: 'Rules & Templates',
     items: [
-      { to: '/settings/rules', label: 'Tax, Discount & Schemes', icon: SlidersHorizontal, roles: ADM },
+      { to: '/settings/rules', label: 'Rules & Schemes', icon: SlidersHorizontal, roles: ADM },
       { to: '/settings/templates', label: 'Print Templates', icon: Printer, roles: ADM },
       { to: '/settings/automation', label: 'Automation Rules', icon: SlidersHorizontal, roles: ADM },
     ],
@@ -59,24 +65,24 @@ export const NAV_GROUPS = [
   {
     key: 'Pending Tasks',
     items: [
-      { to: '/tasks/pending', label: 'My Task Queue', icon: ClipboardList, roles: [...WH, 'SALESMAN', 'BOOKER'] },
+      { to: '/tasks/pending', label: 'My Task Queue', activePrefix: '/tasks/', icon: ClipboardList, roles: [...WH, 'SALESMAN', 'BOOKER'] },
     ],
   },
   {
     key: 'Field Portals',
     items: [
       { to: '/portal/booker', label: 'Booker Portal', icon: Smartphone, roles: ['SUPER_ADMIN', 'BOOKER'], strictRoleOnly: true },
-      { to: '/portal/pos', label: 'POS Store Counter', icon: Smartphone, roles: ['SUPER_ADMIN', 'POS_OPERATOR'], strictRoleOnly: true },
+      { to: '/portal/pos', label: 'POS Counter', icon: Smartphone, roles: ['SUPER_ADMIN', 'POS_OPERATOR'], strictRoleOnly: true },
       { to: '/portal/salesman', label: 'Salesman Portal', icon: Smartphone, roles: ['SUPER_ADMIN', 'SALESMAN'], strictRoleOnly: true },
     ],
   },
   {
     key: 'HRM',
     items: [
-      { to: '/hrm/employees', label: 'Employees & Work Parts', icon: UserCheck, roles: ADM },
+      { to: '/hrm/employees', label: 'Employees', icon: UserCheck, roles: ADM },
       { to: '/hrm/attendance', label: 'Attendance & Leave', icon: UserCheck, roles: ADM },
-      { to: '/hrm/payroll', label: 'Payroll & Commission', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/hrm/reports', label: 'Employee Performance', icon: BarChart3, roles: ADM },
+      { to: '/hrm/payroll', label: 'Payroll', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
+      { to: '/hrm/reports', label: 'Staff Performance', icon: BarChart3, roles: ADM },
     ],
   },
   {
@@ -84,7 +90,7 @@ export const NAV_GROUPS = [
     items: [
       { to: '/accounts/movements', label: 'Account Movements', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
       { to: '/accounts/ledgers', label: 'Ledgers & Day Book', icon: Landmark, roles: [...ADM, 'ACCOUNTANT'] },
-      { to: '/accounts/statements', label: 'Financial Statements', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT'] },
+      { to: '/accounts/statements', label: 'Statements', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT'] },
       { to: '/procurement', label: 'Procurement & PO', icon: Package, roles: [...ADM, 'ACCOUNTANT', 'WAREHOUSE_MANAGER'] },
     ],
   },
@@ -92,8 +98,8 @@ export const NAV_GROUPS = [
     key: 'Reports & Dashboards',
     items: [
       { to: '/dashboard', label: 'Executive Dashboard', icon: LayoutDashboard, roles: [...ADM, 'WAREHOUSE_MANAGER', 'ACCOUNTANT'] },
-      { to: '/reports/center', label: 'Report Center (19+)', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT', 'WAREHOUSE_MANAGER'] },
-      { to: '/reports/company-share', label: 'Company Info Share', icon: Share2, roles: [...ADM, 'BOOKER'] },
+      { to: '/reports/center', label: 'Report Center', icon: BarChart3, roles: [...ADM, 'ACCOUNTANT', 'WAREHOUSE_MANAGER'] },
+      { to: '/reports/company-share', label: 'Company Share', icon: Share2, roles: [...ADM, 'BOOKER'] },
     ],
   },
 ];

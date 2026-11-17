@@ -157,7 +157,7 @@ export default function RecoveryLedgerPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer *</label>
             <select
               required
               value={form.customerId}
@@ -173,7 +173,7 @@ export default function RecoveryLedgerPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Mode</label>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Mode (Optional)</label>
             <select
               value={form.paymentMode}
               onChange={(e) => setForm((p) => ({ ...p, paymentMode: e.target.value }))}
@@ -187,7 +187,7 @@ export default function RecoveryLedgerPage() {
           </div>
           {(form.paymentMode === 'CASH' || form.paymentMode === 'MIXED') && (
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Amount (PKR)</label>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Cash Amount PKR (Optional)</label>
               <input
                 type="number"
                 min="0"
@@ -209,14 +209,14 @@ export default function RecoveryLedgerPage() {
                 <option value="BANK_TRANSFER">Bank Transfer</option>
               </select>
               <input
-                placeholder="Transaction ID"
+                placeholder="Transaction ID (Optional)"
                 value={form.onlineTxId}
                 onChange={(e) => setForm((p) => ({ ...p, onlineTxId: e.target.value }))}
                 className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs font-mono"
               />
               <input
                 type="number"
-                placeholder="Online PKR"
+                placeholder="Online PKR (Optional)"
                 value={form.onlineAmountPkr}
                 onChange={(e) => setForm((p) => ({ ...p, onlineAmountPkr: Number(e.target.value) }))}
                 className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
@@ -226,20 +226,20 @@ export default function RecoveryLedgerPage() {
           {(form.paymentMode === 'CHEQUE' || form.paymentMode === 'MIXED') && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input
-                placeholder="Cheque No"
+                placeholder="Cheque No (Optional)"
                 value={form.chequeNo}
                 onChange={(e) => setForm((p) => ({ ...p, chequeNo: e.target.value }))}
                 className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs font-mono"
               />
               <input
-                placeholder="Bank Name"
+                placeholder="Bank Name (Optional)"
                 value={form.bankName}
                 onChange={(e) => setForm((p) => ({ ...p, bankName: e.target.value }))}
                 className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
               />
               <input
                 type="number"
-                placeholder="Cheque PKR"
+                placeholder="Cheque PKR (Optional)"
                 value={form.chequeAmountPkr}
                 onChange={(e) => setForm((p) => ({ ...p, chequeAmountPkr: Number(e.target.value) }))}
                 className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"

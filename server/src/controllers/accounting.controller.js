@@ -1,11 +1,15 @@
-import { AccountLedger, Recovery, Customer, SaleInvoice } from '../models/index.js';
+import { AccountLedger as _AccountLedger, Recovery as _Recovery, Customer as _Customer, SaleInvoice as _SaleInvoice } from '../models/index.js';
+import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { CHART_OF_ACCOUNTS, postDoubleEntry } from '../services/accountingPost.service.js';
 import { runWithTransaction } from '../services/stockLedger.service.js';
 import { checkCustomerCreditAlert, createNotificationIfAbsent } from '../services/automationAlert.service.js';
 
+const m = () => getTenantModels({ AccountLedger: _AccountLedger, Recovery: _Recovery, Customer: _Customer, SaleInvoice: _SaleInvoice });
+
 export const listAccountMovements = asyncHandler(async (req, res) => {
+  const { Recovery } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = {};
   if (req.query.status) extra.status = req.query.status;
@@ -28,6 +32,7 @@ export const listAccountMovements = asyncHandler(async (req, res) => {
 });
 
 export const listCheques = asyncHandler(async (req, res) => {
+  const { Recovery } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req);
   const extra = { paymentMode: { $in: ['CHEQUE', 'MIXED'] }, 'chequeDetails.amountPkr': { $gt: 0 } };
   if (req.query.chequeStatus) extra['chequeDetails.chequeStatus'] = req.query.chequeStatus;
@@ -47,6 +52,7 @@ export const listCheques = asyncHandler(async (req, res) => {
 });
 
 async function handleChequeLifecycle(rec, action, req, session) {
+  const { Customer, SaleInvoice } = m();
   const amt = Number(rec.chequeDetails?.amountPkr || rec.amountPkr || 0);
   const cur = rec.chequeDetails?.chequeStatus || 'PENDING';
   const opts = session ? { session } : {};
@@ -137,6 +143,7 @@ async function handleChequeLifecycle(rec, action, req, session) {
 }
 
 export const approveAccountMovement = asyncHandler(async (req, res) => {
+  const { Recovery } = m();
   const { recoveryId, action = 'APPROVE' } = req.body;
   const targetId = req.params.id || recoveryId;
   if (!targetId) throw new AppError('Recovery / movement ID is required.', 400, 'ID_REQUIRED');
@@ -207,6 +214,7 @@ export const updateChequeStatus = asyncHandler(async (req, res, next) => {
 });
 
 export const listLedgers = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const { skip, limit, sort, searchRegex, buildPaginationMeta } = buildPaginationQuery(req, { defaultSortBy: 'transactionDate' });
   const extra = {};
   for (const key of ['voucherType', 'accountCode', 'accountCategory', 'partyType', 'partyId', 'status']) {
@@ -250,6 +258,7 @@ export const createManualJournal = asyncHandler(async (req, res) => {
 });
 
 export const getTrialBalance = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const rows = await AccountLedger.aggregate([
     { $match: { distributorId: req.distributorId, status: 'APPROVED' } },
     { $group: { _id: { accountCode: '$accountCode', accountName: '$accountName', accountCategory: '$accountCategory' }, debitPkr: { $sum: '$debitPkr' }, creditPkr: { $sum: '$creditPkr' } } },
@@ -262,6 +271,7 @@ export const getTrialBalance = asyncHandler(async (req, res) => {
 });
 
 export const getProfitAndLoss = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const rows = await AccountLedger.aggregate([
     { $match: { distributorId: req.distributorId, status: 'APPROVED', accountCategory: { $in: ['REVENUE', 'EXPENSE'] } } },
     { $group: { _id: { accountCode: '$accountCode', accountName: '$accountName', accountCategory: '$accountCategory' }, debitPkr: { $sum: '$debitPkr' }, creditPkr: { $sum: '$creditPkr' } } },
@@ -283,6 +293,7 @@ export const getProfitAndLoss = asyncHandler(async (req, res) => {
 });
 
 export const getBalanceSheet = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const rows = await AccountLedger.aggregate([
     { $match: { distributorId: req.distributorId, status: 'APPROVED' } },
     { $group: { _id: { accountCode: '$accountCode', accountName: '$accountName', accountCategory: '$accountCategory' }, debitPkr: { $sum: '$debitPkr' }, creditPkr: { $sum: '$creditPkr' } } },
@@ -311,6 +322,7 @@ export const getBalanceSheet = asyncHandler(async (req, res) => {
 });
 
 export const getCashFlow = asyncHandler(async (req, res) => {
+  const { AccountLedger } = m();
   const cashFlows = await AccountLedger.aggregate([
     { $match: { distributorId: req.distributorId, status: 'APPROVED', accountCode: { $in: ['1010', '1020', '1030'] } } },
     { $group: { _id: '$voucherType', inflowPkr: { $sum: '$debitPkr' }, outflowPkr: { $sum: '$creditPkr' } } },

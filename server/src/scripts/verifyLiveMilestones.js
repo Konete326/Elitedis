@@ -55,18 +55,33 @@ async function run() {
       assert.equal(r.json.database.connected, true);
     });
 
-    const superTokens = await step('M1.2 Super Admin login, refresh rotation & /auth/me', async () => {
+    const superTokens = await step('M1.2 Super Admin login, refresh rotation, /auth/me & Super Admin Distributor Panel', async () => {
       const login = await api('POST', '/auth/login', { email: env.SUPER_ADMIN_EMAIL, password: env.SUPER_ADMIN_PASSWORD });
       assert.equal(login.status, 200);
+      assert.ok(login.json.data.agencyProfile);
       const ref = await api('POST', '/auth/refresh', { refreshToken: login.json.data.refreshToken });
       assert.equal(ref.status, 200);
       const me = await api('GET', '/auth/me', null, ref.json.data.accessToken);
       assert.equal(me.status, 200);
       assert.equal(me.json.data.primaryRole, 'SUPER_ADMIN');
+      assert.equal((await api('POST', '/super-admin/distributors/test-uri', { mongodbUri: 'invalid://uri' }, me.json.data ? ref.json.data.accessToken : '')).status, 400);
+      const uriPing = await api('POST', '/super-admin/distributors/test-uri', { mongodbUri: env.MONGODB_URI }, ref.json.data.accessToken);
+      assert.equal(uriPing.status, 200);
+      assert.equal(uriPing.json.data.ok, true);
+      const tempDist = await api('POST', '/super-admin/distributors', {
+        distributorName: 'Temp SA Dist', email: `temp.sa.${Date.now()}@elitedist.test`, adminPassword: 'TempPass@2026!',
+        mongodbUri: env.MONGODB_URI, businessProfile: { city: 'Karachi', fullAddress: 'Orangi Town' },
+      }, ref.json.data.accessToken);
+      assert.equal(tempDist.status, 201);
+      assert.equal(tempDist.json.data.distributor.onboardingCompleted, true);
+      assert.equal(tempDist.json.data.distributor.hasCustomDb, true);
+      assert.equal(tempDist.json.data.distributor.mongodbUri, undefined);
+      assert.equal((await api('PUT', `/super-admin/distributors/${tempDist.json.data.distributor._id}`, { status: 'SUSPENDED' }, ref.json.data.accessToken)).status, 200);
+      assert.equal((await api('DELETE', `/super-admin/distributors/${tempDist.json.data.distributor._id}`, null, ref.json.data.accessToken)).status, 200);
       return ref.json.data;
     });
 
-    const adminAuth = await step('M1.3 Isolated test distributor registration', async () => {
+    const adminAuth = await step('M1.3 Isolated test distributor registration, Agency Onboarding & RBAC isolation', async () => {
       const reg = await api('POST', '/auth/register', {
         fullName: 'Live Verify Admin',
         email: `verify.${Date.now()}@elitedist.test`,
@@ -76,7 +91,16 @@ async function run() {
         distributorCode: 'VFY',
       });
       assert.equal(reg.status, 201);
+      assert.equal(reg.json.data.agencyProfile.onboardingCompleted, false);
       testDistributorId = reg.json.data.user.distributorId;
+      const aTok = reg.json.data.accessToken;
+      assert.equal((await api('GET', '/super-admin/distributors', null, aTok)).status, 403);
+      const skip = await api('POST', '/auth/agency-profile/skip', {}, aTok);
+      assert.equal(skip.status, 200);
+      assert.equal(skip.json.data.onboardingSkipped, true);
+      const prof = await api('PUT', '/auth/agency-profile', { companyTitle: 'Verify Agency Sync', city: 'Karachi', ntn: '1234567-8', footerNote: 'Thank you!' }, aTok);
+      assert.equal(prof.status, 200);
+      assert.equal(prof.json.data.onboardingCompleted, true);
       return reg.json.data;
     });
     const tok = adminAuth.accessToken;
@@ -92,15 +116,16 @@ async function run() {
       assert.equal((await api('DELETE', `/upload/image?publicId=${encodeURIComponent(up.json.data.publicId)}`, null, tok)).status, 200);
     });
 
-    const inv = await step('M2 Inventory Master, prerequisites, multi-unit math, bulk rules, tenant guard & dashboard', async () => {
-      assert.equal((await api('POST', '/inventory/brands', { brandName: 'No Co Brand' }, tok)).status, 400);
+    const inv = await step('M2 Inventory Master, optional parents, multi-unit math, bulk rules, tenant guard & dashboard', async () => {
+      assert.equal((await api('POST', '/inventory/brands', { brandName: 'Standalone Brand' }, tok)).status, 201);
+      assert.equal((await api('POST', '/inventory/products', { productName: 'Standalone POS Item', baseUnit: { unitName: 'Piece', traderPurchaseRate: 50, wholesaleSaleRate: 60, posRetailEndRate: 70 } }, tok)).status, 201);
+      assert.equal((await api('POST', '/inventory/products', { productName: 'Bad Ref Item', companyId: '000000000000000000000000', baseUnit: { unitName: 'Piece' } }, tok)).status, 400);
       const cmp = await api('POST', '/inventory/companies', { companyName: 'Green Chemicals Verify', shortName: 'GCV' }, tok);
       assert.equal(cmp.status, 201);
       assert.equal((await api('GET', `/inventory/companies/${cmp.json.data._id}`, null, superTokens.accessToken)).status, 404);
       const brd = await api('POST', '/inventory/brands', { brandName: 'SURAJ VERIFY', companyId: cmp.json.data._id }, tok);
       const cat = await api('POST', '/inventory/categories', { name: 'Detergent', companyId: cmp.json.data._id, linkedBrandIds: [brd.json.data._id] }, tok);
       const sub = await api('POST', '/inventory/sub-categories', { name: 'Powder', parentCategoryId: cat.json.data._id, companyId: cmp.json.data._id }, tok);
-      assert.equal((await api('POST', '/inventory/products', { productName: 'No Cat Product', companyId: cmp.json.data._id, brandId: brd.json.data._id }, tok)).status, 400);
       const prod = await api('POST', '/inventory/products', {
         productName: 'Suraj 500g Verify',
         companyId: cmp.json.data._id,

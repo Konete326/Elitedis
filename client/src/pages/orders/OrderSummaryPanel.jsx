@@ -24,7 +24,7 @@ export default function OrderSummaryPanel({
 
         <div className="space-y-2 text-xs">
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Whole-Bill Discount Rule</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Whole-Bill Discount Rule (Optional)</label>
             <select
               value={grandDiscountRuleId}
               onChange={(e) => setGrandDiscountRuleId(e.target.value)}
@@ -41,7 +41,7 @@ export default function OrderSummaryPanel({
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Extra Flat Discount (PKR)</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Extra Flat Discount PKR (Optional)</label>
             <input
               type="number"
               min="0"
@@ -51,7 +51,7 @@ export default function OrderSummaryPanel({
             />
           </div>
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Extra Bill Charge (e.g. Delivery)</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Extra Bill Charge (Optional)</label>
             <select
               value={grandChargeRuleId}
               onChange={(e) => setGrandChargeRuleId(e.target.value)}
@@ -68,7 +68,7 @@ export default function OrderSummaryPanel({
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Whole-Bill Bonus Scheme</label>
+            <label className="block text-[11px] text-[var(--text-muted)] mb-1">Whole-Bill Bonus Scheme (Optional)</label>
             <select
               value={grandSchemeRuleId}
               onChange={(e) => setGrandSchemeRuleId(e.target.value)}
