@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Check, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { ConfirmModal, PrintPreviewModal } from '../../components/global';
+import { ConfirmModal, PrintPreviewModal, SearchableSelect } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
@@ -20,6 +20,9 @@ export default function CreateAdvanceOrderPage() {
 
   const [step, setStep] = useState(0);
   const [customerId, setCustomerId] = useState('');
+  const [areaId, setAreaId] = useState('');
+  const [routeId, setRouteId] = useState('');
+  const [paymentCondition, setPaymentCondition] = useState('PAID_CASH');
   const [overrideBlocked, setOverrideBlocked] = useState(false);
   const [lineItems, setLineItems] = useState([]);
   const [layoutType, setLayoutType] = useState('CHILLAN_FINANCE');
@@ -47,6 +50,25 @@ export default function CreateAdvanceOrderPage() {
     () => (customersQuery.data || []).find((c) => c._id === customerId) || null,
     [customersQuery.data, customerId]
   );
+
+  const customerOptions = useMemo(
+    () =>
+      (customersQuery.data || []).map((c) => ({
+        value: c._id,
+        label: `${c.customerCode} — ${c.shopName}`,
+        sublabel: `${c.ownerName || 'Owner'} · ${c.locationHierarchy?.areaName || c.locationHierarchy?.city || 'City'}`,
+      })),
+    [customersQuery.data]
+  );
+
+  const handleCustomerChange = (nextCustId) => {
+    setCustomerId(nextCustId);
+    setOverrideBlocked(false);
+    const cust = (customersQuery.data || []).find((c) => c._id === nextCustId);
+    setAreaId(cust?.locationHierarchy?.areaId || '');
+    setRouteId(cust?.locationHierarchy?.routeId || '');
+    setPaymentCondition(cust?.financialTerms?.paymentCondition || 'PAID_CASH');
+  };
 
   const netPayable = useMemo(
     () => lineItems.reduce((s, li) => s + (Number(li.customSaleRate || li.baseRate) || 0) * (Number(li.quantity) || 0), 0),
@@ -99,6 +121,9 @@ export default function CreateAdvanceOrderPage() {
       orderMode: 'ADVANCE',
       orderType: 'REGULAR',
       customerId,
+      areaId: areaId || null,
+      routeId: routeId || null,
+      paymentCondition,
       overrideBlocked,
       assignedSalesmanId: assignedSalesmanId || null,
       invoiceStyle: { layoutType, originalAndDuplicate },
@@ -143,18 +168,14 @@ export default function CreateAdvanceOrderPage() {
           <div className="max-w-2xl space-y-4">
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Search &amp; Select Customer *</label>
-              <select
+              <SearchableSelect
+                required
+                options={customerOptions}
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-              >
-                <option value="">Choose customer shop...</option>
-                {(customersQuery.data || []).map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.customerCode} — {c.shopName} ({c.ownerName})
-                  </option>
-                ))}
-              </select>
+                onChange={handleCustomerChange}
+                emptyLabel="Choose customer shop..."
+                placeholder="Search shop name, code, or owner..."
+              />
             </div>
 
             {customer && (

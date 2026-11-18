@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FormModal } from '../../components/global';
+import FormModeToggle, { useFormMode } from '../../components/shared/FormModeToggle';
 import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyZone(warehouseId = '') {
@@ -34,6 +35,8 @@ export default function ZoneFormModal({
     };
   });
   const [touched, setTouched] = useState({});
+  const [formMode, setFormMode] = useFormMode();
+  const isAdvanced = formMode === 'advanced';
 
   const codeError = touched.zoneCode ? validateField('code', form.zoneCode, { required: true, label: 'Zone Code' }) : '';
   const nameError = touched.zoneName ? validateField('required', form.zoneName, { required: true, minLength: 2, label: 'Zone Name' }) : '';
@@ -49,7 +52,8 @@ export default function ZoneFormModal({
     <FormModal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Zone' : 'New Warehouse Zone'}
+      title={isEditing ? 'Edit Storage Zone' : 'New Warehouse Zone'}
+      subtitle="Hierarchy: Warehouse → Zone → Area"
       onSubmit={(e) => {
         e.preventDefault();
         setTouched({ zoneCode: true, zoneName: true });
@@ -63,7 +67,12 @@ export default function ZoneFormModal({
       }}
       isSubmitting={isSubmitting}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-[var(--text-muted)]">{isAdvanced ? 'All zone & dimension specs' : 'Quick entry: warehouse, code, name & storage type'}</span>
+          <FormModeToggle mode={formMode} onChange={setFormMode} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {!isEditing && (
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse <span className="text-[var(--status-danger)]">*</span></label>
@@ -133,22 +142,27 @@ export default function ZoneFormModal({
             <option value="EXPIRY">Expiry</option>
           </select>
         </div>
-        <div className="sm:col-span-2 grid grid-cols-3 gap-2 pt-1">
-          {['width', 'length', 'height'].map((dim) => (
-            <div key={dim}>
-              <label className="block text-[11px] text-[var(--text-muted)] mb-1 capitalize">{dim} (Ft) (Optional)</label>
-              <input
-                type="number"
-                value={form.dimensions?.[dim] || 0}
-                onChange={(e) => setForm((p) => ({ ...p, dimensions: { ...p.dimensions, [dim]: Number(e.target.value) } }))}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
+        {isAdvanced && (
+          <>
+            <div className="sm:col-span-2 grid grid-cols-3 gap-2 pt-1">
+              {['width', 'length', 'height'].map((dim) => (
+                <div key={dim}>
+                  <label className="block text-[11px] text-[var(--text-muted)] mb-1 capitalize">{dim} (Ft) (Optional)</label>
+                  <input
+                    type="number"
+                    value={form.dimensions?.[dim] || 0}
+                    onChange={(e) => setForm((p) => ({ ...p, dimensions: { ...p.dimensions, [dim]: Number(e.target.value) } }))}
+                    className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="sm:col-span-2 text-xs font-mono tabular-nums text-[var(--text-muted)]">
-          Computed Area: {dimTotals.totalArea} sq ft · Volume: {dimTotals.totalVolume} cu ft
-        </p>
+            <p className="sm:col-span-2 text-xs font-mono tabular-nums text-[var(--text-muted)]">
+              Computed Area: {dimTotals.totalArea} sq ft · Volume: {dimTotals.totalVolume} cu ft
+            </p>
+          </>
+        )}
+      </div>
       </div>
     </FormModal>
   );

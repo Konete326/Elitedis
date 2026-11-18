@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Receipt } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { FilterToolbar, FormModal, MetricCard, SmartDataTable } from '../../components/global';
+import { FilterToolbar, FormModal, MetricCard, SearchableSelect, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload, formatCurrency, formatDateTime } from '../../utils/formatters';
@@ -16,13 +16,23 @@ export default function RecoveryLedgerPage() {
   const table = useServerTable({
     queryKey: 'recoveries',
     endpoint: '/sales-recovery/recoveries',
-    initialFilters: { paymentMode: '', status: '' },
+    initialFilters: { customerId: '', paymentMode: '', status: '' },
   });
 
   const customersQuery = useQuery({
     queryKey: ['customers-options'],
     queryFn: async () => extractListPayload(await apiClient.get('/crm/customers', { params: { limit: 100 } })).data,
   });
+
+  const customerOptions = useMemo(
+    () =>
+      (customersQuery.data || []).map((c) => ({
+        value: c._id,
+        label: `${c.customerCode || ''} — ${c.shopName}`.replace(/^ — /, ''),
+        sublabel: `Bal: ${formatCurrency(c.financialTerms?.outstandingBalancePkr || 0)}`,
+      })),
+    [customersQuery.data]
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
@@ -132,7 +142,17 @@ export default function RecoveryLedgerPage() {
             options: ['PENDING_VERIFICATION', 'APPROVED', 'REJECTED', 'BOUNCED'],
           },
         ]}
-      />
+      >
+        <div className="w-full sm:w-56">
+          <SearchableSelect
+            options={customerOptions}
+            value={table.filters.customerId}
+            onChange={(val) => table.setFilter('customerId', val)}
+            emptyLabel="All Customers"
+            placeholder="Filter customer..."
+          />
+        </div>
+      </FilterToolbar>
 
       <SmartDataTable
         columns={columns}
@@ -158,19 +178,14 @@ export default function RecoveryLedgerPage() {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Customer *</label>
-            <select
+            <SearchableSelect
               required
+              options={customerOptions}
               value={form.customerId}
-              onChange={(e) => setForm((p) => ({ ...p, customerId: e.target.value }))}
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            >
-              <option value="">Select customer...</option>
-              {(customersQuery.data || []).map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.shopName} (Bal: {formatCurrency(c.financialTerms?.outstandingBalancePkr || 0)})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setForm((p) => ({ ...p, customerId: val }))}
+              emptyLabel="Select customer..."
+              placeholder="Search customer shop..."
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Mode (Optional)</label>

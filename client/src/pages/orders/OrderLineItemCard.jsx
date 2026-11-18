@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { Calculator, Trash2 } from 'lucide-react';
+import { SearchableSelect } from '../../components/global';
 import { formatCurrency } from '../../utils/formatters';
 
 /**
@@ -15,6 +17,16 @@ export default function OrderLineItemCard({
   onOpenKeypad,
   onRequestRemove,
 }) {
+  const productOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        value: p._id,
+        label: `${p.skuCode} — ${p.productName}`,
+        sublabel: p.brandId?.brandName || p.baseUnit?.unitName || '',
+      })),
+    [products]
+  );
+
   const handleSelectProduct = (productId) => {
     const prod = products.find((x) => x._id === productId);
     if (!prod) return;
@@ -40,17 +52,14 @@ export default function OrderLineItemCard({
             <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
               Product #{idx + 1} *
             </label>
-            <select
+            <SearchableSelect
+              options={productOptions}
               value={row.productId}
-              onChange={(e) => handleSelectProduct(e.target.value)}
-              className="w-full min-h-[40px] px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs font-medium"
-            >
-              {products.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.skuCode} — {p.productName}
-                </option>
-              ))}
-            </select>
+              onChange={handleSelectProduct}
+              clearable={false}
+              emptyLabel="Select product..."
+              placeholder="Search SKU or product..."
+            />
           </div>
           <button
             type="button"
@@ -124,17 +133,14 @@ export default function OrderLineItemCard({
       <div className="hidden md:grid md:grid-cols-7 gap-2 items-end">
         <div className="md:col-span-2">
           <label className="block text-[10px] text-[var(--text-muted)] mb-1">Product *</label>
-          <select
+          <SearchableSelect
+            options={productOptions}
             value={row.productId}
-            onChange={(e) => handleSelectProduct(e.target.value)}
-            className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs"
-          >
-            {products.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.skuCode} — {p.productName}
-              </option>
-            ))}
-          </select>
+            onChange={handleSelectProduct}
+            clearable={false}
+            emptyLabel="Select product..."
+            placeholder="Search SKU or product..."
+          />
         </div>
         <div>
           <label className="block text-[10px] text-[var(--text-muted)] mb-1">Qty ({row.unitName}) *</label>

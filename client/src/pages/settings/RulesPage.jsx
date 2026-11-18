@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { ConfirmModal, FilterToolbar, FormModal, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, FormModal, SearchableSelect, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
@@ -45,6 +45,16 @@ export default function RulesPage() {
     queryKey: ['products-options'],
     queryFn: async () => extractListPayload(await apiClient.get('/inventory/products', { params: { limit: 100 } })).data,
   });
+
+  const productOptions = useMemo(
+    () =>
+      (productsQuery.data || []).map((pr) => ({
+        value: pr._id,
+        label: pr.skuCode ? `${pr.skuCode} — ${pr.productName}` : pr.productName,
+        sublabel: pr.brandId?.brandName || pr.baseUnit?.unitName || '',
+      })),
+    [productsQuery.data]
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -271,36 +281,26 @@ export default function RulesPage() {
           </div>
 
           {category === 'SCHEME' && (
-            <div className="sm:col-span-2 grid grid-cols-2 gap-2.5 rounded-xl border p-3 bg-[var(--bg-canvas)]">
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5 rounded-xl border p-3 bg-[var(--bg-canvas)]">
               <div>
                 <label className="block text-[11px] text-[var(--text-muted)] mb-1">Paid Product (Optional)</label>
-                <select
+                <SearchableSelect
+                  options={productOptions}
                   value={form.schemeDetails?.paidProductId || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, paidProductId: e.target.value } }))}
-                  className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs"
-                >
-                  <option value="">Any / Select...</option>
-                  {(productsQuery.data || []).map((pr) => (
-                    <option key={pr._id} value={pr._id}>
-                      {pr.productName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, paidProductId: val } }))}
+                  emptyLabel="Any / Select..."
+                  placeholder="Search paid product..."
+                />
               </div>
               <div>
                 <label className="block text-[11px] text-[var(--text-muted)] mb-1">Free Product (Optional)</label>
-                <select
+                <SearchableSelect
+                  options={productOptions}
                   value={form.schemeDetails?.freeProductId || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, freeProductId: e.target.value } }))}
-                  className="w-full h-8 px-2 rounded-lg border bg-[var(--bg-surface)] text-xs"
-                >
-                  <option value="">Same / Select...</option>
-                  {(productsQuery.data || []).map((pr) => (
-                    <option key={pr._id} value={pr._id}>
-                      {pr.productName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm((p) => ({ ...p, schemeDetails: { ...p.schemeDetails, freeProductId: val } }))}
+                  emptyLabel="Same / Select..."
+                  placeholder="Search free product..."
+                />
               </div>
             </div>
           )}

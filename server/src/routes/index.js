@@ -106,6 +106,7 @@ router.use('/inventory', invRouter);
 
 // Warehouse routes (/api/v1/warehouses)
 const whRouter = express.Router();
+whRouter.get('/dashboard', whCtrl.getWarehouseDashboardMetrics);
 whRouter.get('/zones', whCtrl.listAllZones);
 whRouter.get('/areas', whCtrl.listAllAreas);
 whRouter.get('/', whCtrl.listWarehouses);

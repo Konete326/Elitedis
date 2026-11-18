@@ -55,7 +55,27 @@ export default function MovementsPage() {
       header: 'From → To',
       accessor: (r) => `${r.fromWarehouseId?.warehouseName || 'Supplier'} → ${r.toWarehouseId?.warehouseName || '—'}`,
     },
-    { key: 'items', header: 'Lines', numeric: true, accessor: (r) => r.items?.length || 0 },
+    {
+      key: 'items',
+      header: 'Lines / Count',
+      numeric: true,
+      render: (r) => {
+        const count = r.items?.length || 0;
+        if (r.movementType !== 'ADJUSTMENT') return count;
+        const netDiff = (r.items || []).reduce(
+          (s, it) => s + (it.differenceBaseQty ?? ((it.physicalCountBaseQty ?? 0) - (it.systemBaseQty ?? it.previousErpBaseQty ?? 0))),
+          0
+        );
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span>{count}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${netDiff === 0 ? 'bg-[var(--status-success)]/12 text-[var(--status-success)]' : 'bg-[var(--status-warning)]/12 text-[var(--status-warning)]'}`}>
+              Diff {netDiff > 0 ? `+${netDiff}` : netDiff}
+            </span>
+          </span>
+        );
+      },
+    },
     { key: 'createdAt', header: 'Date', accessor: (r) => formatDateTime(r.createdAt) },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
@@ -165,13 +185,33 @@ export default function MovementsPage() {
         onClose={() => setPrintTarget(null)}
         title={`Stock Movement ${printTarget?.movementCode || ''}`}
         documentType={printTarget?.movementType || 'Movement'}
-        columns={[
-          { key: 'batchNo', header: 'Batch', numeric: true },
-          { key: 'unitName', header: 'Unit' },
-          { key: 'movedBaseQty', header: 'Moved Base Qty', numeric: true },
-          { key: 'physicalCountBaseQty', header: 'Physical Count', numeric: true },
-          { key: 'lineDecision', header: 'Decision' },
-        ]}
+        columns={
+          printTarget?.movementType === 'ADJUSTMENT'
+            ? [
+                { key: 'batchNo', header: 'Batch', numeric: true },
+                { key: 'unitName', header: 'Unit' },
+                { key: 'systemQty', header: 'System Qty', numeric: true, accessor: (r) => r.systemBaseQty ?? r.previousErpBaseQty ?? 0 },
+                { key: 'physicalCountBaseQty', header: 'Physical Count Qty', numeric: true },
+                {
+                  key: 'diff',
+                  header: 'Difference (+/-)',
+                  numeric: true,
+                  accessor: (r) => {
+                    const d = r.differenceBaseQty ?? ((r.physicalCountBaseQty ?? 0) - (r.systemBaseQty ?? r.previousErpBaseQty ?? 0));
+                    return d > 0 ? `+${d}` : String(d);
+                  },
+                },
+                { key: 'updatedBal', header: 'Updated Balance', numeric: true, accessor: (r) => r.updatedBalanceBaseQty ?? r.physicalCountBaseQty ?? 0 },
+                { key: 'lineDecision', header: 'Decision' },
+              ]
+            : [
+                { key: 'batchNo', header: 'Batch', numeric: true },
+                { key: 'unitName', header: 'Unit' },
+                { key: 'movedBaseQty', header: 'Moved Base Qty', numeric: true },
+                { key: 'physicalCountBaseQty', header: 'Physical Count', numeric: true },
+                { key: 'lineDecision', header: 'Decision' },
+              ]
+        }
         rows={printTarget?.items || []}
       />
       <ConfirmModal

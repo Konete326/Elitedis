@@ -668,7 +668,7 @@
   - `Test Case`: Switch policy from `FIFO` to `FEFO` and approve order; verify earliest-expiring non-expired batch is reserved while `Blocked` batches are skipped and `Available = Current - Reserved`.
   - `Status`: Complete
 
-### [ ] Phase 103: Warehouse Hierarchy (`Warehouse -> Zone -> Area`), Physical Stock Count Variance & 4-Step Zero-Stock Guard
+### [x] Phase 103: Warehouse Hierarchy (`Warehouse -> Zone -> Area`), Physical Stock Count Variance & 4-Step Zero-Stock Guard
 - **Scope:** Standardize UI, routes, and labels to strict `Warehouse -> Zone -> Area` (`Normal/Mix/Temperature/Cold Store`; `Floor/Rack/Walked`), capture explicit Physical Stock Count columns (`System Qty`, `Physical Count Qty`, `Difference Qty`, `Updated Balance`), expose all 8 Warehouse Dashboard KPIs, and enforce the 4-step zero-stock deletion guard across all three levels.
 - **Traceability (§30.5):**
   - `PRD Section`: §7.1–7.9, §8.6–8.7
@@ -676,7 +676,7 @@
   - `Classification`: Existing / Confirmed
   - `Acceptance Criteria`: AC-05
   - `Test Case`: Attempt to delete Area/Zone/Warehouse with `currentBaseQty > 0` -> expect 400 with remaining unit count; transfer stock to 0 -> verify deletion succeeds; verify Physical Count records `Difference = Physical - System`.
-  - `Status`: Pending
+  - `Status`: Complete
 
 ### [ ] Phase 104: 5-Step Purchase Receiving, Expected vs Received MFG/EXP Discrepancies & Segregated Put-Away + Purchase Return
 - **Scope:** Upgrade `Purchase` movement workflow into all 5 stages (`Purchase Received -> Check & Received -> Move & Put Away -> Create Movement -> Purchase Movement Result` [24 fields]), add Expected vs Received quantity & MFG/EXP mismatch alerts, segregate `Normal` / `Damaged` / `Expired` destination storage areas at put-away, and link `Purchase Return` directly to source batch/company payable.

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Plus, Printer } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { ConfirmModal, PrintPreviewModal, TouchKeypadModal } from '../../components/global';
+import { ConfirmModal, PrintPreviewModal, SearchableSelect, TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
@@ -19,6 +19,9 @@ export default function CreateNormalOrderPage() {
   const { addToast } = useShell();
 
   const [customerId, setCustomerId] = useState('');
+  const [areaId, setAreaId] = useState('');
+  const [routeId, setRouteId] = useState('');
+  const [paymentCondition, setPaymentCondition] = useState('PAID_CASH');
   const [orderType, setOrderType] = useState('REGULAR');
   const [invoiceRules, setInvoiceRules] = useState({
     discountAllow: true,
@@ -54,6 +57,24 @@ export default function CreateNormalOrderPage() {
     () => (customersQuery.data || []).find((c) => c._id === customerId) || null,
     [customersQuery.data, customerId]
   );
+
+  const customerOptions = useMemo(
+    () =>
+      (customersQuery.data || []).map((c) => ({
+        value: c._id,
+        label: `${c.customerCode} — ${c.shopName}`,
+        sublabel: `${c.locationHierarchy?.areaName || c.locationHierarchy?.city || 'City'} · ${c.financialTerms?.paymentCondition || 'PAID_CASH'}`,
+      })),
+    [customersQuery.data]
+  );
+
+  const handleCustomerChange = (nextCustId) => {
+    setCustomerId(nextCustId);
+    const cust = (customersQuery.data || []).find((c) => c._id === nextCustId);
+    setAreaId(cust?.locationHierarchy?.areaId || '');
+    setRouteId(cust?.locationHierarchy?.routeId || '');
+    setPaymentCondition(cust?.financialTerms?.paymentCondition || 'PAID_CASH');
+  };
 
   const rules = rulesQuery.data || [];
   const ruleMap = useMemo(() => new Map(rules.map((r) => [r._id, r])), [rules]);
@@ -131,6 +152,9 @@ export default function CreateNormalOrderPage() {
       orderMode: 'NORMAL',
       orderType,
       customerId,
+      areaId: areaId || null,
+      routeId: routeId || null,
+      paymentCondition,
       invoiceRules,
       grandDiscountRuleId: grandDiscountRuleId || null,
       grandChargeRuleId: grandChargeRuleId || null,
@@ -180,14 +204,14 @@ export default function CreateNormalOrderPage() {
         <div className="shrink-0 rounded-xl border bg-[var(--bg-surface)] p-3.5 grid grid-cols-1 lg:grid-cols-4 gap-3 items-center">
           <div className="lg:col-span-2">
             <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Customer Shop *</label>
-            <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full h-10 sm:h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">Choose customer shop...</option>
-              {customers.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.customerCode} — {c.shopName} ({c.locationHierarchy?.areaName || c.locationHierarchy?.city || 'City'})
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              required
+              options={customerOptions}
+              value={customerId}
+              onChange={handleCustomerChange}
+              emptyLabel="Choose customer shop..."
+              placeholder="Search shop name, code, or area..."
+            />
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Order Priority (Optional)</label>
@@ -201,13 +225,18 @@ export default function CreateNormalOrderPage() {
           <div className="flex flex-wrap gap-2 pt-1 lg:pt-0">
             {selectedCustomer ? (
               <>
-                <StatusBadge status={selectedCustomer.financialTerms?.paymentCondition} />
+                <StatusBadge status={paymentCondition} />
+                {selectedCustomer.locationHierarchy?.areaName && (
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
+                    {selectedCustomer.locationHierarchy.areaName}
+                  </span>
+                )}
                 <span className="text-xs font-mono tabular-nums text-[var(--text-secondary)]">
                   Balance: {formatCurrency(selectedCustomer.financialTerms?.outstandingBalancePkr || 0)}
                 </span>
               </>
             ) : (
-              <span className="text-xs text-[var(--text-muted)]">Select a customer to see credit terms</span>
+              <span className="text-xs text-[var(--text-muted)]">Select a customer to auto-fill area &amp; terms</span>
             )}
           </div>
         </div>

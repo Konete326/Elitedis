@@ -102,7 +102,7 @@ export function MetricCard({
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)] truncate">
             {displayTitle}
           </p>
-          {loading ? (
+          {loading && (value === undefined || value === null || value === '') ? (
             <div className="mt-2 h-7 w-24 rounded-md skeleton-shimmer" />
           ) : (
             <p className="mt-1 text-xl sm:text-2xl font-bold text-[var(--text-primary)] tabular-nums truncate">

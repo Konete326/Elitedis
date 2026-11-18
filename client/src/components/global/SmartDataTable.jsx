@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpDown, ArrowUp, ArrowDown, Inbox, Plus } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Inbox, Loader2, Plus } from 'lucide-react';
 import PaginationBar from './PaginationBar';
 
 const getRowKey = (row, idx, keyField) => row?.[keyField] ?? row?.id ?? row?._id ?? idx;
@@ -59,6 +59,8 @@ export function SmartDataTable({
   className = '',
 }) {
   const busy = loading || isLoading;
+  const showSkeleton = busy && data.length === 0;
+  const showRefreshing = busy && data.length > 0;
   const activeCols = columns.filter((col) => checkColumnVisible(visibleColumns, col.key));
   const rowIds = data.map((row, idx) => getRowKey(row, idx, keyField));
   const allSelected = selectable && rowIds.length > 0 && rowIds.every((id) => checkSelected(selectedKeys, id));
@@ -100,7 +102,16 @@ export function SmartDataTable({
   }
 
   return (
-    <div className={`lg:flex-1 lg:min-h-0 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] lg:overflow-hidden transition-colors duration-200 ${className}`}>
+    <div className={`relative lg:flex-1 lg:min-h-0 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] lg:overflow-hidden transition-colors duration-200 ${className}`}>
+      {showRefreshing && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 px-2.5 py-0.5 text-[11px] font-medium text-[var(--text-secondary)] shadow-sm"
+        >
+          <Loader2 className="w-3 h-3 animate-spin text-[var(--accent-primary)]" strokeWidth={2} />
+          <span>Updating...</span>
+        </div>
+      )}
       {viewMode !== 'card' && (
         <div className="hidden lg:block flex-1 min-h-0 overflow-auto overscroll-contain">
           <table className="w-full border-collapse text-left text-sm">
@@ -145,8 +156,8 @@ export function SmartDataTable({
             </thead>
 
             <tbody className="divide-y divide-[var(--border-subtle)]">
-              {busy
-                ? Array.from({ length: 5 }).map((_, rIdx) => (
+              {showSkeleton
+                ? Array.from({ length: 3 }).map((_, rIdx) => (
                     <tr key={`skeleton-${rIdx}`}>
                       {selectable && <td className="px-3 py-3"><div className="h-4 w-4 mx-auto rounded skeleton-shimmer" /></td>}
                       {activeCols.map((col) => (
@@ -162,7 +173,7 @@ export function SmartDataTable({
                       <tr
                         key={id}
                         onClick={onRowClick ? () => onRowClick(row) : undefined}
-                        className={`${selected ? 'bg-[var(--accent-soft)]/50' : 'hover:bg-[var(--bg-elevated)]/60'} ${onRowClick ? 'cursor-pointer' : ''}`}
+                        className={`transition-none ${selected ? 'bg-[var(--accent-soft)]/50' : 'hover:bg-[var(--bg-elevated)]/60'} ${onRowClick ? 'cursor-pointer' : ''}`}
                       >
                         {selectable && (
                           <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
@@ -198,9 +209,9 @@ export function SmartDataTable({
 
       <div className={`${viewMode === 'card' ? 'block' : 'lg:hidden'} lg:flex-1 lg:min-h-0 lg:overflow-auto p-3`}>
         <div className={viewMode === 'card' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-3'}>
-          {busy
-            ? Array.from({ length: 4 }).map((_, idx) => (
-                <div key={`card-skel-${idx}`} className="h-36 rounded-xl border border-[var(--border-subtle)] skeleton-shimmer" />
+          {showSkeleton
+            ? Array.from({ length: 3 }).map((_, idx) => (
+                <div key={`card-skel-${idx}`} className="h-32 rounded-xl border border-[var(--border-subtle)] skeleton-shimmer" />
               ))
             : data.map((row, rIdx) => {
                 const id = getRowKey(row, rIdx, keyField);

@@ -3,6 +3,9 @@ import { Product } from '../models/Product.model.js';
 import { Distributor } from '../models/Distributor.model.js';
 import { AppError } from '../middlewares/errorMiddleware.js';
 import { getActiveConnection, getTenantModel } from '../config/tenantDb.js';
+import { assertZeroStockBeforeDelete } from './warehouseGuard.service.js';
+
+export { assertZeroStockBeforeDelete };
 
 /**
  * Executes a callback inside a Mongoose ACID transaction when supported (Atlas Replica Set),
@@ -124,25 +127,6 @@ export function applyBatchConditionAndStatus(batch, { status, condition, customC
     batch.status = status;
   } else {
     batch.status = deriveBatchStatus(batch, conv);
-  }
-}
-
-/**
- * Zero-Quantity Deletion Guard: Blocks deleting a Warehouse, Zone, or Area with currentBaseQty > 0.
- */
-export async function assertZeroStockBeforeDelete({ distributorId, warehouseId, zoneId = null, areaId = null }) {
-  const query = { distributorId, warehouseId, currentBaseQty: { $gt: 0 } };
-  if (zoneId) query.zoneId = zoneId;
-  if (areaId) query.areaId = areaId;
-  const stocked = await getTenantModel('StockBatch', StockBatch).find(query).select('batchNo productId currentBaseQty').limit(10).lean();
-  if (stocked.length > 0) {
-    const remainingBaseQty = stocked.reduce((sum, b) => sum + (Number(b.currentBaseQty) || 0), 0);
-    throw new AppError(
-      'Cannot delete this storage location while it holds stock. Execute a Stock Movement first to bring quantity to 0.',
-      400,
-      'ZERO_STOCK_GUARD_BLOCKED',
-      { remainingBaseQty, sampleBatches: stocked.map((b) => ({ batchNo: b.batchNo, currentBaseQty: b.currentBaseQty })) }
-    );
   }
 }
 

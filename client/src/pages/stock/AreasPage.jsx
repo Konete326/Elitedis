@@ -36,7 +36,7 @@ export default function AreasPage() {
 
   const [modalState, setModalState] = useState({ open: false, editing: null, initial: null, key: 0 });
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [guardError, setGuardError] = useState('');
+  const [guardError, setGuardError] = useState(null);
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -46,11 +46,11 @@ export default function AreasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-areas'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
-      addToast({ type: 'success', message: modalState.editing ? 'Area updated.' : 'Floor/Rack area created.' });
+      addToast({ type: 'success', message: modalState.editing ? 'Storage area updated.' : 'Storage area created.' });
       setModalState({ open: false, editing: null, initial: null, key: 0 });
     },
     onError: (err) => {
-      addToast({ type: 'error', message: err?.response?.data?.message || 'Failed to save area.' });
+      addToast({ type: 'error', message: err?.response?.data?.message || 'Failed to save storage area.' });
     },
   });
 
@@ -60,14 +60,16 @@ export default function AreasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-areas'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
-      addToast({ type: 'success', message: 'Area deleted.' });
+      addToast({ type: 'success', message: 'Storage area deleted.' });
       setDeleteTarget(null);
-      setGuardError('');
+      setGuardError(null);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || 'Zero-quantity guard blocked deletion: transfer stock out first.';
-      setGuardError(msg);
-      addToast({ type: 'warning', message: msg });
+      const data = err?.response?.data;
+      const msg = data?.message || 'Zero-quantity guard blocked deletion: transfer stock out first.';
+      const steps = Array.isArray(data?.details?.steps) ? data.details.steps : [];
+      setGuardError({ message: msg, steps });
+      addToast({ type: 'warning', message: steps.length ? `${msg} — ${steps[0]}` : msg });
     },
   });
 
@@ -106,7 +108,7 @@ export default function AreasPage() {
 
   const columns = [
     { key: 'areaCode', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.areaCode}</span> },
-    { key: 'areaName', header: 'Area / Floor / Rack', mobilePrimary: true, accessor: 'areaName' },
+    { key: 'areaName', header: 'Storage Area', mobilePrimary: true, accessor: 'areaName' },
     { key: 'warehouseName', header: 'Warehouse', accessor: 'warehouseName' },
     { key: 'zoneName', header: 'Zone', accessor: 'zoneName' },
     { key: 'areaType', header: 'Type', accessor: 'areaType' },
@@ -120,20 +122,25 @@ export default function AreasPage() {
   return (
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
-        title="Floor, Rack & Storage Areas"
-        subtitle="Assign allowed products (Min/Max packing limits) with zero-quantity deletion guard"
+        title="Storage Areas Master"
+        subtitle="Hierarchy: Warehouse → Zone → Area · Min/Max packing capacity with 4-step zero-stock guard"
         actions={
-          <button type="button" onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
-            <Plus className="w-4 h-4" />
-            <span>Add Floor / Rack</span>
-          </button>
+          <>
+            <button type="button" onClick={() => navigate('/stock/zones')} className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium">
+              <span>Zones</span>
+            </button>
+            <button type="button" onClick={openCreate} className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold">
+              <Plus className="w-4 h-4" />
+              <span>Add Storage Area</span>
+            </button>
+          </>
         }
       />
 
       {(!warehouses.length || !hasAnyZone) && (
         <SetupGuideBanner
           isLoading={warehousesQuery.isLoading}
-          missingMessage="Set up a Warehouse and at least one Zone before creating storage Floor/Rack Areas."
+          missingMessage="Set up a Warehouse and at least one Zone before creating Storage Areas."
           steps={[
             { label: 'Create Warehouse', done: warehouses.length > 0, to: '/stock/warehouses', actionLabel: 'Warehouses' },
             { label: 'Add Zone', done: hasAnyZone, to: '/stock/zones', actionLabel: 'Zones' },
@@ -145,7 +152,7 @@ export default function AreasPage() {
         searchValue={table.search}
         onSearchChange={table.setSearch}
         onResetPage={() => table.setPage(1)}
-        searchPlaceholder="Search area code, rack, floor..."
+        searchPlaceholder="Search area code, name, or type..."
         viewMode={table.viewMode}
         onViewModeChange={table.setViewMode}
         onResetFilters={table.resetFilters}
@@ -171,9 +178,9 @@ export default function AreasPage() {
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyIcon={MapPin}
-        emptyTitle="No floor or rack areas configured"
-        emptyDescription="Define physical storage bays inside a warehouse zone before receiving stock."
-        emptyActionLabel="Add Floor / Rack"
+        emptyTitle="No storage areas configured"
+        emptyDescription="Define storage areas inside a warehouse zone (Warehouse → Zone → Area) before receiving stock."
+        emptyActionLabel="Add Storage Area"
         onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
@@ -184,7 +191,7 @@ export default function AreasPage() {
             <button
               type="button"
               onClick={() => {
-                setGuardError('');
+                setGuardError(null);
                 setDeleteTarget(row);
               }}
               className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs"
@@ -215,12 +222,12 @@ export default function AreasPage() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => {
           setDeleteTarget(null);
-          setGuardError('');
+          setGuardError(null);
         }}
         onConfirm={() => deleteMutation.mutate(deleteTarget)}
         isLoading={deleteMutation.isPending}
         title="Delete storage area?"
-        message={guardError || `Delete ${deleteTarget?.areaName || 'this area'}? Stock quantity must be 0 first.`}
+        message={guardError?.message || `Delete ${deleteTarget?.areaName || 'this storage area'}? Stock quantity and open tasks must be 0 first.`}
         secondaryAction={
           guardError
             ? {
@@ -232,7 +239,15 @@ export default function AreasPage() {
               }
             : undefined
         }
-      />
+      >
+        {guardError?.steps?.length > 0 && (
+          <ul className="rounded-lg border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-xs space-y-1 text-[var(--text-primary)]">
+            {guardError.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

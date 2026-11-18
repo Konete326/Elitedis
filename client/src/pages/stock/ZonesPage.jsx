@@ -31,7 +31,7 @@ export default function ZonesPage() {
 
   const [modalState, setModalState] = useState({ open: false, editing: null, initial: null, key: 0 });
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [guardError, setGuardError] = useState('');
+  const [guardError, setGuardError] = useState(null);
 
   const saveMutation = useMutation({
     mutationFn: (body) =>
@@ -56,12 +56,14 @@ export default function ZonesPage() {
       queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
       addToast({ type: 'success', message: 'Zone deleted.' });
       setDeleteTarget(null);
-      setGuardError('');
+      setGuardError(null);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || 'Delete blocked because stock exists in this zone.';
-      setGuardError(msg);
-      addToast({ type: 'warning', message: msg });
+      const data = err?.response?.data;
+      const msg = data?.message || 'Delete blocked because stock or open tasks exist in this zone.';
+      const steps = Array.isArray(data?.details?.steps) ? data.details.steps : [];
+      setGuardError({ message: msg, steps });
+      addToast({ type: 'warning', message: steps.length ? `${msg} — ${steps[0]}` : msg });
     },
   });
 
@@ -92,16 +94,32 @@ export default function ZonesPage() {
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Warehouse Zones & Sections"
-        subtitle="Configure Normal, Damage, Expiry, and Temperature zones per warehouse"
+        subtitle="Hierarchy: Warehouse → Zone → Area (Normal, Mix, Temperature, Cold Store)"
         actions={
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Zone</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => navigate('/stock/warehouses')}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+            >
+              <span>Warehouses</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/stock/areas')}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+            >
+              <span>Storage Areas</span>
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Zone</span>
+            </button>
+          </>
         }
       />
 
@@ -160,7 +178,7 @@ export default function ZonesPage() {
             <button
               type="button"
               onClick={() => {
-                setGuardError('');
+                setGuardError(null);
                 setDeleteTarget(row);
               }}
               className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs"
@@ -190,12 +208,12 @@ export default function ZonesPage() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => {
           setDeleteTarget(null);
-          setGuardError('');
+          setGuardError(null);
         }}
         onConfirm={() => deleteMutation.mutate(deleteTarget)}
         isLoading={deleteMutation.isPending}
         title="Delete zone?"
-        message={guardError || `Delete zone ${deleteTarget?.zoneName || ''}? Zones containing stock cannot be deleted.`}
+        message={guardError?.message || `Delete zone ${deleteTarget?.zoneName || ''}? Zones containing stock or open tasks cannot be deleted.`}
         secondaryAction={
           guardError
             ? {
@@ -207,7 +225,15 @@ export default function ZonesPage() {
               }
             : undefined
         }
-      />
+      >
+        {guardError?.steps?.length > 0 && (
+          <ul className="rounded-lg border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-xs space-y-1 text-[var(--text-primary)]">
+            {guardError.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

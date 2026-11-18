@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Printer, Search, Store, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
-import { PrintPreviewModal } from '../../components/global';
+import { PrintPreviewModal, SearchableSelect } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import { extractListPayload, formatCurrency, formatDateTime } from '../../utils/formatters';
 
@@ -37,6 +37,26 @@ export default function PosPortalPage() {
   const cartTotal = useMemo(
     () => cart.reduce((s, item) => s + (Number(item.baseRate) || 0) * (Number(item.quantity) || 0), 0),
     [cart]
+  );
+
+  const customerOptions = useMemo(
+    () =>
+      (customersQuery.data || []).map((c) => ({
+        value: c._id,
+        label: `${c.customerCode || ''} — ${c.shopName}`.replace(/^ — /, ''),
+        sublabel: c.locationHierarchy?.areaName || c.ownerContact || '',
+      })),
+    [customersQuery.data]
+  );
+
+  const productOptions = useMemo(
+    () =>
+      (catalogQuery.data || []).map((p) => ({
+        value: p._id,
+        label: `${p.skuCode} — ${p.productName}`,
+        sublabel: `Stock: ${p.availableBaseQty ?? 0} ${p.baseUnit?.unitName || 'Pc'}`,
+      })),
+    [catalogQuery.data]
   );
 
   const checkoutMutation = useMutation({
@@ -113,6 +133,18 @@ export default function PosPortalPage() {
                   className="w-full min-h-[40px] sm:h-9 pl-9 pr-3 rounded-lg border bg-[var(--bg-surface)] text-sm"
                 />
               </div>
+              <div className="w-full sm:w-56">
+                <SearchableSelect
+                  options={productOptions}
+                  value=""
+                  emptyLabel="Quick-add product..."
+                  placeholder="Type SKU / name..."
+                  onChange={(prodId) => {
+                    const found = (catalogQuery.data || []).find((x) => x._id === prodId);
+                    if (found) addItem(found);
+                  }}
+                />
+              </div>
               <select
                 value={invoiceMode}
                 onChange={(e) => setInvoiceMode(e.target.value)}
@@ -151,18 +183,13 @@ export default function PosPortalPage() {
 
           <div className="flex flex-col rounded-xl border bg-[var(--bg-surface)] lg:overflow-hidden lg:min-h-0">
             <div className="shrink-0 p-3 border-b bg-[var(--bg-elevated)] space-y-2">
-              <select
+              <SearchableSelect
+                options={customerOptions}
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full min-h-[40px] sm:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs"
-              >
-                <option value="">Walk-in Customer</option>
-                {(customersQuery.data || []).map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.shopName}
-                  </option>
-                ))}
-              </select>
+                onChange={setCustomerId}
+                emptyLabel="Walk-in Customer"
+                placeholder="Search customer shop..."
+              />
               {!customerId && (
                 <input
                   value={walkInCustomerName}

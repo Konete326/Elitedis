@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, MapPin, Plus, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +9,7 @@ import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, MetricCard, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { suggestCode, validateField } from '../../utils/validation';
 
 const INITIAL_FORM = {
@@ -33,12 +33,17 @@ export default function WarehousesPage() {
     initialFilters: { warehouseType: '', status: '' },
   });
 
+  const dashboardQuery = useQuery({
+    queryKey: ['warehouse-dashboard'],
+    queryFn: async () => (await apiClient.get('/warehouses/dashboard')).data?.data || {},
+  });
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [guardError, setGuardError] = useState('');
+  const [guardError, setGuardError] = useState(null);
 
   const codeError = touched.warehouseCode ? validateField('code', form.warehouseCode, { required: true, label: 'Warehouse Code' }) : '';
   const nameError = touched.warehouseName ? validateField('required', form.warehouseName, { required: true, minLength: 2, label: 'Warehouse Name' }) : '';
@@ -62,14 +67,17 @@ export default function WarehousesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses-options'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-dashboard'] });
       addToast({ type: 'success', message: 'Warehouse deleted.' });
       setDeleteTarget(null);
-      setGuardError('');
+      setGuardError(null);
     },
     onError: (err) => {
-      const msg = err?.response?.data?.message || 'Cannot delete warehouse while stock exists.';
-      setGuardError(msg);
-      addToast({ type: 'warning', message: msg });
+      const data = err?.response?.data;
+      const msg = data?.message || 'Cannot delete warehouse while stock or open tasks exist.';
+      const steps = Array.isArray(data?.details?.steps) ? data.details.steps : [];
+      setGuardError({ message: msg, steps });
+      addToast({ type: 'warning', message: steps.length ? `${msg} — ${steps[0]}` : msg });
     },
   });
 
@@ -106,11 +114,17 @@ export default function WarehousesPage() {
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
+  const kpi = dashboardQuery.data || {};
+  const stockValueDisplay =
+    canViewPurchasePrice && kpi.stockValuePkr !== null && kpi.stockValuePkr !== undefined
+      ? formatCurrency(kpi.stockValuePkr)
+      : 'Restricted';
+
   return (
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Warehouses Master"
-        subtitle="Main plots, shop sub-stores, utilization capacity, and zones"
+        subtitle="Storage hierarchy: Warehouse → Zone → Area"
         actions={
           <>
             <button
@@ -119,7 +133,14 @@ export default function WarehousesPage() {
               className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
             >
               <MapPin className="w-3.5 h-3.5" />
-              <span>Manage Zones</span>
+              <span>Zones</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/stock/areas')}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] text-xs font-medium"
+            >
+              <span>Storage Areas</span>
             </button>
             <button
               type="button"
@@ -133,11 +154,15 @@ export default function WarehousesPage() {
         }
       />
 
-      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard title="Total Warehouses" value={table.pagination.totalRecords} icon={WarehouseIcon} status="primary" />
-        <MetricCard title="Total Zones" value={table.rows.reduce((s, w) => s + (w.zoneCount ?? w.zones?.length ?? 0), 0)} status="info" />
-        <MetricCard title="Total Areas" value={table.rows.reduce((s, w) => s + (w.areaCount ?? 0), 0)} status="success" />
-        <MetricCard title="Low Stock Warnings" value={table.rows.reduce((s, w) => s + (w.stockStats?.lowStockCount ?? 0), 0)} status="warning" />
+      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <MetricCard title="Available Stock" value={formatNumber(kpi.availableStockBaseQty ?? 0)} subtitle="Base units" icon={WarehouseIcon} status="primary" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Total Batches" value={formatNumber(kpi.totalBatches ?? 0)} status="info" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Stock Value" value={stockValueDisplay} subtitle={canViewPurchasePrice ? 'Active cost value' : 'Permission required'} status={canViewPurchasePrice ? 'success' : 'default'} loading={dashboardQuery.isLoading} />
+        <MetricCard title="Assigned Staff" value={formatNumber(kpi.assignedStaffCount ?? 0)} status="info" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Low Stock Alerts" value={formatNumber(kpi.lowStockAlertsCount ?? 0)} status="warning" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Storage Utilization" value={`${kpi.storageUtilizationPct ?? 0}%`} status="primary" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Warehouses / Zones" value={`${kpi.warehousesAndZonesCount?.warehouses ?? table.pagination.totalRecords} / ${kpi.warehousesAndZonesCount?.zones ?? 0}`} status="success" loading={dashboardQuery.isLoading} />
+        <MetricCard title="Storage Areas" value={formatNumber(kpi.storageAreasCount ?? 0)} status="default" loading={dashboardQuery.isLoading} />
       </div>
 
       <FilterToolbar
@@ -177,7 +202,7 @@ export default function WarehousesPage() {
         onPageChange={table.setPage}
         onPageSizeChange={table.setLimit}
         emptyTitle="No warehouses created yet"
-        emptyDescription="Add your main warehouse or shop store before configuring zones and floor/rack areas."
+        emptyDescription="Add your main warehouse or shop store before configuring zones and storage areas (Warehouse → Zone → Area)."
         emptyActionLabel="Add Warehouse"
         onEmptyAction={openCreate}
         renderActions={(row) => (
@@ -189,7 +214,7 @@ export default function WarehousesPage() {
             <button
               type="button"
               onClick={() => {
-                setGuardError('');
+                setGuardError(null);
                 setDeleteTarget(row);
               }}
               className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs"
@@ -291,14 +316,14 @@ export default function WarehousesPage() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => {
           setDeleteTarget(null);
-          setGuardError('');
+          setGuardError(null);
         }}
         onConfirm={() => deleteMutation.mutate(deleteTarget._id)}
         isLoading={deleteMutation.isPending}
         title="Delete warehouse?"
         message={
-          guardError ||
-          `Remove ${deleteTarget?.warehouseName || 'this warehouse'}? Deletion is blocked if any batch holds currentBaseQty > 0.`
+          guardError?.message ||
+          `Remove ${deleteTarget?.warehouseName || 'this warehouse'}? Deletion is blocked if any batch holds currentBaseQty > 0 or open tasks exist.`
         }
         secondaryAction={
           guardError
@@ -311,7 +336,15 @@ export default function WarehousesPage() {
               }
             : undefined
         }
-      />
+      >
+        {guardError?.steps?.length > 0 && (
+          <ul className="rounded-lg border border-[var(--status-warning)]/40 bg-[var(--status-warning)]/10 p-3 text-xs space-y-1 text-[var(--text-primary)]">
+            {guardError.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

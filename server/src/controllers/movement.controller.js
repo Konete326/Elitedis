@@ -1,23 +1,9 @@
-import {
-  StockBatch as _StockBatch,
-  StockMovement as _StockMovement,
-  PendingTask as _PendingTask,
-  Product as _Product,
-} from '../models/index.js';
+import { StockBatch as _StockBatch, StockMovement as _StockMovement, PendingTask as _PendingTask, Product as _Product } from '../models/index.js';
 import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { canViewPurchasePrice, stripBatchPurchaseRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
-import {
-  applyBatchConditionAndStatus,
-  deriveBatchStatus,
-  formatDualUnitQty,
-  getDistributorStockPolicy,
-  getProductUnitMeta,
-  runWithTransaction,
-  saveDistributorStockPolicy,
-  syncProductUnitVersionLifecycle,
-} from '../services/stockLedger.service.js';
+import { applyBatchConditionAndStatus, deriveBatchStatus, formatDualUnitQty, getDistributorStockPolicy, getProductUnitMeta, runWithTransaction, saveDistributorStockPolicy, syncProductUnitVersionLifecycle } from '../services/stockLedger.service.js';
 import { recordAuditLog } from '../services/accountingPost.service.js';
 import { evaluateLowStockAndExpiryAlerts } from '../services/automationAlert.service.js';
 
@@ -46,14 +32,11 @@ export const listStockBatches = asyncHandler(async (req, res) => {
     const conv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : meta.conversionQty;
     const isBaseLabel = batch.unitName && batch.unitName.toLowerCase() === meta.baseUnitName.toLowerCase();
     const packName = batch.unitName && !isBaseLabel ? batch.unitName : meta.packUnitName;
-    return stripBatchPurchaseRates(
-      {
-        ...batch,
-        dualUnitCurrent: formatDualUnitQty(batch.currentBaseQty, conv, packName, meta.baseUnitName),
-        dualUnitAvailable: formatDualUnitQty(batch.availableBaseQty, conv, packName, meta.baseUnitName),
-      },
-      req.user
-    );
+    return stripBatchPurchaseRates({
+      ...batch,
+      dualUnitCurrent: formatDualUnitQty(batch.currentBaseQty, conv, packName, meta.baseUnitName),
+      dualUnitAvailable: formatDualUnitQty(batch.availableBaseQty, conv, packName, meta.baseUnitName),
+    }, req.user);
   });
   res.status(200).json({ success: true, data: enriched, pagination: buildPaginationMeta(totalRecords) });
 });
@@ -106,18 +89,11 @@ export const getStockValuation = asyncHandler(async (req, res) => {
   const [totals, byWarehouse] = await Promise.all([
     StockBatch.aggregate([
       { $match: match },
-      {
-        $group: {
-          _id: null,
-          totalStockValuePkr: { $sum: '$totalStockValuePkr' },
-          totalWeightKg: { $sum: '$totalWeightKg' },
-          totalCurrentBaseQty: { $sum: '$currentBaseQty' },
-          totalReservedBaseQty: { $sum: '$reservedBaseQty' },
-          totalAvailableBaseQty: { $sum: '$availableBaseQty' },
-          lowWarningCount: { $sum: { $cond: [{ $eq: ['$status', 'LOW_WARNING'] }, 1, 0] } },
-          outOfStockCount: { $sum: { $cond: [{ $eq: ['$status', 'OUT'] }, 1, 0] } },
-        },
-      },
+      { $group: {
+        _id: null, totalStockValuePkr: { $sum: '$totalStockValuePkr' }, totalWeightKg: { $sum: '$totalWeightKg' },
+        totalCurrentBaseQty: { $sum: '$currentBaseQty' }, totalReservedBaseQty: { $sum: '$reservedBaseQty' }, totalAvailableBaseQty: { $sum: '$availableBaseQty' },
+        lowWarningCount: { $sum: { $cond: [{ $eq: ['$status', 'LOW_WARNING'] }, 1, 0] } }, outOfStockCount: { $sum: { $cond: [{ $eq: ['$status', 'OUT'] }, 1, 0] } },
+      } },
     ]),
     StockBatch.aggregate([
       { $match: match },
@@ -235,12 +211,22 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
       if (!batch) throw new AppError('Batch not found for adjustment.', 404, 'BATCH_NOT_FOUND');
       const batchMeta = getProductUnitMeta(product, item.unitName || batch.unitName, batch.unitVersionId);
       const batchConv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : batchMeta.conversionQty;
-      const before = batch.currentBaseQty;
-      batch.currentBaseQty = Math.max(0, Number(item.physicalCountBaseQty) || 0);
+      const previousQty = Number(batch.currentBaseQty) || 0;
+      const physicalQty = Math.max(0, Number(item.physicalCountBaseQty) || 0);
+      Object.assign(item, {
+        systemBaseQty: previousQty,
+        previousErpBaseQty: previousQty,
+        physicalCountBaseQty: physicalQty,
+        differenceBaseQty: physicalQty - previousQty,
+        updatedBalanceBaseQty: physicalQty,
+      });
+      batch.currentBaseQty = physicalQty;
       await saveBatchWeightAndStatus(batch, batchMeta.baseWeightKg, batchConv, session, depletedProducts);
       await recordAuditLog({
         distributorId, actorId, module: 'STOCK_ADJUSTMENT', action: 'ADJUST_BATCH', entityModel: 'StockBatch', entityId: batch._id,
-        beforeState: { currentBaseQty: before }, afterState: { currentBaseQty: batch.currentBaseQty, missing: item.missingBaseQty, damaged: item.damagedBaseQty }, session,
+        beforeState: { currentBaseQty: previousQty },
+        afterState: { currentBaseQty: physicalQty, systemBaseQty: previousQty, physicalCountBaseQty: physicalQty, differenceBaseQty: item.differenceBaseQty, updatedBalanceBaseQty: physicalQty, missing: item.missingBaseQty, damaged: item.damagedBaseQty },
+        session,
       });
     } else if (movement.movementType === 'EXPIRY_DAMAGE_BACK') {
       const batch = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
@@ -297,26 +283,31 @@ export const getMovementById = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: sanitizeMovementCost(movement, req.user) });
 });
 
+function normalizeMovementItem(movementType, it) {
+  if (movementType === 'ADJUSTMENT') {
+    const sys = Math.max(0, Number(it.systemBaseQty ?? it.previousErpBaseQty ?? 0));
+    const phys = Math.max(0, Number(it.physicalCountBaseQty) || 0);
+    return { ...it, systemBaseQty: sys, previousErpBaseQty: sys, physicalCountBaseQty: phys, differenceBaseQty: phys - sys, updatedBalanceBaseQty: phys };
+  }
+  if (movementType !== 'PURCHASE' || (it.totalValuePkr && Number(it.totalValuePkr) > 0)) return it;
+  const qty = Number(it.movedBaseQty) || 0;
+  const packQty = Number(it.movedPackQty) || 0;
+  const conv = Math.max(1, Number(it.conversionQty) || 1);
+  const val = Number(it.purchaseRatePerBase) > 0 && qty > 0
+    ? Number((Number(it.purchaseRatePerBase) * qty).toFixed(2))
+    : Number(it.purchaseRatePerPack) > 0
+      ? (packQty > 0 ? Number((Number(it.purchaseRatePerPack) * packQty).toFixed(2)) : (qty > 0 ? Number(((Number(it.purchaseRatePerPack) / conv) * qty).toFixed(2)) : 0))
+      : 0;
+  return val > 0 ? { ...it, totalValuePkr: val } : it;
+}
+
 export const createMovement = asyncHandler(async (req, res) => {
   const { StockMovement, PendingTask } = m();
   const distributorId = req.distributorId;
   const actorId = req.user._id;
   const movementCode = req.body.movementCode || `MV-${Date.now().toString().slice(-6)}`;
   const status = req.body.status || 'PENDING';
-  const normalizedItems = Array.isArray(req.body.items)
-    ? req.body.items.map((it) => {
-        if (req.body.movementType !== 'PURCHASE' || (it.totalValuePkr && Number(it.totalValuePkr) > 0)) return it;
-        const qty = Number(it.movedBaseQty) || 0;
-        const packQty = Number(it.movedPackQty) || 0;
-        const conv = Math.max(1, Number(it.conversionQty) || 1);
-        const val = Number(it.purchaseRatePerBase) > 0 && qty > 0
-          ? Number((Number(it.purchaseRatePerBase) * qty).toFixed(2))
-          : Number(it.purchaseRatePerPack) > 0
-            ? (packQty > 0 ? Number((Number(it.purchaseRatePerPack) * packQty).toFixed(2)) : (qty > 0 ? Number(((Number(it.purchaseRatePerPack) / conv) * qty).toFixed(2)) : 0))
-            : 0;
-        return val > 0 ? { ...it, totalValuePkr: val } : it;
-      })
-    : [];
+  const normalizedItems = Array.isArray(req.body.items) ? req.body.items.map((it) => normalizeMovementItem(req.body.movementType, it)) : [];
 
   const movement = await runWithTransaction(async (session) => {
     const [created] = await StockMovement.create([{ ...req.body, items: normalizedItems, distributorId, movementCode, preparedById: actorId, status }], session ? { session } : {});

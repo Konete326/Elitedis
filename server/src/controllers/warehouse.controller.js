@@ -1,10 +1,19 @@
 import { Warehouse as _Warehouse, StockBatch as _StockBatch } from '../models/index.js';
 import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
+import { canViewPurchasePrice, stripBatchPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
-import { assertZeroStockBeforeDelete } from '../services/stockLedger.service.js';
+import {
+  assertZeroStockBeforeDelete,
+  computeWarehouseDashboardMetrics,
+} from '../services/warehouseGuard.service.js';
 
 const m = () => getTenantModels({ Warehouse: _Warehouse, StockBatch: _StockBatch });
+
+export const getWarehouseDashboardMetrics = asyncHandler(async (req, res) => {
+  const data = await computeWarehouseDashboardMetrics(req.distributorId, canViewPurchasePrice(req.user));
+  res.status(200).json({ success: true, data });
+});
 
 export const listWarehouses = asyncHandler(async (req, res) => {
   const { Warehouse, StockBatch } = m();
@@ -32,18 +41,22 @@ export const listWarehouses = asyncHandler(async (req, res) => {
     ]),
   ]);
 
+  const allowCost = canViewPurchasePrice(req.user);
   const statMap = new Map(stockStats.map((s) => [String(s._id), s]));
-  const enriched = warehouses.map((wh) => ({
-    ...wh,
-    zoneCount: wh.zones?.length || 0,
-    areaCount: (wh.zones || []).reduce((acc, z) => acc + (z.areas?.length || 0), 0),
-    stockStats: statMap.get(String(wh._id)) || {
+  const enriched = warehouses.map((wh) => {
+    const rawStats = statMap.get(String(wh._id)) || {
       totalBatches: 0,
       totalBaseQty: 0,
       totalStockValuePkr: 0,
       lowStockCount: 0,
-    },
-  }));
+    };
+    return {
+      ...wh,
+      zoneCount: wh.zones?.length || 0,
+      areaCount: (wh.zones || []).reduce((acc, z) => acc + (z.areas?.length || 0), 0),
+      stockStats: allowCost ? rawStats : { ...rawStats, totalStockValuePkr: null },
+    };
+  });
 
   res.status(200).json({ success: true, data: enriched, pagination: buildPaginationMeta(totalRecords) });
 });
@@ -61,7 +74,10 @@ export const getWarehouseById = asyncHandler(async (req, res) => {
     .select('batchNo productId currentBaseQty availableBaseQty totalStockValuePkr status condition')
     .lean();
 
-  res.status(200).json({ success: true, data: { ...warehouse, batches } });
+  res.status(200).json({
+    success: true,
+    data: { ...warehouse, batches: batches.map((b) => stripBatchPurchaseRates(b, req.user)) },
+  });
 });
 
 export const createWarehouse = asyncHandler(async (req, res) => {
@@ -89,7 +105,7 @@ export const deleteWarehouse = asyncHandler(async (req, res) => {
   const warehouse = await Warehouse.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!warehouse) throw new AppError('Warehouse not found.', 404, 'WAREHOUSE_NOT_FOUND');
 
-  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id });
+  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id, entityLabel: 'Warehouse' });
   await warehouse.deleteOne();
   res.status(200).json({ success: true, message: 'Warehouse deleted successfully.' });
 });
@@ -154,7 +170,7 @@ export const deleteZone = asyncHandler(async (req, res) => {
   const zone = warehouse.zones.id(req.params.zoneId);
   if (!zone) throw new AppError('Zone not found.', 404, 'ZONE_NOT_FOUND');
 
-  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id, zoneId: zone._id });
+  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id, zoneId: zone._id, entityLabel: 'Zone' });
 
   zone.deleteOne();
   await warehouse.save();
@@ -189,7 +205,7 @@ export const listAllAreas = asyncHandler(async (req, res) => {
 export const addArea = asyncHandler(async (req, res) => {
   const { Warehouse } = m();
   const warehouse = await Warehouse.findOne({ _id: req.params.warehouseId, distributorId: req.distributorId });
-  if (!warehouse) throw new AppError('Please create a Warehouse first before adding a Floor/Rack Area.', 404, 'PREREQUISITE_WAREHOUSE_NOT_FOUND');
+  if (!warehouse) throw new AppError('Please create a Warehouse first before adding a Storage Area (Warehouse → Zone → Area).', 404, 'PREREQUISITE_WAREHOUSE_NOT_FOUND');
 
   const zone = warehouse.zones.id(req.params.zoneId);
   if (!zone) throw new AppError('Please create a Zone inside this warehouse first before adding an Area.', 404, 'PREREQUISITE_ZONE_NOT_FOUND');
@@ -225,14 +241,15 @@ export const deleteArea = asyncHandler(async (req, res) => {
   const area = zone.areas.id(req.params.areaId);
   if (!area) throw new AppError('Area not found.', 404, 'AREA_NOT_FOUND');
 
-  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id, zoneId: zone._id, areaId: area._id });
+  await assertZeroStockBeforeDelete({ distributorId: req.distributorId, warehouseId: warehouse._id, zoneId: zone._id, areaId: area._id, entityLabel: 'Storage Area' });
 
   area.deleteOne();
   await warehouse.save();
-  res.status(200).json({ success: true, message: 'Floor/Rack area deleted successfully.' });
+  res.status(200).json({ success: true, message: 'Storage Area (Warehouse → Zone → Area) deleted successfully.' });
 });
 
 export default {
+  getWarehouseDashboardMetrics,
   listWarehouses, getWarehouseById, createWarehouse, updateWarehouse, deleteWarehouse,
   listAllZones, addZone, updateZone, deleteZone, listAllAreas, addArea, updateArea, deleteArea,
 };

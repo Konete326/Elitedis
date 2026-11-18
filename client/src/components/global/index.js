@@ -14,3 +14,4 @@ export { PwaInstallPrompt } from './PwaInstallPrompt';
 export { TouchKeypadModal } from './TouchKeypadModal';
 export { ImageDropzone } from './ImageDropzone';
 export { ToastContainer } from './ToastContainer';
+export { SearchableSelect } from './SearchableSelect';

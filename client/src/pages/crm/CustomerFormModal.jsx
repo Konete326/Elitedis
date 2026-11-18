@@ -1,5 +1,9 @@
-import { useState } from 'react';
-import { FormModal, ImageDropzone } from '../../components/global';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '../../services/apiClient';
+import { FormModal, ImageDropzone, SearchableSelect } from '../../components/global';
+import FormModeToggle, { useFormMode } from '../../components/shared/FormModeToggle';
+import { extractListPayload } from '../../utils/formatters';
 import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyCustomer(suggestedCode = '') {
@@ -18,6 +22,7 @@ export function buildEmptyCustomer(suggestedCode = '') {
     locationHierarchy: {
       city: 'Karachi',
       townOrZone: '',
+      areaId: '',
       areaName: '',
       routeName: '',
       street: '',
@@ -46,6 +51,32 @@ export default function CustomerFormModal({
 }) {
   const [form, setForm] = useState(() => initialValue || buildEmptyCustomer());
   const [touched, setTouched] = useState({});
+  const [formMode, setFormMode] = useFormMode();
+  const isAdvanced = formMode === 'advanced';
+
+  const areasQuery = useQuery({
+    queryKey: ['crm-areas-options'],
+    queryFn: async () => extractListPayload(await apiClient.get('/crm/areas', { params: { limit: 100 } })).data,
+  });
+  const areas = areasQuery.data || [];
+  const areaOptions = useMemo(
+    () => areas.map((a) => ({ value: a._id, label: `${a.areaCode} — ${a.areaName}`, sublabel: [a.subDistrict, a.city].filter(Boolean).join(' · ') })),
+    [areas]
+  );
+
+  const handleAreaSelect = (nextAreaId) => {
+    const area = areas.find((a) => String(a._id) === String(nextAreaId));
+    setForm((p) => ({
+      ...p,
+      locationHierarchy: {
+        ...p.locationHierarchy,
+        areaId: nextAreaId || '',
+        areaName: area?.areaName || '',
+        city: area?.city || p.locationHierarchy?.city || 'Karachi',
+        townOrZone: area?.subDistrict || p.locationHierarchy?.townOrZone || '',
+      },
+    }));
+  };
 
   const errors = {
     customerCode:
@@ -86,6 +117,10 @@ export default function CustomerFormModal({
       shopName: String(form.shopName || '').trim(),
       ownerName: String(form.ownerName || '').trim(),
       ownerContact: String(form.ownerContact || '').trim(),
+      locationHierarchy: {
+        ...(form.locationHierarchy || {}),
+        areaId: form.locationHierarchy?.areaId || null,
+      },
       contacts: (form.contacts || [])
         .filter((c) => c?.personName?.trim() || c?.contactNo?.trim())
         .map((c) => ({
@@ -116,7 +151,11 @@ export default function CustomerFormModal({
       isSubmitting={isSubmitting}
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-[var(--text-muted)]">{isAdvanced ? 'Full shop profile, Pehchan & credit limits' : 'Quick entry: essential shop, owner & area details'}</span>
+          <FormModeToggle mode={formMode} onChange={setFormMode} />
+        </div>
+        <div className={`grid grid-cols-1 ${isAdvanced ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -193,52 +232,76 @@ export default function CustomerFormModal({
                 <option value="POS_WALKIN">POS Walk-in</option>
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop Category (Optional)</label>
-              <input
-                value={form.shopCategory}
-                onChange={(e) => setForm((p) => ({ ...p, shopCategory: e.target.value }))}
-                placeholder="Confectionery / General"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-              />
-            </div>
+            {isAdvanced && (
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop Category (Optional)</label>
+                <input
+                  value={form.shopCategory}
+                  onChange={(e) => setForm((p) => ({ ...p, shopCategory: e.target.value }))}
+                  placeholder="Confectionery / General"
+                  className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                />
+              </div>
+            )}
           </div>
 
-          <ImageDropzone
-            label="Shop Picture (Optional)"
-            folder="customers"
-            value={form.shopPic}
-            isSubmitting={isSubmitting}
-            onChange={(shopPic) => setForm((p) => ({ ...p, shopPic }))}
-          />
+          {isAdvanced && (
+            <ImageDropzone
+              label="Shop Picture (Optional)"
+              folder="customers"
+              value={form.shopPic}
+              isSubmitting={isSubmitting}
+              onChange={(shopPic) => setForm((p) => ({ ...p, shopPic }))}
+            />
+          )}
         </div>
 
         <div className="rounded-xl border p-3.5 space-y-3">
           <h3 className="text-xs font-bold uppercase text-[var(--accent-primary)]">
-            Shop Address &amp; Landmark (Optional)
+            Shop Area &amp; Location {isAdvanced ? '(Full Hierarchy & Pehchan)' : '(Auto-fills City & Zone)'}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <input placeholder="City (Optional)" value={form.locationHierarchy?.city || ''} onChange={(e) => updateLoc('city', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <input placeholder="Town / Zone (Optional)" value={form.locationHierarchy?.townOrZone || ''} onChange={(e) => updateLoc('townOrZone', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <input placeholder="Area (Optional)" value={form.locationHierarchy?.areaName || ''} onChange={(e) => updateLoc('areaName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <input placeholder="Route / Road (Optional)" value={form.locationHierarchy?.routeName || ''} onChange={(e) => updateLoc('routeName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <input placeholder="Street / Block (Optional)" value={form.locationHierarchy?.street || ''} onChange={(e) => updateLoc('street', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <input placeholder="Google Map Link (Optional)" value={form.locationHierarchy?.mapLink || ''} onChange={(e) => updateLoc('mapLink', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
-            <div className="sm:col-span-3">
-              <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
-                Nearby Landmark / Pehchan Directions (Optional)
-              </label>
-              <input
-                placeholder="e.g. Opposite petrol pump, corner green-gate shop"
-                value={form.locationHierarchy?.pehchanRemarks || ''}
-                onChange={(e) => updateLoc('pehchanRemarks', e.target.value)}
-                className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
+            <div>
+              <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Select Area (Optional)</label>
+              <SearchableSelect
+                options={areaOptions}
+                value={form.locationHierarchy?.areaId || ''}
+                onChange={handleAreaSelect}
+                emptyLabel="Choose CRM area..."
+                placeholder="Search area or city..."
               />
             </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">City (Optional)</label>
+              <input placeholder="City" value={form.locationHierarchy?.city || ''} onChange={(e) => updateLoc('city', e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">Town / Zone (Optional)</label>
+              <input placeholder="Town / Zone" value={form.locationHierarchy?.townOrZone || ''} onChange={(e) => updateLoc('townOrZone', e.target.value)} className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+            </div>
+            {isAdvanced && (
+              <>
+                <input placeholder="Area Name (Optional)" value={form.locationHierarchy?.areaName || ''} onChange={(e) => updateLoc('areaName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+                <input placeholder="Route / Road (Optional)" value={form.locationHierarchy?.routeName || ''} onChange={(e) => updateLoc('routeName', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+                <input placeholder="Street / Block (Optional)" value={form.locationHierarchy?.street || ''} onChange={(e) => updateLoc('street', e.target.value)} className="h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+                <input placeholder="Google Map Link (Optional)" value={form.locationHierarchy?.mapLink || ''} onChange={(e) => updateLoc('mapLink', e.target.value)} className="sm:col-span-3 h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs" />
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
+                    Nearby Landmark / Pehchan Directions (Optional)
+                  </label>
+                  <input
+                    placeholder="e.g. Opposite petrol pump, corner green-gate shop"
+                    value={form.locationHierarchy?.pehchanRemarks || ''}
+                    onChange={(e) => updateLoc('pehchanRemarks', e.target.value)}
+                    className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="rounded-xl border p-3.5 grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className={`rounded-xl border p-3.5 grid grid-cols-1 ${isAdvanced ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-3`}>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Payment Condition (Optional)</label>
             <select
@@ -251,26 +314,30 @@ export default function CustomerFormModal({
               <option value="ADVANCE">Advance</option>
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Limit PKR (Optional)</label>
-            <input
-              type="number"
-              min="0"
-              value={form.financialTerms?.creditLimitPkr ?? 0}
-              onChange={(e) => updateFin('creditLimitPkr', Number(e.target.value))}
-              className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Days (Optional)</label>
-            <input
-              type="number"
-              min="0"
-              value={form.financialTerms?.creditDays ?? 0}
-              onChange={(e) => updateFin('creditDays', Number(e.target.value))}
-              className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-            />
-          </div>
+          {isAdvanced && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Limit PKR (Optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.financialTerms?.creditLimitPkr ?? 0}
+                  onChange={(e) => updateFin('creditLimitPkr', Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Credit Days (Optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.financialTerms?.creditDays ?? 0}
+                  onChange={(e) => updateFin('creditDays', Number(e.target.value))}
+                  className="w-full h-9 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Account Status (Optional)</label>
             <select

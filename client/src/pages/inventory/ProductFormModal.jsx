@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FormModal } from '../../components/global';
+import FormModeToggle, { useFormMode } from '../../components/shared/FormModeToggle';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import ProductUnitPanels, {
   PRODUCT_RATE_LIST_COLUMNS,
@@ -35,6 +36,8 @@ export default function ProductFormModal({
   const [form, setForm] = useState(() => initialValue || buildEmptyProduct());
   const [touched, setTouched] = useState({});
   const [draftVersionId, setDraftVersionId] = useState(null);
+  const [formMode, setFormMode] = useFormMode();
+  const isAdvanced = formMode === 'advanced';
 
   const skuError = touched.skuCode ? validateField('sku', form.skuCode, { required: true, label: 'SKU Code' }) : '';
   const nameError = touched.productName ? validateField('required', form.productName, { required: true, minLength: 2, label: 'Product Name' }) : '';
@@ -212,8 +215,12 @@ export default function ProductFormModal({
       onSubmit={handleSubmit}
       isSubmitting={isSubmitting}
     >
-      <div className="space-y-5">
-        {(companies.length === 0 || brands.length === 0 || categories.length === 0) && (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-[var(--text-muted)]">{isAdvanced ? 'Showing all catalog fields' : 'Quick entry: essential SKU & pricing fields'}</span>
+          <FormModeToggle mode={formMode} onChange={setFormMode} />
+        </div>
+        {isAdvanced && (companies.length === 0 || brands.length === 0 || categories.length === 0) && (
           <SetupGuideBanner
             isOptional
             title="Optional Catalog Grouping"
@@ -259,17 +266,19 @@ export default function ProductFormModal({
             />
             {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <input
-              value={form.barcode}
-              onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
-              onBlur={() => setTouched((p) => ({ ...p, barcode: true }))}
-              placeholder="8964000123456"
-              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${barcodeError ? 'border-[var(--status-danger)]' : ''}`}
-            />
-            {barcodeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{barcodeError}</p>}
-          </div>
+          {isAdvanced && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Barcode <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+              <input
+                value={form.barcode}
+                onChange={(e) => setForm((p) => ({ ...p, barcode: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, barcode: true }))}
+                placeholder="8964000123456"
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${barcodeError ? 'border-[var(--status-danger)]' : ''}`}
+              />
+              {barcodeError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{barcodeError}</p>}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
             <select value={form.companyId} onChange={(e) => handleCompanyChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
@@ -303,17 +312,19 @@ export default function ProductFormModal({
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <select value={form.subCategoryId} onChange={(e) => handleSubCategoryChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
-              <option value="">None / Optional...</option>
-              {filteredSubCategories.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAdvanced && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+              <select value={form.subCategoryId} onChange={(e) => handleSubCategoryChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+                <option value="">None / Optional...</option>
+                {filteredSubCategories.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>
             <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">

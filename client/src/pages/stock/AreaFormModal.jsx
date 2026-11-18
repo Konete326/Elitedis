@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { FormModal } from '../../components/global';
+import { Trash2 } from 'lucide-react';
+import { FormModal, SearchableSelect } from '../../components/global';
+import FormModeToggle, { useFormMode } from '../../components/shared/FormModeToggle';
 import { suggestCode, validateField } from '../../utils/validation';
 
 export function buildEmptyArea(wh = null) {
@@ -38,6 +40,12 @@ export default function AreaFormModal({
     };
   });
   const [touched, setTouched] = useState({});
+  const [formMode, setFormMode] = useFormMode();
+  const isAdvanced = formMode === 'advanced';
+  const productOptions = useMemo(
+    () => products.map((pr) => ({ value: pr._id, label: `${pr.skuCode} — ${pr.productName}`, sublabel: pr.brandId?.brandName || pr.baseUnit?.unitName })),
+    [products]
+  );
 
   const codeError = touched.areaCode ? validateField('code', form.areaCode, { required: true, label: 'Area Code' }) : '';
   const nameError = touched.areaName ? validateField('required', form.areaName, { required: true, minLength: 2, label: 'Area Name' }) : '';
@@ -60,7 +68,8 @@ export default function AreaFormModal({
     <FormModal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Storage Area' : 'New Floor / Rack Area'}
+      title={isEditing ? 'Edit Storage Area' : 'New Storage Area'}
+      subtitle="Hierarchy: Warehouse → Zone → Area"
       size="lg"
       onSubmit={(e) => {
         e.preventDefault();
@@ -76,6 +85,10 @@ export default function AreaFormModal({
       isSubmitting={isSubmitting}
     >
       <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-[var(--text-muted)]">{isAdvanced ? 'Storage area & allowed SKU capacity rules' : 'Quick entry: warehouse, zone, code, name & type'}</span>
+          <FormModeToggle mode={formMode} onChange={setFormMode} />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {!isEditing && (
             <>
@@ -142,7 +155,7 @@ export default function AreaFormModal({
               value={form.areaName}
               onChange={(e) => setForm((p) => ({ ...p, areaName: e.target.value }))}
               onBlur={() => setTouched((p) => ({ ...p, areaName: true }))}
-              placeholder="1st Floor / Rack A1"
+              placeholder="e.g. Rack A1 / Bay 01"
               className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${nameError ? 'border-[var(--status-danger)]' : ''}`}
             />
             {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
@@ -166,58 +179,66 @@ export default function AreaFormModal({
           </div>
         </div>
 
-        <div className="rounded-xl border p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Allowed Products &amp; Capacity (Optional)</span>
-            <button type="button" onClick={addAllowedProduct} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">
-              + Add Product Rule
-            </button>
-          </div>
-          {form.allowedProducts.map((ap, idx) => (
-            <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
-              <select
-                value={ap.productId}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, productId: e.target.value } : row)),
-                  }))
-                }
-                className="sm:col-span-2 h-8 px-2 rounded-lg border bg-[var(--bg-elevated)] text-xs"
-              >
-                {products.map((pr) => (
-                  <option key={pr._id} value={pr._id}>
-                    {pr.skuCode} — {pr.productName}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Min Pack"
-                value={ap.minQtyPacking}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, minQtyPacking: Number(e.target.value) } : row)),
-                  }))
-                }
-                className="h-8 px-2 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
-              <input
-                type="number"
-                placeholder="Max Pack"
-                value={ap.maxQtyPacking}
-                onChange={(e) =>
-                  setForm((p) => ({
-                    ...p,
-                    allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, maxQtyPacking: Number(e.target.value) } : row)),
-                  }))
-                }
-                className="h-8 px-2 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
-              />
+        {isAdvanced && (
+          <div className="rounded-xl border p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">Allowed Products &amp; Capacity (Optional)</span>
+              <button type="button" onClick={addAllowedProduct} className="text-xs font-semibold text-[var(--accent-primary)] hover:underline">
+                + Add Product Rule
+              </button>
             </div>
-          ))}
-        </div>
+            {form.allowedProducts.map((ap, idx) => (
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                <div className="sm:col-span-6">
+                  <SearchableSelect
+                    options={productOptions}
+                    value={ap.productId}
+                    emptyLabel="Select SKU..."
+                    placeholder="Search SKU or product..."
+                    onChange={(val) =>
+                      setForm((p) => ({
+                        ...p,
+                        allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, productId: val } : row)),
+                      }))
+                    }
+                  />
+                </div>
+                <input
+                  type="number"
+                  placeholder="Min Pack"
+                  value={ap.minQtyPacking}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, minQtyPacking: Number(e.target.value) } : row)),
+                    }))
+                  }
+                  className="sm:col-span-2 h-9 px-2 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
+                />
+                <input
+                  type="number"
+                  placeholder="Max Pack"
+                  value={ap.maxQtyPacking}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      allowedProducts: p.allowedProducts.map((row, i) => (i === idx ? { ...row, maxQtyPacking: Number(e.target.value) } : row)),
+                    }))
+                  }
+                  className="sm:col-span-3 h-9 px-2 rounded-lg border bg-[var(--bg-elevated)] text-xs tabular-nums"
+                />
+                <button
+                  type="button"
+                  aria-label="Remove product rule"
+                  onClick={() => setForm((p) => ({ ...p, allowedProducts: p.allowedProducts.filter((_, i) => i !== idx) }))}
+                  className="sm:col-span-1 h-9 flex items-center justify-center rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)]"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </FormModal>
   );
