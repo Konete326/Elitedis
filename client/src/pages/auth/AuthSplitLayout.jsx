@@ -1,10 +1,21 @@
 import { Link } from 'react-router-dom';
 import { Moon, ShieldCheck, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useShell } from '../../context/ShellContext';
 
 export default function AuthSplitLayout({ mode = 'login', title, subtitle, children }) {
   const { isDark, toggleTheme } = useTheme();
+  const { openComingSoon } = useShell();
   const appName = import.meta.env.VITE_APP_NAME || 'ELITE DIST ERP';
+
+  const handleOpenSignupSoon = () => {
+    openComingSoon({
+      title: 'Distributor Self-Registration — Coming Soon',
+      description:
+        'To keep every distributor database 100% isolated, new accounts are currently created by the Super Admin. Please sign in with your provided credentials.',
+      phase: 'Tenant Provisioning',
+    });
+  };
 
   return (
     <div className="min-h-dvh flex flex-col lg:flex-row bg-[var(--bg-canvas)] text-[var(--text-primary)] animate-fade-in">
@@ -28,7 +39,7 @@ export default function AuthSplitLayout({ mode = 'login', title, subtitle, child
             Inventory, dispatch, field booking, and double-entry ledgers in one workspace.
           </h1>
           <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-            Sign in to your existing distributor tenant or launch a new isolated agency workspace with custom invoice branding.
+            Sign in with credentials issued by your Platform Super Admin. Self-registration is coming soon.
           </p>
         </div>
 
@@ -69,7 +80,7 @@ export default function AuthSplitLayout({ mode = 'login', title, subtitle, child
           <div className="grid grid-cols-2 gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-1 mb-5">
             <Link
               to="/auth/login"
-              className={`text-center py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              className={`inline-flex items-center justify-center text-center py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 mode === 'login'
                   ? 'bg-[var(--accent-primary)] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -77,16 +88,26 @@ export default function AuthSplitLayout({ mode = 'login', title, subtitle, child
             >
               Sign In
             </Link>
-            <Link
-              to="/auth/signup"
-              className={`text-center py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            <button
+              type="button"
+              onClick={handleOpenSignupSoon}
+              className={`inline-flex items-center justify-center gap-1.5 text-center py-2 px-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 mode === 'signup'
                   ? 'bg-[var(--accent-primary)] text-white shadow-sm'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              Create Distributor Account
-            </Link>
+              <span className="truncate">Create Distributor Account</span>
+              <span
+                className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-semibold leading-none ${
+                  mode === 'signup'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[var(--accent-soft)] text-[var(--accent-primary)]'
+                }`}
+              >
+                Soon
+              </span>
+            </button>
           </div>
 
           <h2 className="text-xl font-bold text-[var(--text-primary)]">{title}</h2>

@@ -177,6 +177,8 @@ export const updateDistributor = asyncHandler(async (req, res) => {
     businessProfile,
     status,
     onboardingCompleted,
+    adminPassword,
+    password,
   } = req.body;
 
   if (distributorName !== undefined) dist.distributorName = distributorName;
@@ -186,10 +188,13 @@ export const updateDistributor = asyncHandler(async (req, res) => {
   if (whatsappNo !== undefined) dist.whatsappNo = whatsappNo;
   if (status !== undefined) dist.status = status;
 
+  let uriChanged = false;
   if (clearMongodbUri) {
     dist.mongodbUri = '';
   } else if (mongodbUri !== undefined && String(mongodbUri).trim() !== '') {
-    dist.mongodbUri = String(mongodbUri).trim();
+    const cleanUri = String(mongodbUri).trim();
+    uriChanged = cleanUri !== (dist.mongodbUri || '');
+    dist.mongodbUri = cleanUri;
   }
 
   if (businessProfile && typeof businessProfile === 'object') {
@@ -201,9 +206,35 @@ export const updateDistributor = asyncHandler(async (req, res) => {
     dist.onboardingCompleted = onboardingCompleted;
   }
 
+  const rawNewPassword = adminPassword || password;
+  if (rawNewPassword !== undefined && String(rawNewPassword).length > 0) {
+    if (String(rawNewPassword).length < 6) {
+      throw new AppError('Admin password must be at least 6 characters.', 400, 'INVALID_PASSWORD');
+    }
+  }
+
   await dist.save();
   const newLogoId = dist.businessProfile?.logo?.publicId;
   if (oldLogoId && newLogoId !== oldLogoId) await destroyImage(oldLogoId).catch(() => {});
+
+  let mirroredAdmin = false;
+  if (rawNewPassword !== undefined && String(rawNewPassword).length >= 6) {
+    const passwordHash = await bcrypt.hash(String(rawNewPassword), 12);
+    const updatedAdminUser = await User.findOneAndUpdate(
+      { distributorId: dist.distributorId, primaryRole: 'ADMIN' },
+      { $set: { passwordHash } },
+      { new: true }
+    );
+    if (updatedAdminUser && dist.mongodbUri) {
+      await mirrorAdminToCustomDb(dist.mongodbUri, updatedAdminUser);
+      mirroredAdmin = true;
+    }
+  }
+
+  if (uriChanged && dist.mongodbUri && !mirroredAdmin) {
+    const existingAdmin = await User.findOne({ distributorId: dist.distributorId, primaryRole: 'ADMIN' });
+    if (existingAdmin) await mirrorAdminToCustomDb(dist.mongodbUri, existingAdmin);
+  }
 
   const userCount = await User.countDocuments({ distributorId: dist.distributorId });
   res.status(200).json({ success: true, data: sanitizeDistributor(dist.toObject({ transform: false }), userCount) });

@@ -9,16 +9,10 @@ import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-
-const INITIAL_FORM = {
-  beatCode: '',
-  beatName: '',
-  beatDay: 'MONDAY',
-  assignedBookerId: '',
-  status: 'ACTIVE',
-};
+const INITIAL_FORM = { beatCode: '', beatName: '', beatDay: 'MONDAY', assignedBookerId: '', status: 'ACTIVE' };
 
 export default function BeatsPage() {
   const queryClient = useQueryClient();
@@ -50,7 +44,36 @@ export default function BeatsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setTouched({});
+  };
+
+  const openCreateModal = () => {
+    setEditingId(null);
+    setForm(INITIAL_FORM);
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const openEditModal = (row) => {
+    setEditingId(row._id);
+    setForm({ ...INITIAL_FORM, ...row, assignedBookerId: row.assignedBookerId?._id || row.assignedBookerId || '' });
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const errors = {
+    beatCode: touched.beatCode
+      ? validateField('code', form.beatCode, { required: true, label: 'Beat Code' })
+      : '',
+    beatName: touched.beatName
+      ? validateField('required', form.beatName, { required: true, minLength: 2, label: 'Beat Name' })
+      : '',
+  };
 
   const prereqReady = !areasCheck.isLoading && !routesCheck.isLoading && !customersCheck.isLoading;
   const hasAreasAndRoutes =
@@ -68,7 +91,7 @@ export default function BeatsPage() {
       queryClient.invalidateQueries({ queryKey: ['beats'] });
       queryClient.invalidateQueries({ queryKey: ['booker-beats'] });
       addToast({ type: 'success', message: editingId ? 'Beat plan updated.' : 'Beat plan created.' });
-      setModalOpen(false);
+      closeModal();
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Could not save beat plan.' });
@@ -94,6 +117,21 @@ export default function BeatsPage() {
     },
   });
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setTouched({ beatCode: true, beatName: true });
+    const invalid =
+      validateField('code', form.beatCode, { required: true, label: 'Beat Code' }) ||
+      validateField('required', form.beatName, { required: true, minLength: 2, label: 'Beat Name' });
+    if (invalid) return;
+    saveMutation.mutate({
+      ...form,
+      beatCode: form.beatCode.trim().toUpperCase(),
+      beatName: form.beatName.trim(),
+      assignedBookerId: form.assignedBookerId || null,
+    });
+  };
+
   const columns = [
     { key: 'beatCode', header: 'Beat Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.beatCode}</span> },
     { key: 'beatName', header: 'Beat Name', mobilePrimary: true, accessor: 'beatName' },
@@ -112,11 +150,7 @@ export default function BeatsPage() {
         actions={
           <button
             type="button"
-            onClick={() => {
-              setEditingId(null);
-              setForm(INITIAL_FORM);
-              setModalOpen(true);
-            }}
+            onClick={openCreateModal}
             className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
@@ -146,20 +180,8 @@ export default function BeatsPage() {
         onRefresh={table.refresh}
         isRefreshing={table.isFetching}
         filters={[
-          {
-            key: 'beatDay',
-            label: 'Day',
-            value: table.filters.beatDay,
-            onChange: (val) => table.setFilter('beatDay', val),
-            options: DAYS,
-          },
-          {
-            key: 'status',
-            label: 'Status',
-            value: table.filters.status,
-            onChange: (val) => table.setFilter('status', val),
-            options: ['ACTIVE', 'INACTIVE'],
-          },
+          { key: 'beatDay', label: 'Day', value: table.filters.beatDay, onChange: (val) => table.setFilter('beatDay', val), options: DAYS },
+          { key: 'status', label: 'Status', value: table.filters.status, onChange: (val) => table.setFilter('status', val), options: ['ACTIVE', 'INACTIVE'] },
         ]}
       />
 
@@ -175,42 +197,17 @@ export default function BeatsPage() {
         emptyTitle="No beat plans created"
         emptyDescription="Create a Monday–Sunday beat schedule and assign it to an Order Booker."
         emptyActionLabel="Create Beat Plan"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreateModal}
         renderActions={(row) => (
           <>
-            <button
-              type="button"
-              onClick={() => duplicateMutation.mutate(row._id)}
-              title="Duplicate Beat"
-              className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]"
-            >
+            <button type="button" onClick={() => duplicateMutation.mutate(row._id)} title="Duplicate Beat" className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]">
               <Copy className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingId(row._id);
-                setForm({
-                  ...INITIAL_FORM,
-                  ...row,
-                  assignedBookerId: row.assignedBookerId?._id || row.assignedBookerId || '',
-                });
-                setModalOpen(true);
-              }}
-              className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1"
-            >
+            <button type="button" onClick={() => openEditModal(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">
               <Edit className="w-3.5 h-3.5" />
               <span>Edit</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(row)}
-              className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs"
-            >
+            <button type="button" onClick={() => setDeleteTarget(row)} className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </>
@@ -219,57 +216,68 @@ export default function BeatsPage() {
 
       <FormModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         title={editingId ? 'Edit Beat Plan' : 'Create Beat Plan'}
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMutation.mutate(form);
-        }}
+        onSubmit={handleSubmit}
         isSubmitting={saveMutation.isPending}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Code *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Beat Code *</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({
+                    ...p,
+                    beatCode: suggestCode(
+                      'BAT',
+                      table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+                      (table.rows || []).map((r) => r.beatCode)
+                    ),
+                  }))
+                }
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
             <input
-              required
+              aria-required="true"
               value={form.beatCode}
               onChange={(e) => setForm((p) => ({ ...p, beatCode: e.target.value.toUpperCase() }))}
-              placeholder="BATB-1"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+              onBlur={() => setTouched((p) => ({ ...p, beatCode: true }))}
+              placeholder="BAT-001"
+              aria-invalid={Boolean(errors.beatCode)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${errors.beatCode ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {errors.beatCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.beatCode}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Name *</label>
             <input
-              required
+              aria-required="true"
               value={form.beatName}
               onChange={(e) => setForm((p) => ({ ...p, beatName: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, beatName: true }))}
               placeholder="ALIGARH TO BANARAS"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+              aria-invalid={Boolean(errors.beatName)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${errors.beatName ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {errors.beatName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.beatName}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Beat Day (Optional)</label>
-            <select
-              value={form.beatDay}
-              onChange={(e) => setForm((p) => ({ ...p, beatDay: e.target.value }))}
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            >
+            <select value={form.beatDay} onChange={(e) => setForm((p) => ({ ...p, beatDay: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               {DAYS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
+                <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Assign Booker (Optional)</label>
-            <select
-              value={form.assignedBookerId}
-              onChange={(e) => setForm((p) => ({ ...p, assignedBookerId: e.target.value }))}
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-            >
-              <option value="">Select booker...</option>
+            <select value={form.assignedBookerId} onChange={(e) => setForm((p) => ({ ...p, assignedBookerId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <option value="">Unassigned (Select later)</option>
               {(employeesQuery.data || []).map((emp) => (
                 <option key={emp._id} value={emp._id}>
                   {emp.fullName} ({emp.profileId})

@@ -80,7 +80,29 @@ export default function CustomerFormModal({
       validateField('required', form.ownerName, { required: true, minLength: 2, label: 'Owner Name' }) ||
       validateField('phone', form.ownerContact, { required: true, label: 'Owner Phone' });
     if (invalid) return;
-    onSave(form);
+    const cleanedPayload = {
+      ...form,
+      customerCode: form.customerCode?.trim() ? form.customerCode.trim().toUpperCase() : '',
+      shopName: String(form.shopName || '').trim(),
+      ownerName: String(form.ownerName || '').trim(),
+      ownerContact: String(form.ownerContact || '').trim(),
+      contacts: (form.contacts || [])
+        .filter((c) => c?.personName?.trim() || c?.contactNo?.trim())
+        .map((c) => ({
+          ...c,
+          personName: c.personName?.trim() || c.role?.trim() || 'Contact',
+          contactNo: c.contactNo?.trim() || '',
+        })),
+      paymentAccounts: (form.paymentAccounts || [])
+        .filter((a) => a?.providerName?.trim() || a?.accountTitle?.trim() || a?.accountNo?.trim())
+        .map((a) => ({
+          ...a,
+          providerName: a.providerName?.trim() || '',
+          accountTitle: a.accountTitle?.trim() || '',
+          accountNo: a.accountNo?.trim() || '',
+        })),
+    };
+    onSave(cleanedPayload);
   };
 
   return (
@@ -122,7 +144,7 @@ export default function CustomerFormModal({
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Shop / Customer Name *</label>
               <input
-                required
+                aria-required="true"
                 value={form.shopName}
                 onChange={(e) => setForm((p) => ({ ...p, shopName: e.target.value }))}
                 onBlur={() => setTouched((p) => ({ ...p, shopName: true }))}
@@ -135,7 +157,7 @@ export default function CustomerFormModal({
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Name *</label>
               <input
-                required
+                aria-required="true"
                 value={form.ownerName}
                 onChange={(e) => setForm((p) => ({ ...p, ownerName: e.target.value }))}
                 onBlur={() => setTouched((p) => ({ ...p, ownerName: true }))}
@@ -148,7 +170,7 @@ export default function CustomerFormModal({
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Owner Phone / WhatsApp *</label>
               <input
-                required
+                aria-required="true"
                 value={form.ownerContact}
                 onChange={(e) => setForm((p) => ({ ...p, ownerContact: e.target.value.trim() }))}
                 onBlur={() => setTouched((p) => ({ ...p, ownerContact: true }))}

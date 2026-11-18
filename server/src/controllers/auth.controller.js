@@ -13,15 +13,6 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-const registerSchema = z.object({
-  fullName: z.string().trim().min(2, 'Full name is required'),
-  email: z.string().trim().email('Valid email is required'),
-  phone: z.string().trim().min(7, 'Phone number is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  distributorName: z.string().trim().min(2).optional(),
-  distributorCode: z.string().trim().min(2).optional(),
-});
-
 function issueTokens(user) {
   const payload = {
     sub: user._id.toString(),
@@ -107,68 +98,12 @@ export const login = asyncHandler(async (req, res) => {
   });
 });
 
-export const register = asyncHandler(async (req, res) => {
-  const parsed = registerSchema.parse(req.body);
-  const normalizedEmail = parsed.email.toLowerCase().trim();
-  if (await User.exists({ email: normalizedEmail })) {
-    throw new AppError('An account with this email already exists.', 409, 'EMAIL_EXISTS');
-  }
-
-  const slug = (parsed.distributorCode || parsed.distributorName || 'DIST')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toUpperCase()
-    .slice(0, 8);
-  const distributorId = `${slug || 'DIST'}-${Date.now().toString().slice(-4)}`;
-  const distributorName = parsed.distributorName || `${parsed.fullName} Distribution`;
-  const passwordHash = await bcrypt.hash(parsed.password, 12);
-
-  await Distributor.create({
-    distributorId,
-    distributorName,
-    ownerName: parsed.fullName,
-    email: normalizedEmail,
-    phone: parsed.phone,
-    businessProfile: {
-      companyTitle: distributorName,
-      phonePrimary: parsed.phone,
-      email: normalizedEmail,
-    },
-    onboardingCompleted: false,
-    onboardingSkipped: false,
-    status: 'ACTIVE',
-  });
-
-  const user = await User.create({
-    distributorId,
-    distributorName,
-    profileId: `ADM-${Date.now().toString().slice(-5)}`,
-    fullName: parsed.fullName,
-    email: normalizedEmail,
-    phone: parsed.phone,
-    passwordHash,
-    primaryRole: 'ADMIN',
-    workParts: {
-      orderBooker: true,
-      warehouseManager: true,
-      posStore: true,
-      normalInvoice: true,
-      advanceInvoice: true,
-      salesman: true,
-    },
-    status: 'ACTIVE',
-    lastLoginAt: new Date(),
-  });
-
-  const agencyProfile = await ensureAgencyProfile(distributorId, user);
-  const { accessToken, refreshToken } = issueTokens(user);
-  user.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-  await user.save();
-  setRefreshCookie(res, refreshToken);
-
-  res.status(201).json({
-    success: true,
-    data: { user: user.toJSON(), agencyProfile, accessToken, refreshToken },
-  });
+export const register = asyncHandler(async (_req, _res) => {
+  throw new AppError(
+    'Self-registration is coming soon. New distributor workspaces are provisioned by the Super Admin.',
+    403,
+    'SIGNUP_COMING_SOON'
+  );
 });
 
 export const refresh = asyncHandler(async (req, res) => {

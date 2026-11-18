@@ -8,12 +8,14 @@ import { FilterToolbar, FormModal, SmartDataTable } from '../../components/globa
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 export default function AreasRoutesPage() {
   const queryClient = useQueryClient();
   const { addToast } = useShell();
   const [tab, setTab] = useState('areas');
   const [modalOpen, setModalOpen] = useState(false);
+  const [touched, setTouched] = useState({});
 
   const table = useServerTable({
     queryKey: `crm-${tab}`,
@@ -45,11 +47,50 @@ export default function AreasRoutesPage() {
     routeType: 'Main Road',
   });
 
+  const closeModal = () => {
+    setModalOpen(false);
+    setTouched({});
+  };
+
+  const openModal = () => {
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const areaErrors = {
+    areaCode: touched.areaCode
+      ? validateField('code', areaForm.areaCode, { required: true, label: 'Area Code' })
+      : '',
+    areaName: touched.areaName
+      ? validateField('required', areaForm.areaName, { required: true, minLength: 2, label: 'Area Name' })
+      : '',
+  };
+
+  const routeErrors = {
+    areaId: touched.areaId
+      ? validateField('required', routeForm.areaId, { required: true, minLength: 1, label: 'Area' })
+      : '',
+    routeCode: touched.routeCode
+      ? validateField('code', routeForm.routeCode, { required: true, label: 'Route Code' })
+      : '',
+    routeName: touched.routeName
+      ? validateField('required', routeForm.routeName, { required: true, minLength: 2, label: 'Route Name' })
+      : '',
+  };
+
   const saveMutation = useMutation({
     mutationFn: () =>
       tab === 'areas'
-        ? apiClient.post('/crm/areas', areaForm)
-        : apiClient.post('/crm/routes', routeForm),
+        ? apiClient.post('/crm/areas', {
+            ...areaForm,
+            areaCode: areaForm.areaCode.trim().toUpperCase(),
+            areaName: areaForm.areaName.trim(),
+          })
+        : apiClient.post('/crm/routes', {
+            ...routeForm,
+            routeCode: routeForm.routeCode.trim().toUpperCase(),
+            routeName: routeForm.routeName.trim(),
+          }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-areas'] });
       queryClient.invalidateQueries({ queryKey: ['crm-routes'] });
@@ -59,7 +100,7 @@ export default function AreasRoutesPage() {
       queryClient.invalidateQueries({ queryKey: ['prereq-routes'] });
       queryClient.invalidateQueries({ queryKey: ['territories-options'] });
       addToast({ type: 'success', message: tab === 'areas' ? 'Area created.' : 'Route created.' });
-      setModalOpen(false);
+      closeModal();
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Could not save record.' });
@@ -83,19 +124,39 @@ export default function AreasRoutesPage() {
     { key: 'isAccepted', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.isAccepted ? 'ACCEPT' : 'NON_ACCEPT'} /> },
   ];
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (tab === 'areas') {
+      setTouched({ areaCode: true, areaName: true });
+      const err =
+        validateField('code', areaForm.areaCode, { required: true, label: 'Area Code' }) ||
+        validateField('required', areaForm.areaName, { required: true, minLength: 2, label: 'Area Name' });
+      if (err) return;
+      saveMutation.mutate();
+      return;
+    }
+    setTouched({ areaId: true, routeCode: true, routeName: true });
+    const err =
+      validateField('required', routeForm.areaId, { required: true, minLength: 1, label: 'Area' }) ||
+      validateField('code', routeForm.routeCode, { required: true, label: 'Route Code' }) ||
+      validateField('required', routeForm.routeName, { required: true, minLength: 2, label: 'Route Name' });
+    if (err) return;
+    saveMutation.mutate();
+  };
+
   return (
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
         title="Areas &amp; Routes Setup"
         subtitle="Add cities, market areas, and delivery roads so shops and beat schedules stay organized"
         tabs={[
-          { id: 'areas', label: 'Areas List', active: tab === 'areas', onClick: () => setTab('areas') },
-          { id: 'routes', label: 'Routes List', active: tab === 'routes', onClick: () => setTab('routes') },
+          { id: 'areas', label: 'Areas List', active: tab === 'areas', onClick: () => { setTab('areas'); setTouched({}); } },
+          { id: 'routes', label: 'Routes List', active: tab === 'routes', onClick: () => { setTab('routes'); setTouched({}); } },
         ]}
         actions={
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
+            onClick={openModal}
             className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
@@ -128,17 +189,14 @@ export default function AreasRoutesPage() {
         emptyTitle={`No ${tab} configured`}
         emptyDescription="Add Areas and Routes to organize territories and daily booker beats."
         emptyActionLabel={tab === 'areas' ? 'Add Area' : 'Add Route'}
-        onEmptyAction={() => setModalOpen(true)}
+        onEmptyAction={openModal}
       />
 
       <FormModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         title={tab === 'areas' ? 'Add Geographical Area' : 'Add Delivery / Booking Route'}
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMutation.mutate();
-        }}
+        onSubmit={handleSubmit}
         isSubmitting={saveMutation.isPending}
       >
         {tab === 'areas' ? (
@@ -159,24 +217,44 @@ export default function AreasRoutesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Code *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Area Code *</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAreaForm((p) => ({
+                      ...p,
+                      areaCode: suggestCode('AR', (areasQuery.data || []).length, (areasQuery.data || []).map((a) => a.areaCode)),
+                    }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
               <input
-                required
+                aria-required="true"
                 value={areaForm.areaCode}
                 onChange={(e) => setAreaForm((p) => ({ ...p, areaCode: e.target.value.toUpperCase() }))}
-                placeholder="AQC-23"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                onBlur={() => setTouched((p) => ({ ...p, areaCode: true }))}
+                placeholder="AR-001"
+                aria-invalid={Boolean(areaErrors.areaCode)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${areaErrors.areaCode ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {areaErrors.areaCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{areaErrors.areaCode}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area Name *</label>
               <input
-                required
+                aria-required="true"
                 value={areaForm.areaName}
                 onChange={(e) => setAreaForm((p) => ({ ...p, areaName: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, areaName: true }))}
                 placeholder="Qasba Colony"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                aria-invalid={Boolean(areaErrors.areaName)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${areaErrors.areaName ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {areaErrors.areaName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{areaErrors.areaName}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Town / Sub-District (Optional)</label>
@@ -200,10 +278,12 @@ export default function AreasRoutesPage() {
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Area *</label>
               <select
-                required
+                aria-required="true"
                 value={routeForm.areaId}
                 onChange={(e) => setRouteForm((p) => ({ ...p, areaId: e.target.value }))}
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                onBlur={() => setTouched((p) => ({ ...p, areaId: true }))}
+                aria-invalid={Boolean(routeErrors.areaId)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${routeErrors.areaId ? 'border-[var(--status-danger)]' : ''}`}
               >
                 <option value="">Select area...</option>
                 {(areasQuery.data || []).map((a) => (
@@ -212,26 +292,51 @@ export default function AreasRoutesPage() {
                   </option>
                 ))}
               </select>
+              {routeErrors.areaId && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{routeErrors.areaId}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Code *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Route Code *</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRouteForm((p) => ({
+                      ...p,
+                      routeCode: suggestCode(
+                        'RT',
+                        table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+                        (table.rows || []).map((r) => r.routeCode)
+                      ),
+                    }))
+                  }
+                  className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+                >
+                  Auto Code
+                </button>
+              </div>
               <input
-                required
+                aria-required="true"
                 value={routeForm.routeCode}
                 onChange={(e) => setRouteForm((p) => ({ ...p, routeCode: e.target.value.toUpperCase() }))}
-                placeholder="R-1"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+                onBlur={() => setTouched((p) => ({ ...p, routeCode: true }))}
+                placeholder="RT-001"
+                aria-invalid={Boolean(routeErrors.routeCode)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${routeErrors.routeCode ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {routeErrors.routeCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{routeErrors.routeCode}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Route Name *</label>
               <input
-                required
+                aria-required="true"
                 value={routeForm.routeName}
                 onChange={(e) => setRouteForm((p) => ({ ...p, routeName: e.target.value }))}
+                onBlur={() => setTouched((p) => ({ ...p, routeName: true }))}
                 placeholder="Jamsheed Pump Road"
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                aria-invalid={Boolean(routeErrors.routeName)}
+                className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${routeErrors.routeName ? 'border-[var(--status-danger)]' : ''}`}
               />
+              {routeErrors.routeName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{routeErrors.routeName}</p>}
             </div>
           </div>
         )}

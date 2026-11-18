@@ -20,9 +20,9 @@ export const gpsSchema = new Schema(
 
 export const contactPersonSchema = new Schema(
   {
-    personName: { type: String, required: true, trim: true },
+    personName: { type: String, trim: true, default: '' },
     role: { type: String, trim: true, default: '' },
-    contactNo: { type: String, required: true, trim: true },
+    contactNo: { type: String, trim: true, default: '' },
     channelType: {
       type: String,
       enum: ['WHATSAPP', 'PHONE', 'LANDLINE'],
@@ -36,10 +36,10 @@ export const contactPersonSchema = new Schema(
 
 export const socialLinkSchema = new Schema(
   {
-    platform: { type: String, required: true, trim: true },
+    platform: { type: String, trim: true, default: '' },
     pageName: { type: String, trim: true, default: '' },
     purposeType: { type: String, trim: true, default: '' },
-    url: { type: String, required: true, trim: true },
+    url: { type: String, trim: true, default: '' },
     isDefault: { type: Boolean, default: false },
   },
   { _id: true }
@@ -52,9 +52,9 @@ export const paymentAccountSchema = new Schema(
       enum: ['BANK', 'EASYPAISA', 'JAZZCASH'],
       default: 'BANK',
     },
-    providerName: { type: String, required: true, trim: true },
-    accountTitle: { type: String, required: true, trim: true },
-    accountNo: { type: String, required: true, trim: true },
+    providerName: { type: String, trim: true, default: '' },
+    accountTitle: { type: String, trim: true, default: '' },
+    accountNo: { type: String, trim: true, default: '' },
     ibanOrRef: { type: String, trim: true, default: '' },
     isDefault: { type: Boolean, default: false },
   },
@@ -90,6 +90,8 @@ export function syncAreaAndVolume(dims) {
   if ('totalVolume' in dims || dims.totalVolume !== undefined) dims.totalVolume = volume;
 }
 
+const emptyToNull = (v) => (v === '' || v === undefined ? null : v);
+
 /**
  * Builds Level-1 invoice line item sub-schema shared by Order and SaleInvoice.
  * @param {object} extraFields
@@ -97,11 +99,11 @@ export function syncAreaAndVolume(dims) {
 export function createLineItemSchema(extraFields = {}) {
   return new Schema(
     {
-      productId: { type: Schema.Types.ObjectId, ref: 'Product', default: null },
-      batchId: { type: Schema.Types.ObjectId, ref: 'StockBatch', default: null },
+      productId: { type: Schema.Types.ObjectId, ref: 'Product', default: null, set: emptyToNull },
+      batchId: { type: Schema.Types.ObjectId, ref: 'StockBatch', default: null, set: emptyToNull },
       productName: { type: String, trim: true, default: '' },
       skuCode: { type: String, trim: true, uppercase: true, default: '' },
-      unitName: { type: String, required: true, trim: true },
+      unitName: { type: String, trim: true, default: 'Piece' },
       conversionQty: { type: Number, default: 1, min: 1 },
       unitWeightKg: { type: Number, default: 0, min: 0 },
       unitVolumeCubic: { type: Number, default: 0, min: 0 },
@@ -111,13 +113,33 @@ export function createLineItemSchema(extraFields = {}) {
       quantity: { type: Number, required: true, default: 0, min: 0 },
       grossRateTotal: { type: Number, default: 0, min: 0 },
       totalWeightKg: { type: Number, default: 0, min: 0 },
-      itemDiscountRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      itemDiscountRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       itemDiscountAmount: { type: Number, default: 0, min: 0 },
-      itemChargeRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      itemChargeRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       itemChargeAmount: { type: Number, default: 0, min: 0 },
-      itemTaxRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      itemTaxRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       itemTaxAmount: { type: Number, default: 0, min: 0 },
-      schemeRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      schemeRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       isFreeSchemeRow: { type: Boolean, default: false },
       netLineAmount: { type: Number, default: 0, min: 0 },
       ...extraFields,
@@ -143,11 +165,26 @@ export function createGrandSummarySchema(extraFields = {}) {
       totalItemCharges: { type: Number, default: 0, min: 0 },
       totalItemTaxes: { type: Number, default: 0, min: 0 },
       subtotalAfterItems: { type: Number, default: 0, min: 0 },
-      grandDiscountRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      grandDiscountRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       grandDiscountAmount: { type: Number, default: 0, min: 0 },
-      grandChargeRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      grandChargeRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       grandChargeAmount: { type: Number, default: 0, min: 0 },
-      grandTaxRuleId: { type: Schema.Types.ObjectId, ref: 'CommercialRule', default: null },
+      grandTaxRuleId: {
+        type: Schema.Types.ObjectId,
+        ref: 'CommercialRule',
+        default: null,
+        set: emptyToNull,
+      },
       grandTaxAmount: { type: Number, default: 0, min: 0 },
       netPayableAmount: { type: Number, default: 0, min: 0 },
       ...extraFields,

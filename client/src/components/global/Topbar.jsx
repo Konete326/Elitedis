@@ -1,23 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Search, Plus, Bell, Sun, Moon, ChevronRight, X, ClipboardList, Building2 } from 'lucide-react';
+import { Menu, Search, Plus, Bell, Sun, Moon, ChevronRight, X, ClipboardList, Building2, Download } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
+import { usePwaInstall } from '../../hooks/usePwaInstall';
 import { NAV_GROUPS, EXTRA_QUICK_ROUTES, QUICK_ACTIONS, canAccessNavItem } from './navConfig';
 
 const formatBreadcrumb = (seg) => seg.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
 /**
  * Sticky Topbar (z-20, h-14) with sidebar toggle, breadcrumbs, desktop Ctrl+K & mobile
- * Quick Jump search, role-filtered Quick Action launcher, Agency Branding trigger, Notification Bell, and Theme toggle.
+ * Quick Jump search, Quick Action launcher, Notification Bell, PWA Install, and Theme toggle.
  */
 export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const { hasRole, hasWorkPart } = useAuth();
-  const { toggleSidebar, isMobileDrawerOpen, openMobileDrawer, closeMobileDrawer, openAgencyProfileModal } = useShell();
+  const { toggleSidebar, isMobileDrawerOpen, openMobileDrawer, closeMobileDrawer, openAgencyProfileModal, addToast } = useShell();
+  const { canInstall, isInstalled, isIosInstallable, hasDeferredPrompt, promptInstall } = usePwaInstall();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -111,6 +113,15 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
     }
   };
 
+  const handleInstallClick = async () => {
+    const res = await promptInstall();
+    if (res?.iosGuide || (isIosInstallable && !hasDeferredPrompt)) {
+      addToast?.({ type: 'info', title: 'Install on iOS', message: 'Tap Share in Safari, then choose "Add to Home Screen".', duration: 5000 });
+    } else if (res?.outcome === 'accepted') {
+      addToast?.({ type: 'success', title: 'App Installed', message: 'ELITE DIST has been installed on your device.', duration: 5000 });
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-20 shrink-0 h-14 flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] transition-colors duration-200">
@@ -140,11 +151,9 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
             {crumbs.map((crumb, idx) => (
               <React.Fragment key={crumb.to || idx}>
                 <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
-                {idx === crumbs.length - 1 ? (
-                  <span className="font-semibold text-[var(--text-primary)] truncate">{crumb.label}</span>
-                ) : (
-                  <span className="hidden md:inline text-[var(--text-secondary)] truncate">{crumb.label}</span>
-                )}
+                <span className={idx === crumbs.length - 1 ? 'font-semibold text-[var(--text-primary)] truncate' : 'hidden md:inline text-[var(--text-secondary)] truncate'}>
+                  {crumb.label}
+                </span>
               </React.Fragment>
             ))}
           </nav>
@@ -153,19 +162,14 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => {
-              setMobileSearchOpen((p) => !p);
-              setQuickOpen(false);
-              setNotifOpen(false);
-              setTimeout(() => mobileSearchInputRef.current?.focus(), 40);
-            }}
+            onClick={() => { setMobileSearchOpen((p) => !p); setQuickOpen(false); setNotifOpen(false); setTimeout(() => mobileSearchInputRef.current?.focus(), 40); }}
             aria-label="Toggle mobile quick search"
             className="md:hidden w-9 h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)] flex items-center justify-center text-[var(--text-secondary)]"
           >
             <Search className="w-4 h-4" strokeWidth={1.75} />
           </button>
 
-          <div ref={searchWrapRef} className="relative hidden md:block w-56 lg:w-64">
+          <div ref={searchWrapRef} className="relative hidden md:block w-52 lg:w-64">
             <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.75} />
             <input
               ref={searchInputRef}
@@ -190,15 +194,7 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
                   <p className="px-3 py-2 text-xs text-[var(--text-muted)]">No matching modules</p>
                 ) : (
                   matchedRoutes.map((route, idx) => (
-                    <button
-                      key={route.to}
-                      type="button"
-                      onMouseEnter={() => setActiveRouteIdx(idx)}
-                      onClick={() => navigateRoute(route.to)}
-                      className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-xs transition-colors ${
-                        idx === activeRouteIdx ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold' : 'hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]'
-                      }`}
-                    >
+                    <button key={route.to} type="button" onMouseEnter={() => setActiveRouteIdx(idx)} onClick={() => navigateRoute(route.to)} className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-xs transition-colors ${idx === activeRouteIdx ? 'bg-[var(--accent-soft)] text-[var(--accent-primary)] font-semibold' : 'hover:bg-[var(--bg-elevated)] text-[var(--text-primary)]'}`}>
                       <span className="font-medium truncate">{route.label}</span>
                       <span className="text-[10px] text-[var(--text-muted)] shrink-0">{route.group}</span>
                     </button>
@@ -223,23 +219,14 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
                 {(allowedQuickActions.length > 0 ? allowedQuickActions : [{ label: 'Pending Tasks', to: '/tasks/pending', icon: ClipboardList }]).map((action) => {
                   const Icon = action.icon;
                   return (
-                    <button
-                      key={action.to}
-                      type="button"
-                      onClick={() => { setQuickOpen(false); navigate(action.to); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
-                    >
+                    <button key={action.to} type="button" onClick={() => { setQuickOpen(false); navigate(action.to); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors">
                       <Icon className="w-4 h-4 text-[var(--accent-primary)]" strokeWidth={1.75} />
                       <span>{action.label}</span>
                     </button>
                   );
                 })}
                 {isAdminOrSuper && (
-                  <button
-                    type="button"
-                    onClick={() => { setQuickOpen(false); openAgencyProfileModal?.(); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-[var(--border-subtle)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
-                  >
+                  <button type="button" onClick={() => { setQuickOpen(false); openAgencyProfileModal?.(); }} className="w-full flex items-center gap-2.5 px-3 py-2 mt-1 border-t border-[var(--border-subtle)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors">
                     <Building2 className="w-4 h-4 text-[var(--accent-primary)]" strokeWidth={1.75} />
                     <span>Agency &amp; Bill Profile</span>
                   </button>
@@ -284,6 +271,19 @@ export function Topbar({ notifications = [], breadcrumbs: customBreadcrumbs }) {
               </div>
             )}
           </div>
+
+          {canInstall && !isInstalled && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              aria-label="Install ELITE DIST App"
+              title="Install ELITE DIST App"
+              className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-[var(--accent-primary)]/40 bg-[var(--accent-soft)] hover:bg-[var(--accent-primary)] hover:text-white text-xs font-semibold text-[var(--accent-primary)] transition-colors"
+            >
+              <Download className="w-4 h-4 shrink-0" strokeWidth={1.75} />
+              <span className="hidden lg:inline">Install App</span>
+            </button>
+          )}
 
           <button
             type="button"

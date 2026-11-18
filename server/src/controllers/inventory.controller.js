@@ -13,6 +13,37 @@ function nullIfEmpty(val) {
   return val === '' || val === undefined ? null : val;
 }
 
+function sanitizeInventoryPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  if (Array.isArray(payload.contacts)) {
+    payload.contacts = payload.contacts
+      .filter((c) => (c?.personName || '').trim() || (c?.contactNo || '').trim())
+      .map((c) => ({ ...c, personName: (c?.personName || '').trim(), contactNo: (c?.contactNo || '').trim() }));
+  }
+  if (Array.isArray(payload.bankAccounts)) {
+    payload.bankAccounts = payload.bankAccounts.filter(
+      (a) => (a?.providerName || '').trim() || (a?.accountNo || '').trim()
+    );
+  }
+  if (Array.isArray(payload.socialLinks)) {
+    payload.socialLinks = payload.socialLinks.filter((s) => (s?.url || '').trim());
+  }
+
+  for (const imgField of ['logo', 'coverImage', 'image']) {
+    if (payload[imgField] === null) payload[imgField] = { url: '', publicId: '' };
+  }
+  if (payload.baseUnit && payload.baseUnit.image === null) {
+    payload.baseUnit.image = { url: '', publicId: '' };
+  }
+  if (Array.isArray(payload.packingUnits)) {
+    payload.packingUnits = payload.packingUnits.map((pack) =>
+      pack && pack.image === null ? { ...pack, image: { url: '', publicId: '' } } : pack
+    );
+  }
+  return payload;
+}
+
 function buildResourceHandlers(config) {
   const { Model, name, searchFields, filterKeys = [], populate = '', defaultSortBy = 'createdAt', beforeCreate, beforeUpdate, beforeDelete, extractPublicIds } = config;
 
@@ -95,7 +126,11 @@ export const companyHandlers = buildResourceHandlers({
   filterKeys: ['status', 'businessType'],
   extractPublicIds: (doc) => [doc.logo?.publicId],
   beforeCreate: async (payload) => {
+    sanitizeInventoryPayload(payload);
     if (!payload.companyCode) payload.companyCode = `CMP-${Date.now().toString().slice(-5)}`;
+  },
+  beforeUpdate: async (payload) => {
+    sanitizeInventoryPayload(payload);
   },
   beforeDelete: async (doc, req) => {
     const { Brand: BrandM, Product: ProductM } = getTenantModels({ Brand, Product });
@@ -115,6 +150,7 @@ export const brandHandlers = buildResourceHandlers({
   populate: 'companyId',
   extractPublicIds: (doc) => [doc.logo?.publicId, doc.coverImage?.publicId],
   beforeCreate: async (payload, req) => {
+    sanitizeInventoryPayload(payload);
     payload.companyId = nullIfEmpty(payload.companyId);
     if (payload.companyId && !(await getTenantModel('Company', Company).exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
       throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
@@ -122,6 +158,7 @@ export const brandHandlers = buildResourceHandlers({
     if (!payload.brandCode) payload.brandCode = `BRD-${Date.now().toString().slice(-5)}`;
   },
   beforeUpdate: async (payload, _existing, req) => {
+    sanitizeInventoryPayload(payload);
     if ('companyId' in payload) {
       payload.companyId = nullIfEmpty(payload.companyId);
       if (payload.companyId && !(await getTenantModel('Company', Company).exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
@@ -154,11 +191,21 @@ export const categoryHandlers = buildResourceHandlers({
   populate: 'companyId linkedBrandIds',
   extractPublicIds: (doc) => [doc.image?.publicId],
   beforeCreate: async (payload, req) => {
+    sanitizeInventoryPayload(payload);
     payload.companyId = nullIfEmpty(payload.companyId);
     if (payload.companyId && !(await getTenantModel('Company', Company).exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
       throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
     }
     if (!payload.code) payload.code = `CAT-${Date.now().toString().slice(-5)}`;
+  },
+  beforeUpdate: async (payload, _existing, req) => {
+    sanitizeInventoryPayload(payload);
+    if ('companyId' in payload) {
+      payload.companyId = nullIfEmpty(payload.companyId);
+      if (payload.companyId && !(await getTenantModel('Company', Company).exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
+        throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
+      }
+    }
   },
   beforeDelete: categoryGuard,
 });
@@ -172,12 +219,23 @@ export const subCategoryHandlers = buildResourceHandlers({
   populate: 'parentCategoryId companyId linkedBrandIds',
   extractPublicIds: (doc) => [doc.image?.publicId],
   beforeCreate: async (payload, req) => {
+    sanitizeInventoryPayload(payload);
     payload.companyId = nullIfEmpty(payload.companyId);
     payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
     if (payload.parentCategoryId && !(await getTenantModel('Category', Category).exists({ _id: payload.parentCategoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
       throw new AppError('Parent Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
     }
     if (!payload.code) payload.code = `SUB-${Date.now().toString().slice(-5)}`;
+  },
+  beforeUpdate: async (payload, _existing, req) => {
+    sanitizeInventoryPayload(payload);
+    if ('companyId' in payload) payload.companyId = nullIfEmpty(payload.companyId);
+    if ('parentCategoryId' in payload) {
+      payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
+      if (payload.parentCategoryId && !(await getTenantModel('Category', Category).exists({ _id: payload.parentCategoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
+        throw new AppError('Parent Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
+      }
+    }
   },
   beforeDelete: categoryGuard,
 });
@@ -209,10 +267,12 @@ export const productHandlers = buildResourceHandlers({
   populate: 'companyId brandId categoryId subCategoryId',
   extractPublicIds: (doc) => [doc.baseUnit?.image?.publicId, ...(doc.packingUnits || []).map((u) => u.image?.publicId)],
   beforeCreate: async (payload, req) => {
+    sanitizeInventoryPayload(payload);
     await assertOptionalProductRefs(payload, req);
     if (!payload.skuCode) payload.skuCode = `SKU-${Date.now().toString().slice(-6)}`;
   },
   beforeUpdate: async (payload, _existing, req) => {
+    sanitizeInventoryPayload(payload);
     await assertOptionalProductRefs(payload, req);
   },
   beforeDelete: async (doc, req) => {

@@ -52,20 +52,42 @@ export const getCustomerById = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { ...customer, recentOrders, recentInvoices, recentRecoveries } });
 });
 
-export const createCustomer = asyncHandler(async (req, res) => {
-  const { Customer, Territory } = m();
-  const payload = { ...req.body, distributorId: req.distributorId, customerCode: req.body.customerCode || `CUST-${Date.now().toString().slice(-5)}` };
-  if (!payload.shopName || !payload.ownerName || !payload.ownerContact) {
-    throw new AppError('Shop Name, Owner Name, and Owner Contact are required to create a Customer.', 400, 'CUSTOMER_FIELDS_REQUIRED');
+function sanitizeCustomerPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+  if (Array.isArray(payload.contacts)) {
+    payload.contacts = payload.contacts
+      .filter((c) => (c?.personName || '').trim() || (c?.contactNo || '').trim())
+      .map((c) => ({ ...c, personName: (c?.personName || '').trim(), contactNo: (c?.contactNo || '').trim() }));
   }
+  if (Array.isArray(payload.paymentAccounts)) {
+    payload.paymentAccounts = payload.paymentAccounts.filter(
+      (a) => (a?.providerName || '').trim() || (a?.accountNo || '').trim() || (a?.accountTitle || '').trim()
+    );
+  }
+  if (payload.shopPic === null) payload.shopPic = { url: '', publicId: '' };
   if (payload.locationHierarchy) {
     if (payload.locationHierarchy.areaId === '') payload.locationHierarchy.areaId = null;
     if (payload.locationHierarchy.routeId === '') payload.locationHierarchy.routeId = null;
-    if (payload.locationHierarchy.areaId && !(await Territory.exists({ distributorId: req.distributorId, 'areas._id': payload.locationHierarchy.areaId }))) {
-      throw new AppError('Selected Area was not found. Please create an Area & Route first.', 400, 'PREREQUISITE_AREA_NOT_FOUND');
-    }
   }
-  if (payload.commercialAssignments?.territoryId === '') payload.commercialAssignments.territoryId = null;
+  if (payload.commercialAssignments && payload.commercialAssignments.territoryId === '') {
+    payload.commercialAssignments.territoryId = null;
+  }
+  return payload;
+}
+
+export const createCustomer = asyncHandler(async (req, res) => {
+  const { Customer, Territory } = m();
+  const payload = sanitizeCustomerPayload({
+    ...req.body,
+    distributorId: req.distributorId,
+    customerCode: req.body.customerCode || `CUST-${Date.now().toString().slice(-5)}`,
+  });
+  if (!String(payload.shopName || '').trim()) {
+    throw new AppError('Shop Name is required to create a Customer.', 400, 'CUSTOMER_FIELDS_REQUIRED');
+  }
+  if (payload.locationHierarchy?.areaId && !(await Territory.exists({ distributorId: req.distributorId, 'areas._id': payload.locationHierarchy.areaId }))) {
+    throw new AppError('Selected Area was not found. Please create an Area & Route first.', 400, 'PREREQUISITE_AREA_NOT_FOUND');
+  }
   const created = await Customer.create(payload);
   res.status(201).json({ success: true, data: created });
 });
@@ -75,7 +97,8 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!customer) throw new AppError('Customer not found.', 404, 'CUSTOMER_NOT_FOUND');
   const oldPicId = customer.shopPic?.publicId;
-  Object.assign(customer, { ...req.body, distributorId: req.distributorId });
+  const payload = sanitizeCustomerPayload({ ...req.body, distributorId: req.distributorId });
+  Object.assign(customer, payload);
   await customer.save();
   if (oldPicId && customer.shopPic?.publicId !== oldPicId) await destroyImage(oldPicId).catch(() => {});
   res.status(200).json({ success: true, data: customer });
@@ -224,11 +247,16 @@ export const listBeatPlans = asyncHandler(async (req, res) => {
 
 export const createBeatPlan = asyncHandler(async (req, res) => {
   const { BeatPlan } = m();
-  if (!req.body.assignedBookerId) throw new AppError('Please create or select an Order Booker employee first before creating a Beat Plan.', 400, 'PREREQUISITE_BOOKER_REQUIRED');
-  if (!(await User.exists({ _id: req.body.assignedBookerId, distributorId: req.distributorId }))) {
+  const assignedBookerId = req.body.assignedBookerId || null;
+  if (assignedBookerId && !(await User.exists({ _id: assignedBookerId, distributorId: req.distributorId }))) {
     throw new AppError('Assigned Order Booker was not found. Please create an employee first.', 400, 'PREREQUISITE_BOOKER_NOT_FOUND');
   }
-  const created = await BeatPlan.create({ ...req.body, distributorId: req.distributorId, beatCode: req.body.beatCode || `BAT-${Date.now().toString().slice(-5)}` });
+  const created = await BeatPlan.create({
+    ...req.body,
+    assignedBookerId,
+    distributorId: req.distributorId,
+    beatCode: req.body.beatCode || `BAT-${Date.now().toString().slice(-5)}`,
+  });
   res.status(201).json({ success: true, data: created });
 });
 
@@ -236,7 +264,14 @@ export const updateBeatPlan = asyncHandler(async (req, res) => {
   const { BeatPlan } = m();
   const beat = await BeatPlan.findOne({ _id: req.params.id, distributorId: req.distributorId });
   if (!beat) throw new AppError('Beat plan not found.', 404, 'BEAT_NOT_FOUND');
-  Object.assign(beat, { ...req.body, distributorId: req.distributorId });
+  const payload = { ...req.body, distributorId: req.distributorId };
+  if ('assignedBookerId' in payload) {
+    payload.assignedBookerId = payload.assignedBookerId || null;
+    if (payload.assignedBookerId && !(await User.exists({ _id: payload.assignedBookerId, distributorId: req.distributorId }))) {
+      throw new AppError('Assigned Order Booker was not found.', 400, 'PREREQUISITE_BOOKER_NOT_FOUND');
+    }
+  }
+  Object.assign(beat, payload);
   await beat.save();
   res.status(200).json({ success: true, data: beat });
 });

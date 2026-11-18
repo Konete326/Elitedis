@@ -10,6 +10,7 @@ export { FormModal } from './FormModal';
 export { ComingSoonModal } from './ComingSoonModal';
 export { OnboardingWizardModal } from './OnboardingWizardModal';
 export { PrintPreviewModal } from './PrintPreviewModal';
+export { PwaInstallPrompt } from './PwaInstallPrompt';
 export { TouchKeypadModal } from './TouchKeypadModal';
 export { ImageDropzone } from './ImageDropzone';
 export { ToastContainer } from './ToastContainer';

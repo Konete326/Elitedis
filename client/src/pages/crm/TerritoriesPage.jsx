@@ -9,6 +9,7 @@ import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const INITIAL_FORM = {
   territoryCode: '',
@@ -43,7 +44,36 @@ export default function TerritoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setTouched({});
+  };
+
+  const openCreateModal = () => {
+    setEditingId(null);
+    setForm(INITIAL_FORM);
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const openEditModal = (row) => {
+    setEditingId(row._id);
+    setForm({ ...INITIAL_FORM, ...row });
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const errors = {
+    territoryCode: touched.territoryCode
+      ? validateField('code', form.territoryCode, { required: true, label: 'Territory Code' })
+      : '',
+    territoryName: touched.territoryName
+      ? validateField('required', form.territoryName, { required: true, minLength: 2, label: 'Territory Name' })
+      : '',
+  };
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -54,7 +84,7 @@ export default function TerritoriesPage() {
       queryClient.invalidateQueries({ queryKey: ['territories'] });
       queryClient.invalidateQueries({ queryKey: ['territories-options'] });
       addToast({ type: 'success', message: editingId ? 'Territory updated.' : 'Territory created.' });
-      setModalOpen(false);
+      closeModal();
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Failed to save territory.' });
@@ -90,6 +120,20 @@ export default function TerritoriesPage() {
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setTouched({ territoryCode: true, territoryName: true });
+    const invalid =
+      validateField('code', form.territoryCode, { required: true, label: 'Territory Code' }) ||
+      validateField('required', form.territoryName, { required: true, minLength: 2, label: 'Territory Name' });
+    if (invalid) return;
+    saveMutation.mutate({
+      ...form,
+      territoryCode: form.territoryCode.trim().toUpperCase(),
+      territoryName: form.territoryName.trim(),
+    });
+  };
+
   return (
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3">
       <PageHeader
@@ -98,11 +142,7 @@ export default function TerritoriesPage() {
         actions={
           <button
             type="button"
-            onClick={() => {
-              setEditingId(null);
-              setForm(INITIAL_FORM);
-              setModalOpen(true);
-            }}
+            onClick={openCreateModal}
             className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
           >
             <Plus className="w-4 h-4" />
@@ -154,20 +194,12 @@ export default function TerritoriesPage() {
         emptyTitle="No territories configured"
         emptyDescription="Create territories to divide coverage by brand, warehouse, district, or booker."
         emptyActionLabel="Add Territory"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreateModal}
         renderActions={(row) => (
           <>
             <button
               type="button"
-              onClick={() => {
-                setEditingId(row._id);
-                setForm({ ...INITIAL_FORM, ...row });
-                setModalOpen(true);
-              }}
+              onClick={() => openEditModal(row)}
               className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1"
             >
               <Edit className="w-3.5 h-3.5" />
@@ -186,34 +218,55 @@ export default function TerritoriesPage() {
 
       <FormModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         title={editingId ? 'Edit Territory' : 'New Territory'}
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMutation.mutate(form);
-        }}
+        onSubmit={handleSubmit}
         isSubmitting={saveMutation.isPending}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Code *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Territory Code *</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({
+                    ...p,
+                    territoryCode: suggestCode(
+                      'TER',
+                      table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+                      (table.rows || []).map((r) => r.territoryCode)
+                    ),
+                  }))
+                }
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
             <input
-              required
+              aria-required="true"
               value={form.territoryCode}
               onChange={(e) => setForm((p) => ({ ...p, territoryCode: e.target.value.toUpperCase() }))}
-              placeholder="T-01"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono"
+              onBlur={() => setTouched((p) => ({ ...p, territoryCode: true }))}
+              placeholder="TER-001"
+              aria-invalid={Boolean(errors.territoryCode)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${errors.territoryCode ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {errors.territoryCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.territoryCode}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Name *</label>
             <input
-              required
+              aria-required="true"
               value={form.territoryName}
               onChange={(e) => setForm((p) => ({ ...p, territoryName: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, territoryName: true }))}
               placeholder="ORANGI TOWN"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+              aria-invalid={Boolean(errors.territoryName)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${errors.territoryName ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {errors.territoryName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.territoryName}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Territory Type (Optional)</label>

@@ -169,16 +169,26 @@ export function ShellProvider({ children }) {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const normalized =
         typeof input === 'string'
-          ? { id, type: fallbackType, title: '', message: input, duration: 4500 }
+          ? { id, type: fallbackType, title: '', message: input, duration: 5000 }
           : {
               id,
               type: input?.type || 'info',
               title: input?.title || '',
               message: input?.message || '',
-              duration: input?.duration ?? 4500,
+              duration: input?.duration ?? 5000,
             };
 
-      setToasts((prev) => [...prev.slice(-4), normalized]);
+      setToasts((prev) => {
+        const evictCount = Math.max(0, prev.length - 4);
+        for (let i = 0; i < evictCount; i += 1) {
+          const evictedTimer = toastTimersRef.current.get(prev[i].id);
+          if (evictedTimer) {
+            clearTimeout(evictedTimer);
+            toastTimersRef.current.delete(prev[i].id);
+          }
+        }
+        return [...prev.slice(-4), normalized];
+      });
 
       if (normalized.duration > 0) {
         const timerId = setTimeout(() => {

@@ -55,8 +55,8 @@ const customerSchema = new Schema(
     customerCode: { type: String, required: true, trim: true, uppercase: true },
     shopName: { type: String, required: true, trim: true },
     shopPic: { type: cloudinaryImageSchema, default: () => ({}) },
-    ownerName: { type: String, required: true, trim: true },
-    ownerContact: { type: String, required: true, trim: true },
+    ownerName: { type: String, trim: true, default: '' },
+    ownerContact: { type: String, trim: true, default: '' },
     customerType: {
       type: String,
       enum: ['WHOLESALER', 'RETAILER', 'SUB_DISTRIBUTOR', 'POS_WALKIN'],

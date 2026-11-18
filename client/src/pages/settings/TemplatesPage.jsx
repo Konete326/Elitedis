@@ -7,6 +7,7 @@ import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
+import { suggestCode, validateField } from '../../utils/validation';
 
 const DOC_TYPES = [
   'RETAIL_POS',
@@ -46,8 +47,38 @@ export default function TemplatesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [touched, setTouched] = useState({});
   const [previewTarget, setPreviewTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setTouched({});
+  };
+
+  const openCreateModal = () => {
+    setEditingId(null);
+    setForm(INITIAL_FORM);
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const openEditModal = (row) => {
+    setEditingId(row._id);
+    setForm({ ...INITIAL_FORM, ...row });
+    setTouched({});
+    setModalOpen(true);
+  };
+
+  const errors = {
+    templateCode:
+      touched.templateCode && form.templateCode.trim()
+        ? validateField('code', form.templateCode, { label: 'Template Code' })
+        : '',
+    templateName: touched.templateName
+      ? validateField('required', form.templateName, { required: true, minLength: 2, label: 'Template Name' })
+      : '',
+  };
 
   const saveMutation = useMutation({
     mutationFn: (payload) =>
@@ -57,7 +88,7 @@ export default function TemplatesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['print-templates'] });
       addToast({ type: 'success', message: editingId ? 'Print template updated.' : 'Print template saved.' });
-      setModalOpen(false);
+      closeModal();
     },
     onError: (err) => {
       addToast({ type: 'error', message: err?.response?.data?.message || 'Could not save template.' });
@@ -76,6 +107,27 @@ export default function TemplatesPage() {
       setDeleteTarget(null);
     },
   });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setTouched({ templateCode: true, templateName: true });
+    const invalid =
+      (form.templateCode.trim() ? validateField('code', form.templateCode, { label: 'Template Code' }) : '') ||
+      validateField('required', form.templateName, { required: true, minLength: 2, label: 'Template Name' });
+    if (invalid) return;
+    const resolvedCode = form.templateCode.trim()
+      ? form.templateCode.trim().toUpperCase()
+      : suggestCode(
+          'TPL',
+          table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+          (table.rows || []).map((r) => r.templateCode)
+        );
+    saveMutation.mutate({
+      ...form,
+      templateCode: resolvedCode,
+      templateName: form.templateName.trim(),
+    });
+  };
 
   const columns = [
     { key: 'templateCode', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.templateCode}</span> },
@@ -103,11 +155,7 @@ export default function TemplatesPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setEditingId(null);
-                setForm(INITIAL_FORM);
-                setModalOpen(true);
-              }}
+              onClick={openCreateModal}
               className="inline-flex items-center justify-center gap-1.5 min-h-[40px] sm:h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
@@ -128,13 +176,7 @@ export default function TemplatesPage() {
         onRefresh={table.refresh}
         isRefreshing={table.isFetching}
         filters={[
-          {
-            key: 'documentType',
-            label: 'Document Type',
-            value: table.filters.documentType,
-            onChange: (val) => table.setFilter('documentType', val),
-            options: DOC_TYPES,
-          },
+          { key: 'documentType', label: 'Document Type', value: table.filters.documentType, onChange: (val) => table.setFilter('documentType', val), options: DOC_TYPES },
         ]}
       />
 
@@ -150,25 +192,13 @@ export default function TemplatesPage() {
         emptyTitle="No print templates added yet"
         emptyDescription="Create A4, Landscape, and 80mm POS receipt styles for bills and dispatch sheets."
         emptyActionLabel="Create Template"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreateModal}
         renderActions={(row) => (
           <>
             <button type="button" onClick={() => setPreviewTarget(row)} className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]" title="Preview Layout">
               <Printer className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingId(row._id);
-                setForm({ ...INITIAL_FORM, ...row });
-                setModalOpen(true);
-              }}
-              className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1"
-            >
+            <button type="button" onClick={() => openEditModal(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">
               <Edit className="w-3.5 h-3.5" />
               <span>Edit</span>
             </button>
@@ -181,33 +211,61 @@ export default function TemplatesPage() {
 
       <FormModal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         title={editingId ? 'Edit Print Template' : 'New Print Template'}
         size="lg"
-        onSubmit={(e) => {
-          e.preventDefault();
-          saveMutation.mutate(form);
-        }}
+        onSubmit={handleSubmit}
         isSubmitting={saveMutation.isPending}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-[var(--text-secondary)]">Template Code (Optional)</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((p) => ({
+                    ...p,
+                    templateCode: suggestCode(
+                      'TPL',
+                      table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+                      (table.rows || []).map((r) => r.templateCode)
+                    ),
+                  }))
+                }
+                className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Auto Code
+              </button>
+            </div>
+            <input
+              value={form.templateCode}
+              onChange={(e) => setForm((p) => ({ ...p, templateCode: e.target.value.toUpperCase() }))}
+              onBlur={() => setTouched((p) => ({ ...p, templateCode: true }))}
+              placeholder="TPL-001 (auto if blank)"
+              aria-invalid={Boolean(errors.templateCode)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm font-mono ${errors.templateCode ? 'border-[var(--status-danger)]' : ''}`}
+            />
+            {errors.templateCode && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.templateCode}</p>}
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Template Name *</label>
             <input
-              required
+              aria-required="true"
               value={form.templateName}
               onChange={(e) => setForm((p) => ({ ...p, templateName: e.target.value }))}
+              onBlur={() => setTouched((p) => ({ ...p, templateName: true }))}
               placeholder="Standard Chillan + Finance"
-              className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+              aria-invalid={Boolean(errors.templateName)}
+              className={`w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm ${errors.templateName ? 'border-[var(--status-danger)]' : ''}`}
             />
+            {errors.templateName && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{errors.templateName}</p>}
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Document Type (Optional)</label>
             <select value={form.documentType} onChange={(e) => setForm((p) => ({ ...p, documentType: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               {DOC_TYPES.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
+                <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>
@@ -220,7 +278,7 @@ export default function TemplatesPage() {
               <option value="THERMAL_58MM">Thermal 58mm</option>
             </select>
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Header Company Title (Optional)</label>
             <input
               value={form.headerConfig?.companyTitle || ''}

@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0284C7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ELITE DIST" />
     <title>ELITE DIST — Distribution ERP &amp; SFA</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,6 +33,29 @@
             document.documentElement.style.colorScheme = 'light';
           }
         } catch (e) {}
+
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault();
+          window.__deferredPwaPrompt = e;
+          try {
+            localStorage.removeItem('elitedist_pwa_installed');
+          } catch (err) {}
+          window.dispatchEvent(new Event('elitedist:pwa-change'));
+        });
+
+        window.addEventListener('appinstalled', function () {
+          window.__deferredPwaPrompt = null;
+          try {
+            localStorage.setItem('elitedist_pwa_installed', 'true');
+          } catch (err) {}
+          window.dispatchEvent(new Event('elitedist:pwa-change'));
+        });
+
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+          });
+        }
       })();
     </script>
   </head>
