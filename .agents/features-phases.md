@@ -642,3 +642,158 @@
 - **Scope:** Final production readiness check across `client/` and `server/`.
 - **Actions:** Verify `client/.env.example` and `server/.env.example` are complete, run `npm run build` in `client/`, verify `server` boots cleanly with Super Admin auto-seed, update all 100 phase checkboxes in `.agents/features-phases.md`, and push the final release commit following `.agents/git-sync.md`.
 - **Verification:** ELITE DIST ERP v1.0.0 is 100% production-ready.
+
+---
+
+## Milestone 11: Master PRD v1.0 Final Baseline Alignment & Gap Closure (Phases 101–115)
+*(Added after reconciling the 69-page Master PRD v1.0 against Phases 001–100. All phases below carry mandatory PRD §30.5 6-field traceability metadata.)*
+
+### [ ] Phase 101: Product Master Alignment — Optional Purchase Rate, Purchase Price Visibility RBAC & 8-Step Unit Versioning Engine
+- **Scope:** Remove mandatory `purchaseRate` validation from Product creation/update; implement `unitVersions[]` inside `Product.model.js`, snapshot immutable `unitVersionId` & `conversionQty` onto `StockBatch.model.js`, auto-promote active default version when older batch stock hits zero, and strip/hide cost fields whenever `user.permissions.purchasePriceVisibility === false`.
+- **Traceability (§30.5):**
+  - `PRD Section`: §5.2, §5.3, §5.7, §5.8
+  - `Source Module / Page`: Inventory / Product Master (`ProductForm`, `/api/v1/inventory/products`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-03, AC-04
+  - `Test Case`: Create SKU without `purchaseRate` (201); create Unit Version v2 (`50 pcs`) with existing v1 stock (`48 pcs`); verify dual-version transactions and cost column masking for non-authorized employee.
+  - `Status`: Pending
+
+### [ ] Phase 102: Stock Issue Policy (`FIFO` / `FEFO` / `Manual`), Custom Condition Labels & `Blocked` Status Control
+- **Scope:** Add `DistributorPolicy.model.js` storing `stockIssuePolicy` (`FIFO|FEFO|MANUAL`) and `customStockConditions[]` mapped cleanly onto official conditions (`FRESH|NORMAL|DAMAGE|EXPIRE`). Update `stockLedger.service.js` batch reservation sorting to obey distributor policy and block `BLOCKED`/`QUARANTINED`/`DAMAGE`/`EXPIRE` stock from normal allocation.
+- **Traceability (§30.5):**
+  - `PRD Section`: §6.1–6.7
+  - `Source Module / Page`: Settings & Stock Allocation (`/settings/stock-policy`, `stockLedger.service.js`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-06
+  - `Test Case`: Switch policy from `FIFO` to `FEFO` and approve order; verify earliest-expiring non-expired batch is reserved while `Blocked` batches are skipped and `Available = Current - Reserved`.
+  - `Status`: Pending
+
+### [ ] Phase 103: Warehouse Hierarchy (`Warehouse -> Zone -> Area`), Physical Stock Count Variance & 4-Step Zero-Stock Guard
+- **Scope:** Standardize UI, routes, and labels to strict `Warehouse -> Zone -> Area` (`Normal/Mix/Temperature/Cold Store`; `Floor/Rack/Walked`), capture explicit Physical Stock Count columns (`System Qty`, `Physical Count Qty`, `Difference Qty`, `Updated Balance`), expose all 8 Warehouse Dashboard KPIs, and enforce the 4-step zero-stock deletion guard across all three levels.
+- **Traceability (§30.5):**
+  - `PRD Section`: §7.1–7.9, §8.6–8.7
+  - `Source Module / Page`: Warehouse & Storage / Physical Stock Count (`/stock/warehouses`, `/stock/zones`, `/stock/areas`, `/stock/movements`)
+  - `Classification`: Existing / Confirmed
+  - `Acceptance Criteria`: AC-05
+  - `Test Case`: Attempt to delete Area/Zone/Warehouse with `currentBaseQty > 0` -> expect 400 with remaining unit count; transfer stock to 0 -> verify deletion succeeds; verify Physical Count records `Difference = Physical - System`.
+  - `Status`: Pending
+
+### [ ] Phase 104: 5-Step Purchase Receiving, Expected vs Received MFG/EXP Discrepancies & Segregated Put-Away + Purchase Return
+- **Scope:** Upgrade `Purchase` movement workflow into all 5 stages (`Purchase Received -> Check & Received -> Move & Put Away -> Create Movement -> Purchase Movement Result` [24 fields]), add Expected vs Received quantity & MFG/EXP mismatch alerts, segregate `Normal` / `Damaged` / `Expired` destination storage areas at put-away, and link `Purchase Return` directly to source batch/company payable.
+- **Traceability (§30.5):**
+  - `PRD Section`: §9.1–9.8
+  - `Source Module / Page`: Purchase Movement & Receiving (`/stock/purchase-receiving`, `/stock/movements/create`)
+  - `Classification`: Existing / Confirmed
+  - `Acceptance Criteria`: AC-07
+  - `Test Case`: Receive 100 expected vs 95 Normal + 3 Damaged + 2 Expired with MFG mismatch alert; confirm 3 separate `StockBatch` condition placements and 24-field `Purchase Movement Result`.
+  - `Status`: Pending
+
+### [ ] Phase 105: Company-Wise Operational Payable Ledger & Isolated General Business Expenses (`Loading` / `Transport` / `Other`)
+- **Scope:** Implement `Company-Wise Payable Account` (`Purchases`, `Purchase Returns`, `Payments Made`, `Outstanding Payable`, method/account/Ref no/Due date/Source transaction) under operational accounts, plus `GeneralExpense.model.js` for `Loading`, `Transport`, and `Other` general expenses guaranteed NEVER to alter `StockBatch.purchaseRate`.
+- **Traceability (§30.5):**
+  - `PRD Section`: §9.9, §9.10
+  - `Source Module / Page`: Operational Accounts / Company Payable & General Expenses (`/accounts/company-payables`, `/accounts/expenses`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-07
+  - `Test Case`: Record PKR 50,000 Purchase + PKR 2,500 Transport expense -> confirm `StockBatch.purchaseRate` remains unchanged while `CompanyPayable` = 50,000 and `GeneralExpense` = 2,500.
+  - `Status`: Pending
+
+### [ ] Phase 106: Granular 5D Distribution Authorization (`Company x Brand x Product x Territory x Area`) & Multi-Shop Single-Owner CRM
+- **Scope:** Add `territoryArrangements` 5D check helper on companies/territories so SKU sales/booking permissions validate exact `Company x Brand x Product x Territory x Area` eligibility; add `ownerGroupKey` on `Customer.model.js` linking multiple shops (e.g., Orangi / Baldia / Qasba) under one owner with completely isolated shop balances, ledgers, contacts (`Shopkeeper`, `Accountant`, `Store Keeper`), and payment accounts.
+- **Traceability (§30.5):**
+  - `PRD Section`: §4.2–4.5, §10.1–10.5, §11.1–11.3
+  - `Source Module / Page`: CRM Customers, Companies & Territories (`/crm/customers`, `/inventory/companies`, `/crm/territories`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-02, AC-08
+  - `Test Case`: Link 2 shops to one Owner; sell SKU authorized in Area A but blocked in Area B -> verify Area B order rejected while Shop 1 balance stays isolated from Shop 2.
+  - `Status`: Pending
+
+### [ ] Phase 107: Independent Booker Visit Completion (`Visited` Tag), Daily Beat Ops & `Booking Skip` Workflow
+- **Scope:** Add `VisitLog.model.js` and upgrade Booker portal (`/portal/booker`) so checking in at a customer completes the stop with final tag **`Visited`** independently of whether an order, recovery, or payment occurred; wire all 12 Booker actions including **`Booking Skip`** with structured reason logging and Beat Duplication + Daily Beat booking counters.
+- **Traceability (§30.5):**
+  - `PRD Section`: §11.4–11.5, §12.1–12.4
+  - `Source Module / Page`: CRM Beats & Booker Mobile Portal (`/crm/beats`, `/portal/booker`)
+  - `Classification`: Confirmed
+  - `Acceptance Criteria`: AC-08
+  - `Test Case`: Complete Booker visit with zero order (`Booking Skip` with reason) -> verify customer visit status = `Visited` and skip reason logged in Booking Sheet.
+  - `Status`: Pending
+
+### [ ] Phase 108: Order Verification (`Official` Source, `Write Your Own` Customer), POS/Booking Permission Guards & Rule Snapshots
+- **Scope:** Enforce verified Order sources (`Online`, `Booker`, `Admin`, `Official`) & types (`Urgent`, `POS`, `Special`, `Regular`, `Normal`, `S. Dispatch`), add **`Write Your Own`** inline ad-hoc customer mode in Orders & POS, enforce `Product.posPermission` / `bookingPermission`, and persist immutable `ruleApplicationSnapshot` + `customerSnapshot` on approval.
+- **Traceability (§30.5):**
+  - `PRD Section`: §5.2, §13.1–13.5, §18.6–18.8
+  - `Source Module / Page`: Order Create / POS Portal (`/orders/create-normal`, `/orders/create-advance`, `/portal/pos`)
+  - `Classification`: Existing / Confirmed
+  - `Acceptance Criteria`: AC-09
+  - `Test Case`: Place POS sale using `Write Your Own` customer; attempt POS sale for SKU with `posPermission: false` (blocked); update discount rule after approval and verify existing order invoice math stays frozen.
+  - `Status`: Pending
+
+### [ ] Phase 109: Salesman Client Deal 3-Stage Architecture (`Original` Immutable Snapshot, `Edit` Deltas, `Final`) & `Sales Skip`
+- **Scope:** Refactor `SaleInvoice.model.js` and Salesman Deal UI (`/portal/salesman`, `/sales/master`) into 3 explicit stages: frozen `Original Invoice` (`Report 22.13`), tracked `Edit Invoice` deltas (`Item Return/Cancel`, `Extra Item`, `Extra Return` [`OK`/`SKIP`], `Grand Level Edit`), and `Final Invoice` (`Report 22.14`). Implement 6-rule **`Sales Skip`** producing explicit `Sales Result` entries in Salesman Sheets.
+- **Traceability (§30.5):**
+  - `PRD Section`: §15.1–15.10, §22.13–22.14
+  - `Source Module / Page`: Salesman Portal & Sales Master (`/portal/salesman`, `/sales/master`)
+  - `Classification`: Existing / Confirmed / Extended
+  - `Acceptance Criteria`: AC-10
+  - `Test Case`: Edit invoice qty and add return/extra item at doorstep -> confirm `Original Invoice` snapshot matches initial approved bill untouched; perform `Sales Skip` and verify `Sales Result` appears on Salesman Sheet without faking `$0` completed sale.
+  - `Status`: Pending
+
+### [ ] Phase 110: Recovery Skip, Split Payment Methods, Field Recovery Expenses & Cash Handover Reconciliation
+- **Scope:** Upgrade `Recovery.model.js` and Recovery screens (`/recovery/assign`, `/recovery/cash-handover`, `/portal/booker`) for multi-method split recovery entries (`Cash`, `Check`, `Online`, `Bank account`, `Easy Paisa`, `Jazz Cash`), **`Recovery Skip`** generating `Recovery Result` in Recovery Sheets, and **Cash Handover** capturing `Gas / Petrol`, `Enjoyment`, `Works`, `Total Due Cash`, `Total Cash Received`, and `Shortage / Extra`.
+- **Traceability (§30.5):**
+  - `PRD Section`: §16.1–16.9, §22.8
+  - `Source Module / Page`: Recovery & Cash Handover (`/recovery/assign`, `/recovery/ledger`, `/recovery/cash-handover`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-11
+  - `Test Case`: Collect PKR 10,000 cash + log PKR 800 Gas/Petrol + receive PKR 9,100 physical cash -> verify `Total Due Cash = 9,200`, `Shortage = -100`, customer receivable credited full PKR 10,000, and `Recovery Skip` writes non-payment Result row.
+  - `Status`: Pending
+
+### [ ] Phase 111: Operational Accounts Alignment (10 Record Types + 5 Invoice/Recovery Ledger Types) & §29 Exclusions Cleanup
+- **Scope:** Replace/refactor `AccountLedger` GL endpoints into `OperationalLedger` serving all 10 PRD §17.3 operational account views (`Customer Ledger`, `Recovery Ledger`, `Invoice Ledger` with strict 5 event types [`Extra Return`, `Extra Item`, `Extra Discount`, `Charge Off`, `Paid Payment`], `Company-Wise Payable`, `Payment History`, `Outstanding`, etc.), and cleanly hide/de-scope excluded §29 modules (`Journal Entries`, `Trial Balance`, `Balance Sheet`, standalone `Supplier Master`, `PR`/`PO`, `Marketplace`).
+- **Traceability (§30.5):**
+  - `PRD Section`: §4.2, §9.1, §17.1–17.3, §22.15, §29
+  - `Source Module / Page`: Operational Accounts & Inventory/Purchase (`/accounts/*`, Sidebar nav)
+  - `Classification`: Confirmed / Out of Scope Cleanup
+  - `Acceptance Criteria`: AC-12
+  - `Test Case`: Verify Invoice/Recovery Ledger filters strictly by all 5 official event types; confirm excluded Journal/Trial Balance/Balance Sheet/PO/Supplier routes are removed from operational flow.
+  - `Status`: Pending
+
+### [ ] Phase 112: 13-Point Employee Permission Matrix, Warehouse Scoping & Mandatory `Coming Soon` Gating (§30.2)
+- **Scope:** Implement the full 13-point permission editor & backend middleware checks (`moduleAccess`, `screenAccess`, `canView`, `canCreate`, `canEdit`, `canDelete`, `canSubmit`, `canApprove`, `canStockMovement`, `canPayment`, **`purchasePriceVisibility`**, `reportAccess`, `assignedWarehouseIds[]`). Gate all `§30.2` incomplete areas (`Tax Group`, flagged incomplete `Scheme Group` sections, `HRM History & Reports`, `Payroll & Salary`, `Attendance & Leaving`, and public `/auth/signup`) with HTTP `501` backend guards & UI `<ComingSoonModal />` badges.
+- **Traceability (§30.5):**
+  - `PRD Section`: §1.3, §18.2, §18.5, §20.1–20.5, §30.2
+  - `Source Module / Page`: HRM Employees, Commercial Rules & Auth (`/hrm/*`, `/settings/rules`, `/auth/signup`)
+  - `Classification`: Confirmed / Pending (`Coming Soon`)
+  - `Acceptance Criteria`: AC-03, AC-13
+  - `Test Case`: Restrict user to Warehouse A and toggle `purchasePriceVisibility = false` -> verify Warehouse B stock is inaccessible and purchase cost hidden; click Tax Group / HRM Payroll -> verify `<ComingSoonModal />` opens cleanly.
+  - `Status`: Pending
+
+### [ ] Phase 113: Dual Reporting System (System A Official vs System B Shareable Custom Templates) & All 15 Official Reports (§22.1–22.15)
+- **Scope:** Implement/verify all **15 Official Reports (`22.1` Current Stock through `22.15` Invoice / Recovery Ledger List)** with exact PRD §22.8 & §23 reconciliation formulas and all 20 global filter dimensions; separate protected **System A ELITE DIST Official Reports** from **System B User-Specific Custom Report Templates** with tenant data sanitization before template sharing.
+- **Traceability (§30.5):**
+  - `PRD Section`: §18.9–18.15, §21.1–21.3, §22.1–22.15, §23.1–23.8
+  - `Source Module / Page`: Reports Center & Custom Templates (`/reports/center`, `/settings/templates`)
+  - `Classification`: Confirmed / Extended
+  - `Acceptance Criteria`: AC-12
+  - `Test Case`: Run `22.8 Delivery Sales Movement`, verify exact `Net Amount` & `Balance` equations; attempt to edit official report as tenant admin (blocked); share custom template across Tenant A -> Tenant B verifying zero Tenant A records appear.
+  - `Status`: Pending
+
+### [ ] Phase 114: 16-Part Navigation, 4 Module Dashboards, Urdu/English Print Layouts & 7-Operation Idempotency Guard
+- **Scope:** Align `<Sidebar />` cleanly around the **16 Main Navigation Parts (`§24.1`)**, focus top dashboard tabs on the **4 Confirmed Module Dashboards** (`Product`, `Stock`, `Customer`, `Warehouse`), upgrade `PrintTemplate` for Urdu/English Header/Footer/Notes & 6 Invoices + 4 Supply Docs (`Delivery Dispatch`, `Salesman Sheet`, `Recovery Sheet`, `Booking Sheet`), and wire `IdempotencyRecord` (`idempotencyKey` middleware) across all **7 critical write operations (`§26.4`)**.
+- **Traceability (§30.5):**
+  - `PRD Section`: §18.9, §24.1–24.4, §25.1–25.4, §26.4–26.6
+  - `Source Module / Page`: AppShell Navigation, Print Preview & API Idempotency Middleware (`Sidebar.jsx`, `PrintPreviewModal.jsx`, `idempotency.service.js`)
+  - `Classification`: Confirmed / Recommended
+  - `Acceptance Criteria`: AC-01, AC-13
+  - `Test Case`: Replay identical Order/Payment/Purchase/Movement request twice rapidly with same `idempotencyKey` -> verify single DB document written cleanly with idempotent replay response.
+  - `Status`: Pending
+
+### [ ] Phase 115: Master PRD v1.0 End-to-End Acceptance Verification (`AC-01` to `AC-13`) & Production Parity Audit
+- **Scope:** Execute end-to-end verification covering all 13 Acceptance Criteria groups (`AC-01` through `AC-13`), Historical Data Protection checks (`§3.3`), Light/Dark Blue & Zero-Purple CSS checks, `100dvh` desktop + `375px` mobile stacked card responsive verification, `node --check`, and `npm run build`.
+- **Traceability (§30.5):**
+  - `PRD Section`: §3.3, §28.1–28.13, §30.4–30.5
+  - `Source Module / Page`: Full `client/` & `server/` Integration
+  - `Classification`: Confirmed
+  - `Acceptance Criteria`: AC-01 through AC-13
+  - `Test Case`: Full regression run across DUA reference tenant + secondary SaaS tenant verifying zero cross-tenant leakage, zero console errors, zero dead buttons, and 100% pass across AC-01..AC-13.
+  - `Status`: Pending

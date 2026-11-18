@@ -13,11 +13,11 @@
 Before writing, editing, or deleting a single line of code in any phase, the AI coding agent MUST read and cross-reference all 7 specification files inside `.agents/`:
 1. `.agents/PRD.md` — Product functional scope, modules, and business rules.
 2. `.agents/SRD.md` — System architecture, non-functional requirements, and data isolation rules.
-3. `.agents/TRD.md` — Exact folder structure, 22 Mongoose schemas, REST API routes, and `.env` contracts.
+3. `.agents/trd.md` — Exact folder structure, Master PRD v1.0 Mongoose schemas, REST API routes, and `.env` contracts.
 4. `.agents/design.md` — Blue & White (Light) / Blue & Black (Dark) tokens, zero-purple mandate, viewport-locked shell, and anti-loop rules.
 5. `.agents/project-rules.md` — This constitution.
 6. `.agents/git-sync.md` — Git branch, commit, secret protection, and phase-wise push protocol.
-7. `.agents/features-phases.md` — The 100-Phase sequential execution roadmap.
+7. `.agents/features-phases.md` — The sequential execution roadmap (Milestone 1–10 `[x]` + Milestone 11 Phases 101–115 Master PRD v1.0 Alignment).
 
 ---
 
@@ -120,7 +120,7 @@ Every page must reuse <AppShell />, <Sidebar />, <Topbar />, <MetricCard />, <Sm
 Every unbuilt route or future feature button must open <ComingSoonModal />, and unknown URLs must render <NotFound404 />.
 
 6. Critical Business Logic Rules (Non-Negotiable Domain Invariants)
-Product Master vs. Stock Separation: Never mix static catalog fields with batch quantities. Every purchase creates a StockBatch record with its own batchNo, mfgDate, expDate, purchaseRate, condition, and status.
+Product Master vs. Stock Separation & Optional Purchase Rate: Never mix static catalog fields with batch quantities. `Product.purchaseRate` MUST NOT be required in Product Master; purchase cost originates from Purchase Movement into each `StockBatch` (preserving `unitVersionId`, `conversionQty`, `batchNo`, `mfgDate`, `expDate`, `purchaseRate`, `condition`, and `status`) and is strictly visible only to Admin & users with `purchasePriceVisibility: true`.
 
 Multi-Unit & Volume Math: Every product supports a Base Unit and Packing Units (Carton, Dozen, Box, Sack) with auto-calculated packingWeightKg = baseWeightKg * conversionQty, Area = W * L, and Volume = W * L * H.
 
@@ -142,7 +142,7 @@ Level 1 (Item Level): Supports Base/Packing unit rates, Reverse Custom Sale Rate
 
 Level 2 (Grand Level): Aggregates Total Items, Total Qty, Total Weight (KG), Total Volume (Cubic Feet), and Gross Amount, then applies Grand Discounts (Amount or Weight based in General+Auto, Slab General, or % + Auto mode), Grand Charges, Grand Target Schemes, and Invoice Notes.
 
-Mandatory Task-Wise Closing & Double-Entry Accounting Sync: Every Delivery Dispatch, Salesman Deal, Recovery Collection, Return Put-Away, Warehouse Transfer, and Stock Adjustment must close its linked PendingTask and atomically post balanced Debit/Credit entries to AccountLedger.
+Mandatory Task-Wise Closing & Operational Accounts Sync (Master PRD v1.0 §9, §15–17, §29): Every Delivery Dispatch, Salesman Client Deal (preserving immutable `Original Invoice` alongside `Edit`/`Final Invoice` and explicit `Sales Skip`), Recovery Collection (`Recovery Skip` + itemized Field Expenses & Cash Handover), Return Put-Away, Warehouse Transfer (`Warehouse -> Zone -> Area`), Stock Adjustment, and Purchase Movement (No separate Supplier Master/PR/PO; Loading & Transport General Expenses isolated from SKU cost) must close its linked `PendingTask` and atomically post to `OperationalLedger` (`Customer Ledger`, `Recovery Ledger`, `Invoice Ledger` [5 official types], `Company-wise Payable Ledger`, `GeneralExpense`) + `AuditLog` with `idempotencyKey` duplicate protection. Conventional Double-Entry GL, Journal Entries, Trial Balance, and Balance Sheet are excluded per PRD §29; any area marked `Coming Soon` per PRD §30.2 (`Tax Group`, partial `Scheme Group`, `HRM History/Payroll/Attendance`, public signup) MUST render `<ComingSoonModal />`; and every Milestone 11 task (Phase 101+) MUST document PRD §30.5 traceability (`PRD Section`, `Source Module/Page`, `Classification`, `Acceptance Criteria`, `Test Case`, `Status`).
 
 7. Anti-Loop & Code Quality Verification Checklist (Run Before Completing Any Phase)
 Before marking any phase complete in features-phases.md, verify:

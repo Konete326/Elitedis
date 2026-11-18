@@ -61,48 +61,54 @@ elite-dist-erp/
 │       │   ├── tenantMiddleware.js           # Distributor Data Isolation Guard (distributorId)
 │       │   ├── uploadMiddleware.js           # Multer Memory Storage Filter for Cloudinary
 │       │   └── errorMiddleware.js            # Global Error Handler & Standardized JSON Response
-│       ├── models/                           # 22 Mongoose Models (Strict Schemas & Indexes)
-│       │   ├── User.model.js                 # Super Admin, Admin, Booker, Salesman, POS, Storekeeper
-│       │   ├── Company.model.js              # Manufacturer/Supplier Master + Contacts/Banks/Socials
+│       ├── models/                           # Master PRD v1.0 Mongoose Models (Strict distributorId Indexes)
+│       │   ├── DistributorPolicy.model.js    # Tenant Settings: Stock Issue Policy (FIFO/FEFO/Manual), Custom Conditions
+│       │   ├── User.model.js                 # Super Admin, Admin, Booker, Salesman, POS, Warehouse, 13-Point Matrix
+│       │   ├── Company.model.js              # Principal Company Master (No separate Supplier Master; Brands & Territories)
 │       │   ├── Brand.model.js                # Brand Master + Contacts/Socials + Cloudinary Logo/Cover
 │       │   ├── Category.model.js             # Category & Sub-Category Master + Linked Brands
-│       │   ├── Product.model.js              # Product Master, Multi-Units, 3-Tier Rates, Volume
-│       │   ├── Warehouse.model.js            # Warehouse, Zone (Section) & Area (Floor/Rack) Hierarchy
-│       │   ├── StockBatch.model.js           # Batch-wise Stock, MFG/EXP, Condition, Status, Min/Max
-│       │   ├── StockMovement.model.js        # Transfer, Same Transfer, Adjustment, Purchase, Damage Back
-│       │   ├── Customer.model.js             # 7-Level Geo/Pehchan, Multi-Shop, Credit Limit, Rules
-│       │   ├── Territory.model.js            # Brand/Warehouse/District/Booker Territories
-│       │   ├── BeatPlan.model.js             # Day-wise Booker Beat, Connected Areas, Routes & Customers
-│       │   ├── CommercialRule.model.js       # Tax, Discount, Charge & Scheme Groups (Level 1 & Level 2)
-│       │   ├── PrintTemplate.model.js        # Invoice, Chillan, Sheet & Report Header/Footer/Notes
-│       │   ├── Order.model.js                # Normal/Advance Orders, 2-Level Calc, Approval State
-│       │   ├── DispatchSheet.model.js        # Delivery Planning, Load Weight/Volume, Extra Dispatch
-│       │   ├── SaleInvoice.model.js          # Final Sales, POS Sales, On-Spot Edits, Outstanding
-│       │   ├── Recovery.model.js             # Cash/Online/Cheque Collections, Extra Returns, Expenses
-│       │   ├── PendingTask.model.js          # Assigned Tasks (Dispatch, Recovery, Put-Away, Count)
-│       │   ├── AccountLedger.model.js        # Double-Entry Journal, AR/AP, Cash/Bank/Cheque Ledgers
-│       │   ├── AttendancePayroll.model.js    # HRM Attendance, Leave, Salary & Commission Records
-│       │   ├── Notification.model.js         # Low Stock, Expiry, Approval, Overdue & System Alerts
-│       │   └── AuditLog.model.js             # Immutable Audit Trail for Stock & Financial Mutations
-│       ├── controllers/                      # Modular Route Controllers (< 300 lines each)
+│       │   ├── Product.model.js              # Variant SKUs, Optional Purchase Rate, Unit Versioning, POS/Booking Flags
+│       │   ├── Warehouse.model.js            # Strict Warehouse -> Zone -> Area Hierarchy
+│       │   ├── StockBatch.model.js           # 14 Batch Fields, Immutable unitVersionId, purchaseRate, Conditions/Status
+│       │   ├── StockMovement.model.js        # 9 Official Movement Types, 21+ Fields, Receiving Checks, Idempotency
+│       │   ├── Customer.model.js             # Multi-Shop Owner Grouping, 15 Profile Fields, Multiple Contacts/Accounts
+│       │   ├── Territory.model.js            # Brand/Warehouse/District/Booker Territories + 5D Product Auth
+│       │   ├── BeatPlan.model.js             # Day-wise Booker Beat, Areas, Routes, Customers & Daily Booking Ops
+│       │   ├── VisitLog.model.js             # Independent Booker Stop Check-in (Final Tag: 'Visited', Booking Skip)
+│       │   ├── CommercialRule.model.js       # Discount/Charge/Scheme Rules (+ Coming Soon Guard for Tax/Partial Scheme)
+│       │   ├── PrintTemplate.model.js        # Print Layouts, 6 Invoices, Supply/Delivery Docs, Official vs Custom Reports
+│       │   ├── Order.model.js                # Verified Sources (Online/Booker/Admin/Official), Write-Your-Own, Rule Snapshot
+│       │   ├── DispatchSheet.model.js        # Delivery Planning, Normal/Extra Dispatch, Loading Sheet Reconciliation
+│       │   ├── SaleInvoice.model.js          # Original Immutable Snapshot, Edit Invoice, Final Invoice, Sales Skip
+│       │   ├── Recovery.model.js             # Split Payments, Recovery Skip, Field Expenses, Cash Handover Math
+│       │   ├── PendingTask.model.js          # Assigned Tasks (Recovery, Dispatch, Receiving, Count, Transfer, Expiry Back)
+│       │   ├── OperationalLedger.model.js    # 10 Operational Account Types + 5 Invoice/Recovery Ledger Types & Company Payable
+│       │   ├── GeneralExpense.model.js       # Loading, Transport & General Business Expenses (Isolated from SKU Cost)
+│       │   ├── IdempotencyRecord.model.js    # Duplicate Prevention Across 7 Critical Operations (PRD §26.4)
+│       │   ├── AttendancePayroll.model.js    # Placeholder Schema (HRM Payroll/Attendance/History Gated Coming Soon §30.2)
+│       │   ├── Notification.model.js         # Low, Warning, Out, Expiry, MFG/EXP Discrepancy & Approval Alerts
+│       │   └── AuditLog.model.js             # Immutable Audit Trail + Rule Application History
+│       ├── controllers/                      # Modular Route Controllers (< 350 lines each)
 │       │   ├── auth.controller.js
+│       │   ├── distributor.controller.js     # Super Admin Provisioning & Tenant Stock Issue Policies
 │       │   ├── inventory.controller.js
 │       │   ├── warehouse.controller.js
-│       │   ├── movement.controller.js
+│       │   ├── movement.controller.js        # Purchase Receiving (5-step), Transfers, Physical Counts, Expiry/Damage
 │       │   ├── crm.controller.js
 │       │   ├── rules.controller.js
 │       │   ├── order.controller.js
-│       │   ├── salesRecovery.controller.js
+│       │   ├── salesRecovery.controller.js   # Deal Edits (Original Preserved), Skips & Cash Handover
 │       │   ├── task.controller.js
-│       │   ├── portals.controller.js         # Booker, POS & Salesman Mobile Portal Endpoints
-│       │   ├── hrm.controller.js
-│       │   ├── accounting.controller.js
-│       │   └── dashboardReport.controller.js
+│       │   ├── portals.controller.js         # Booker (Visited/Skip), POS (posPermission) & Salesman Portals
+│       │   ├── hrm.controller.js             # Employees + 13-Point Matrix (Coming Soon Guard on Payroll/Attendance)
+│       │   ├── accounting.controller.js      # Operational Ledgers, Company Payable, General Expenses (No GL/TB/BS)
+│       │   └── dashboardReport.controller.js # 4 Module Dashboards + 15 Official Reports + Shareable Custom Templates
 │       ├── services/                         # Complex Business Logic & Calculation Engines
-│       │   ├── invoiceCalc.service.js        # 2-Level Item & Grand Discount/Tax/Charge/Scheme Engine
-│       │   ├── stockLedger.service.js        # Atomic Stock Reservation, Deduction & Put-Away Engine
-│       │   ├── accountingPost.service.js     # Automated Double-Entry Voucher & Ledger Posting
-│       │   └── automationAlert.service.js    # Low Stock, Expiry & Auto-Purchase Requirement Engine
+│       │   ├── invoiceCalc.service.js        # 2-Level Item & Grand Discount/Charge/Scheme Engine + Snapshots
+│       │   ├── stockLedger.service.js        # FIFO/FEFO/Manual Policy, Unit Versioning, Reservation & Put-Away Engine
+│       │   ├── operationalLedger.service.js  # Customer/Company Payable, 5 Ledger Event Types & Cash Handover Service
+│       │   ├── idempotency.service.js        # Request Key Validation Across 7 Critical Operations
+│       │   └── automationAlert.service.js    # Low/Warning/Out/Expiry, MFG/EXP Discrepancy & Requirement Engine
 │       └── routes/                           # Express API Routers (/api/v1/*)
 │           └── index.js
 │
@@ -203,7 +209,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=elite_dist_unsigned
 4. MongoDB Atlas Collections Schema (server/src/models/)
 All collections reside in the elite_dist_erp database on MongoDB Atlas, scoped by distributorId and indexed for sub-second pagination and aggregation:
 
-4.1 users (Employees & Admins)
+4.1 users (Employees, Admins, 13-Point Permission Matrix & Work Assignments)
 JavaScript
 {
   _id: ObjectId,
@@ -214,7 +220,8 @@ JavaScript
   phone: String, // e.g., "03303008109"
   passwordHash: String,
   avatar: { url: String, publicId: String }, // Cloudinary
-  primaryRole: "SUPER_ADMIN|ADMIN|BOOKER|SALESMAN|POS_OPERATOR|WAREHOUSE_MANAGER|STOREKEEPER|ACCOUNTANT",
+  primaryRole: "SUPER_ADMIN|ADMIN|BOOKER|SALESMAN|POS_OPERATOR|WAREHOUSE_MANAGER|STOREKEEPER|RECOVERY_OFFICER|WHOLESALER",
+  workAssignments: ["Recovery|Booking|Stock Keeper|Wholesaler|POS Keeper"], // PRD §20.1
   workParts: {
     orderBooker: Boolean,      // Accept / Non Accept
     warehouseManager: Boolean, // Accept / Non Accept
@@ -222,6 +229,22 @@ JavaScript
     normalInvoice: Boolean,    // Accept / Non Accept
     advanceInvoice: Boolean,   // Accept / Non Accept
     salesman: Boolean          // Accept / Non Accept
+  },
+  // Mandatory 13-Point Permission Matrix (PRD §20.4)
+  permissions: {
+    moduleAccess: [String],             // 1. Allowed among 16 main navigation parts
+    screenAccess: [String],             // 2. Allowed frontend route keys
+    canView: Boolean,                   // 3. View records
+    canCreate: Boolean,                 // 4. Create records
+    canEdit: Boolean,                   // 5. Edit records
+    canDelete: Boolean,                 // 6. Delete records (subject to zero-stock/historical guards)
+    canSubmit: Boolean,                 // 7. Finalize & submit operational workflows
+    canApprove: Boolean,                // 8. Approve orders, adjustments, receiving
+    canStockMovement: Boolean,          // 9. Execute transfers, put-away, adjustments, purchases
+    canPayment: Boolean,                // 10. Collect recoveries, company disbursements, field expenses
+    purchasePriceVisibility: Boolean,   // 11. CRITICAL: True exposes purchase rates & cost valuations; false masks/strips
+    reportAccess: [String],             // 12. Allowed official & custom report slugs
+    assignedWarehouseIds: [ObjectId]    // 13. Warehouse scoping (empty = all if Admin)
   },
   linkedWarehouseId: ObjectId,
   assignedCompanyIds: [ObjectId],
@@ -231,7 +254,7 @@ JavaScript
   createdAt: Date,
   updatedAt: Date
 }
-4.2 companies (Manufacturer / Supplier Master)
+4.2 companies (Principal Company Master — No Separate Supplier Master per PRD §4.2, §9.1, §29)
 JavaScript
 {
   _id: ObjectId,
@@ -241,14 +264,29 @@ JavaScript
   shortName: String,   // e.g., "GREEN"
   logo: { url: String, publicId: String }, // Cloudinary
   ownerName: String,   // e.g., "ASIF ATTARI"
-  supplierName: String,// e.g., "AMIR ATTARI"
+  supplierName: String,// Company-linked supplier contact context (no separate Supplier Master)
   accountantName: String,
-  businessType: "MANUFACTURER|IMPORTER|DISTRIBUTOR|SUPPLIER",
+  businessType: "MANUFACTURER|IMPORTER|DISTRIBUTOR|PRINCIPAL",
   industryType: String,// e.g., "Chemicals"
   establishYear: Number,
   ntn: String,
   registrationNo: String,
   copyrightText: String,
+  associatedBrands: [ObjectId],         // Brands linked under this Company
+  authorizedProducts: [ObjectId],       // Approved SKUs for distribution
+  territoryArrangements: [{             // Granular 5D Authorization (Company x Brand x Product x Territory x Area)
+    brandId: ObjectId,
+    productIds: [ObjectId],
+    territoryId: ObjectId,
+    allowedAreaIds: [ObjectId],
+    isAuthorized: Boolean
+  }],
+  companyAccountInfo: {                 // Operational payable summary (PRD §9.9)
+    totalPurchasesPkr: Number,
+    totalReturnsPkr: Number,
+    totalPaymentsMadePkr: Number,
+    outstandingPayablePkr: Number
+  },
   address: {
     country: String,   // "PAKISTAN"
     province: String,  // "SINDH"
@@ -259,9 +297,9 @@ JavaScript
     gps: { lat: Number, lng: Number }
   },
   contacts: [{
-    personName: String, // e.g., "AMIR BHAI"
+    personName: String, // Required primary contact (e.g., "AMIR BHAI")
     role: String,       // e.g., "Accountant", "Booker"
-    contactNo: String,
+    contactNo: String,  // Required primary number
     channelType: "WHATSAPP|PHONE|LANDLINE",
     purpose: String,    // e.g., "Payment Transfer"
     isDefault: Boolean
@@ -323,34 +361,34 @@ JavaScript
   createdAt: Date,
   updatedAt: Date
 }
-4.5 products (Product Master — Separated from Stock)
+4.5 products (Product Master — Variant-Per-SKU, Optional Purchase Rate & 8-Step Unit Versioning)
 JavaScript
 {
   _id: ObjectId,
   distributorId: String,
-  skuCode: String, // e.g., "GC-04523", "FA200", "SDH-10" (Indexed)
+  skuCode: String, // Separate SKU per size/variant (e.g., "SS-500G", "SS-1KG") (Indexed)
   barcode: String,
-  productName: String, // e.g., "Fresh AMLA 200ml", "SURAJ Rs10"
+  productName: String, // e.g., "Sufi Surf 500g", "Fresh AMLA 200ml"
   companyId: ObjectId,
   brandId: ObjectId,
   categoryId: ObjectId,
   subCategoryId: ObjectId,
   baseUnit: {
-    unitName: String, // "Bottle", "Piece", "Bar", "Packet"
+    unitName: String, // Smallest indivisible saleable unit ("Piece", "Bottle", "Sachet")
     weightValue: Number, // e.g., 0.500
     weightUnit: "g|Kg|ml|L",
     weightInKg: Number,
-    traderPurchaseRate: Number, // Cost / Purchase Price (e.g., 90)
-    wholesaleSaleRate: Number,  // Wholesale / Sale Price (e.g., 110)
-    posRetailEndRate: Number,   // POS / Consumer End Rate (e.g., 120)
+    traderPurchaseRate: Number, // OPTIONAL in Product Master (PRD §5.3); masked unless purchasePriceVisibility=true
+    wholesaleSaleRate: Number,  // Wholesale / Sale Price
+    posRetailEndRate: Number,   // POS / Consumer End Rate
     image: { url: String, publicId: String } // Cloudinary Base Item Image
   },
   packingUnits: [{
-    unitName: String, // "Carton", "Dozen", "Box", "Sack"
-    conversionQty: Number, // Base units per Packing unit (e.g., 24)
+    unitName: String, // "Piece", "Bottle", "Dozen", "Carton", "Bag", "Sack", "Box"
+    conversionQty: Number, // Base units per Packing unit (product-specific only)
     weightUnit: "Kg|g",
     packingWeightKg: Number, // Auto-calculated: baseUnit.weightInKg * conversionQty
-    traderPurchaseRate: Number,
+    traderPurchaseRate: Number, // OPTIONAL & RBAC-masked (PRD §5.3)
     wholesaleSaleRate: Number,
     posRetailEndRate: Number,
     dimensions: {
@@ -361,11 +399,23 @@ JavaScript
       areaSq: Number,     // Auto: width * length
       volumeCubic: Number // Auto: width * length * height
     },
-    image: { url: String, publicId: String }, // Cloudinary Pack Item Image
+    image: { url: String, publicId: String },
     isDefaultStockUnit: Boolean
   }],
+  // Unit Versioning History (PRD §5.7 — coexists per StockBatch, never mutates old stock)
+  unitVersions: [{
+    versionNo: Number,           // e.g., 1, 2
+    unitVersionId: String,       // Immutable ID referenced by StockBatch & Order lines (e.g., "UV-1", "UV-2")
+    unitName: String,            // e.g., "Carton"
+    conversionQty: Number,       // e.g., v1=48 pcs, v2=50 pcs
+    packingWeightKg: Number,
+    effectiveFrom: Date,
+    versionStatus: "ACTIVE_DEFAULT|COEXISTING|DEPLETED" // Auto-retires v1 when linked batch stock hits 0
+  }],
+  posPermission: Boolean,        // Governs visibility/sale in POS portal (PRD §5.2)
+  bookingPermission: Boolean,    // Governs visibility/booking in Booker & Order workflows (PRD §5.2)
   defaultRules: {
-    taxGroupId: ObjectId,
+    taxGroupId: ObjectId,        // Tax rule ref (Tax Group setup Coming Soon per PRD §18.2, §30.2)
     discountGroupId: ObjectId,
     schemeGroupId: ObjectId,
     loadingCharge: Number,
@@ -373,7 +423,7 @@ JavaScript
     wholesaleMarginPkr: Number
   },
   assignedBookerIds: [ObjectId],
-  showOnMarketplace: Boolean,
+  futureMarketplaceCompatible: Boolean, // Reserved Phase 3 schema compatibility only (Excluded from v1.0 UI)
   shortDescription: String,
   longDescription: String,
   status: "ACTIVE|INACTIVE",
@@ -428,45 +478,57 @@ JavaScript
   createdAt: Date,
   updatedAt: Date
 }
-4.7 stock_batches (Batch-Level Stock & Reservation State)
+4.7 stock_batches (14 Batch Fields, Immutable Unit Version Snapshot & FIFO/FEFO Allocation State)
 JavaScript
 {
   _id: ObjectId,
   distributorId: String,
-  batchNo: String, // e.g., "B-001", "B001:01" (Indexed)
-  productId: ObjectId,
-  warehouseId: ObjectId,
-  zoneId: ObjectId,
-  areaId: ObjectId,
-  mfgDate: Date,
-  expDate: Date,
-  purchaseRatePerBase: Number,
+  batchNo: String, // 1. Batch ID (Indexed)
+  productId: ObjectId, // 2. Product/SKU
+  purchaseDate: Date,  // 3. Purchase Date (Used for FIFO sorting)
+  mfgDate: Date,       // 4. MFG Date
+  expDate: Date,       // 5. EXP Date (Used for FEFO sorting)
+  warehouseId: ObjectId, // 12. Warehouse
+  zoneId: ObjectId,      // 13. Zone
+  areaId: ObjectId,      // 14. Area (Warehouse -> Zone -> Area hierarchy)
+  unitVersionId: String, // Immutable snapshot from Product.unitVersions (PRD §5.7)
+  unitName: String,      // 8. Unit
+  packingSpecification: String, // 9. Packing specification snapshot
+  conversionQty: Number, // Immutable conversion factor preserved for this batch
+  purchaseRatePerBase: Number, // 6. Purchase rate (originates from Purchase Movement; RBAC masked)
   purchaseRatePerPack: Number,
-  currentBaseQty: Number,   // Total physical stock in base units
-  reservedBaseQty: Number,  // Locked against approved/pending orders
-  availableBaseQty: Number, // Computed: currentBaseQty - reservedBaseQty
-  totalWeightKg: Number,
-  totalStockValuePkr: Number,
-  condition: "NORMAL|DAMAGE|EXPIRE|DAMAGE_EXPIRE",
-  status: "AVAILABLE|RESERVED|LOW_WARNING|OUT|BLOCKED|QUARANTINED",
+  initialPurchaseBaseQty: Number, // 7. Initial Purchase Quantity
+  currentBaseQty: Number,   // 11. Remaining stock in base units
+  reservedBaseQty: Number,  // Locked against APPROVED orders
+  availableBaseQty: Number, // Formula: currentBaseQty - reservedBaseQty (PRD §6.4)
+  totalWeightKg: Number,    // 10. Weight
+  totalStockValuePkr: Number, // RBAC-filtered cost valuation
+  condition: "FRESH|NORMAL|DAMAGE|EXPIRE|DAMAGE_EXPIRE", // Official system conditions (PRD §6.5)
+  customConditionLabel: String, // Optional distributor supplementary tag (never replaces official condition)
+  status: "NORMAL|LOW|WARNING|OUT|BLOCKED|QUARANTINED", // PRD §6.6 statuses
   thresholds: {
-    minStockPack: Number,   // e.g., 20 Pack
-    maxStockPack: Number,   // e.g., 50 Pack
-    expiryAlertDays: Number // e.g., 90 Days
+    minStockPack: Number,
+    maxStockPack: Number,
+    expiryAlertDays: Number
   },
   updatedAt: Date
 }
-4.8 stock_movements (Transfers, Adjustments, Purchases & Damage Returns)
+4.8 stock_movements (9 Official Types, Expected vs Received Checks, Physical Count & Idempotency)
 JavaScript
 {
   _id: ObjectId,
   distributorId: String,
+  idempotencyKey: String, // Unique per distributor (PRD §26.4 duplicate prevention)
   movementCode: String, // e.g., "M-011"
-  movementType: "TRANSFER|SAME_TRANSFER|ADJUSTMENT|PURCHASE|EXPIRY_DAMAGE_BACK|DELIVERY_OUT|CUSTOMER_RETURN",
+  movementType: "PURCHASE|DELIVERY|TRANSFER|SAME_TRANSFER|ADJUSTMENT|EXPIRY_DAMAGE_BACK|RECOVERY|POS_SALE|CUSTOM_SALE|CUSTOMER_SALE", // PRD §8.2
   taskName: String,
+  receivingStage: "PURCHASE_RECEIVED|CHECK_AND_RECEIVED|MOVE_AND_PUT_AWAY|MOVEMENT_CREATED|RESULT_FINALIZED", // PRD §9.4
+  supplierContext: String, // Company-linked supplier/contact text (No separate Supplier Master per §9.1)
   fromWarehouseId: ObjectId,
   toWarehouseId: ObjectId,
-  supplierCompanyId: ObjectId,
+  companyId: ObjectId,
+  brandId: ObjectId,
+  categoryId: ObjectId,
   preparedById: ObjectId,
   assignedToId: ObjectId,
   dispatchedById: ObjectId,
@@ -475,17 +537,30 @@ JavaScript
     productId: ObjectId,
     batchId: ObjectId,
     batchNo: String,
+    unitVersionId: String,
+    conversionQty: Number,
     fromZoneId: ObjectId,
     fromAreaId: ObjectId,
     toZoneId: ObjectId,
     toAreaId: ObjectId,
     mfgDate: Date,
     expDate: Date,
+    receivedMfgDate: Date, // Used for Expected vs Received MFG/EXP discrepancy check (PRD §9.5)
+    receivedExpDate: Date,
+    hasDateDiscrepancy: Boolean,
     unitName: String,
-    previousErpBaseQty: Number, // Used in ADJUSTMENT
+    expectedBaseQty: Number,
+    receivedBaseQty: Number,
+    differenceBaseQty: Number, // received - expected (PRD §9.5)
+    // Segregated Put-Away quantities (PRD §9.6)
+    putAwayNormalBaseQty: Number,
+    putAwayDamageBaseQty: Number,
+    putAwayExpireBaseQty: Number,
+    // Physical Stock Count / Adjustment fields (PRD §8.7)
+    systemBaseQty: Number,
     physicalCountBaseQty: Number,
-    missingBaseQty: Number,
-    damagedBaseQty: Number,
+    updatedBalanceBaseQty: Number,
+    purchaseRatePerPack: Number, // Isolated per batch (Never includes Loading/Transport §9.10)
     movedPackQty: Number,
     movedBaseQty: Number,
     totalWeightKg: Number,
@@ -494,41 +569,52 @@ JavaScript
   }],
   linkedTaskId: ObjectId,
   isHidden: Boolean,
-  status: "DRAFT|PENDING|APPROVED|COMPLETED|CANCELLED",
+  status: "DRAFT|PENDING|TRANSFER_PENDING|APPROVED|COMPLETED|CANCELLED",
+  remarks: String,
   createdAt: Date,
   completedAt: Date
 }
-4.9 customers (CRM Customer Master & 7-Level Geo/Pehchan)
+4.9 customers (CRM Multi-Shop Under Single Owner, 15 Profile Fields, Multi-Contacts & Rule Controls)
 JavaScript
 {
   _id: ObjectId,
   distributorId: String,
-  customerCode: String, // e.g., "C-1110", "FA200", "GC-04523"
-  shopName: String,     // e.g., "Lucky Store", "Al Makkah Confectionery"
+  customerCode: String, // Isolated Customer ID per shop (e.g., "C-1110")
+  ownerGroupKey: String,// Links multiple shops under one owner (e.g., Orangi / Baldia / Qasba §10.1)
+  shopName: String,     // e.g., "Shop 1 — Orangi Lucky Store"
   shopPic: { url: String, publicId: String }, // Cloudinary
-  ownerName: String,    // e.g., "IMTIAZ AHSAN"
+  ownerName: String,    // e.g., "HAJI AKRAM"
   ownerContact: String,
   customerType: "WHOLESALER|RETAILER|SUB_DISTRIBUTOR|POS_WALKIN",
-  shopCategory: String, // "Confectionery", "General", "Store", "Supplier"
+  shopCategory: String, // "Confectionery", "General", "Store"
+  cnic: String,
   ntn: String,
+  strn: String,
   registrationNo: String,
   locationHierarchy: {
-    city: String,          // 1. City ("Karachi")
-    townOrZone: String,    // 2. Town/Zone ("Orangi")
-    areaId: ObjectId,      // 3. Area ("Qasba Colony")
-    routeId: ObjectId,     // 4. Route ("Jamsheed Pump Road")
-    street: String,        // 5. Street ("Islamiyah Ki Gali")
-    pehchanRemarks: String,// 6. Pehchan ("PUMP KY ULTY HAATH ROAD PER ULTY HAATH JALI WALI SHOP")
+    city: String,
+    townOrZone: String,
+    areaId: ObjectId,
+    routeId: ObjectId,
+    street: String,
+    pehchanRemarks: String,
     mapLink: String,
     gps: { lat: Number, lng: Number }
   },
-  contacts: [{ personName: String, role: String, contactNo: String, channelType: String, isDefault: Boolean }],
-  paymentAccounts: [{ accountType: String, providerName: String, accountTitle: String, accountNo: String, ibanOrRef: String, isDefault: Boolean }],
+  contacts: [{
+    personName: String,
+    role: "SHOPKEEPER|ACCOUNTANT|STORE_KEEPER|OTHER", // PRD §10.4
+    contactNo: String,
+    channelType: "WHATSAPP|PHONE|LANDLINE",
+    isDefault: Boolean
+  }],
+  paymentAccounts: [{ accountType: "BANK|EASYPAISA|JAZZCASH|OTHER", providerName: String, accountTitle: String, accountNo: String, ibanOrRef: String, isDefault: Boolean }],
   financialTerms: {
-    paymentCondition: "PAID_CASH|ALLOW_CREDIT|ADVANCE",
+    paymentCondition: "PAID|CREDIT|ADVANCE", // PRD §10.4
+    allowCredit: Boolean,
     creditLimitPkr: Number,
     creditDays: Number,
-    outstandingBalancePkr: Number
+    outstandingBalancePkr: Number // Shop-isolated balance
   },
   commercialAssignments: {
     assignedBookerIds: [ObjectId],
@@ -537,7 +623,7 @@ JavaScript
     discountGroupId: ObjectId,
     schemeGroupId: ObjectId
   },
-  visitPosition: "NORMAL|VISITED|ORDERED|DELIVERED",
+  visitPosition: "NORMAL|VISITED|ORDERED|DELIVERED", // Independent Booker Visited tag supported (§12.3)
   status: "ACTIVE|INACTIVE|BLOCKED",
   createdAt: Date,
   updatedAt: Date
@@ -595,25 +681,34 @@ JavaScript
   totalRetailers: Number,
   status: "ACTIVE|INACTIVE"
 }
-4.11 commercial_rules (Taxes, Discounts, Charges & Schemes)
+4.11 commercial_rules (Discounts, Charges & Schemes — Tax Group & Partial Scheme Marked Coming Soon §30.2)
 JavaScript
 {
   _id: ObjectId,
   distributorId: String,
-  ruleCategory: "TAX|DISCOUNT|CHARGE|SCHEME",
-  level: "PRODUCT_LEVEL|GRAND_LEVEL",
-  ruleName: String, // e.g., "Trader Offer Rs20", "10K Per Rs100 Offer", "10 Per 1 Free"
-  calculationMode: "GENERAL_FLAT|PERCENTAGE|SLAB_GENERAL|FIX_GENERAL|FIX_PERCENT|PRODUCT_WISE_SCHEME|SLAB_SCHEME|TARGET_SCHEME",
+  ruleCategory: "TAX|DISCOUNT|CHARGE|SCHEME", // NOTE: TAX is Coming Soon (§18.2, §30.2); SCHEME target/slab sections gated until completed
+  isComingSoonGated: Boolean, // True for incomplete Tax Group / partial Scheme Group modes
+  level: "PRODUCT_LEVEL|GRAND_LEVEL", // Strictly separated Product vs Grand engines (PRD §18.7)
+  ruleName: String,
+  calculationMode: "GENERAL_AUTO|ADVANCE_GENERAL|PERCENTAGE_AUTO|TARGET_WISE|YES_NO|SLAB|PRODUCT_WISE_SCHEME|SLAB_SCHEME",
   compareBasis: "NONE|RATE|QUANTITY|WEIGHT_KG|AMOUNT_PKR",
-  thresholdValue: Number, // e.g., 10000 PKR or 50 KG or 10 Cartons
-  benefitValue: Number,   // e.g., 100 PKR or 7.5% or 1 Free Qty
+  thresholdValue: Number,
+  benefitValue: Number,
   schemeDetails: {
+    schemeSubType: "SAME_PRODUCT|PRODUCT_WISE|SLAB_SCHEME|TARGET_WISE",
     paidProductId: ObjectId,
     paidUnit: String,
     paidQty: Number,
     freeProductId: ObjectId,
     freeUnit: String,
     freeQty: Number
+  },
+  invoiceRuleToggles: {
+    discountAllow: Boolean,
+    taxAllow: Boolean,
+    rateAllow: Boolean,
+    schemeAllow: Boolean,
+    chargesAllow: Boolean
   },
   timeline: {
     isAllTime: Boolean,
@@ -623,28 +718,39 @@ JavaScript
   status: "ACTIVE|EXPIRED|INACTIVE",
   createdAt: Date
 }
-4.12 orders, sale_invoices, recoveries & pending_tasks
+4.12 orders (Verified Sources, Write-Your-Own Customer Mode, 5D Auth & Immutable Rule Snapshots)
 JavaScript
-// orders (Normal & Advance Orders with 2-Level Invoice Calculation)
 {
   _id: ObjectId,
   distributorId: String,
+  idempotencyKey: String, // Unique per distributor (PRD §26.4 duplicate prevention)
   orderCode: String, // e.g., "O-01"
   orderMode: "NORMAL|ADVANCE|POS",
-  orderType: "REGULAR|URGENT|SPECIAL|DISPATCH|CUSTOM_SALE",
-  source: "ONLINE|BOOKER|ADMIN|POS|WHATSAPP",
-  customerId: ObjectId,
+  orderType: "URGENT|POS|SPECIAL|REGULAR|NORMAL|S_DISPATCH", // PRD §13.1
+  source: "ONLINE|BOOKER|ADMIN|OFFICIAL", // Only verified sources (PRD §13.1, §29)
+  customerSelectionMode: "SELECT_CUSTOMER|CREATE_CUSTOMER|WRITE_YOUR_OWN", // PRD §13.2
+  customerId: ObjectId, // Null if WRITE_YOUR_OWN
+  writeYourOwnCustomer: {
+    shopOrPersonName: String,
+    phone: String,
+    addressText: String
+  },
+  customerSnapshot: { shopName: String, ownerName: String, addressText: String, paymentCondition: String }, // Frozen at approval (§3.3)
   bookerId: ObjectId,
   areaId: ObjectId,
   routeId: ObjectId,
+  stockIssuePolicyApplied: "FIFO|FEFO|MANUAL", // Recorded from DistributorPolicy (§6.3)
   lineItems: [{
     productId: ObjectId,
     batchId: ObjectId,
-    unitName: String, // "Carton", "Dozen", "Piece"
+    unitVersionId: String,
+    conversionQty: Number,
+    unitName: String,
     unitWeightKg: Number,
     baseRate: Number,
-    customSaleRate: Number, // Supports reverse discount calculation
+    customSaleRate: Number,
     quantity: Number,
+    baseQty: Number,
     grossRateTotal: Number,
     totalWeightKg: Number,
     itemDiscountRuleId: ObjectId,
@@ -670,13 +776,14 @@ JavaScript
     grandTaxAmount: Number,
     netPayableAmount: Number
   },
+  ruleApplicationSnapshot: Object, // Immutable copy of all applied discounts, charges & schemes (§18.8)
   invoiceStyle: {
-    layoutType: "CHILLAN_FINANCE|DETAILED_LANDSCAPE|ADVANCE_INVOICE|EXPIRY_BATCH_CHILLAN|POS_RETAIL",
+    layoutType: "LANDSCAPE|CHILLAN_FINANCE|DETAILED_LANDSCAPE|ADVANCE_INVOICE|POS_RETAIL", // PRD §13.4
     originalAndDuplicate: Boolean,
     selectedNotes: [String]
   },
   approvalInfo: {
-    status: "DRAFT|PENDING|APPROVED|DELIVERY_ASSIGNED|COMPLETED|CANCELLED",
+    status: "DRAFT|PENDING|APPROVED|DELIVERY|COMPLETE|CANCEL", // PRD §13.5
     approvedById: ObjectId,
     approvedAt: Date
   },
@@ -684,62 +791,245 @@ JavaScript
   assignedStorekeeperId: ObjectId,
   createdAt: Date
 }
-5. REST API & Frontend Route Architecture
+4.13 sale_invoices, recoveries & visit_logs (Doorstep Immutability, Skips, Cash Handover & Visits)
+JavaScript
+// sale_invoices (Supports Original Immutable Invoice, Edit Deltas, Final Invoice & Sales Skip §15.3-15.10)
+{
+  _id: ObjectId,
+  distributorId: String,
+  idempotencyKey: String,
+  invoiceCode: String,
+  orderId: ObjectId,
+  dispatchSheetId: ObjectId,
+  customerId: ObjectId,
+  salesmanId: ObjectId,
+  dealOutcome: "FINALIZED_SALE|SALES_SKIP", // Never treat SALES_SKIP as a zero completed sale (§15.9)
+  salesSkipInfo: {
+    skipReason: String,
+    skipStatus: String,
+    remarks: String,
+    skippedAt: Date
+  },
+  // Immutable Original Invoice preserved forever for Report 22.13 vs 22.14 (§15.3)
+  originalInvoiceSnapshot: {
+    lineItems: [Object],
+    grossAmount: Number,
+    discountAmount: Number,
+    chargeAmount: Number,
+    netAmount: Number,
+    capturedAt: Date
+  },
+  editDeltas: [{
+    editType: "QTY_ADJUST|ITEM_RETURN|ITEM_DAMAGE|ITEM_EXPIRE|EXTRA_ITEM|EXTRA_RETURN_OK|EXTRA_RETURN_SKIP|GRAND_EDIT",
+    productId: ObjectId,
+    batchId: ObjectId,
+    unitVersionId: String,
+    qtyDelta: Number,
+    valueDeltaPkr: Number,
+    reason: String,
+    editedAt: Date
+  }],
+  // Delivery Sales Movement totals (Report 22.8 Formula §22.8)
+  financialSummary: {
+    totalAmount: Number,
+    extraValue: Number,
+    returnValue: Number,
+    extraReturnValue: Number,
+    extraDiscountValue: Number,
+    netAmount: Number,       // Total Amount + Extra Value - Return Value - Extra Return Value - Extra Discount Value
+    totalPaidAmount: Number,
+    balanceAmount: Number    // Net Amount - Total Paid Amount
+  },
+  status: "DRAFT|FINALIZED|SKIPPED|CANCELLED",
+  completedAt: Date
+}
+
+// recoveries (Recovery Skip, Multi-Method Split Payments & Cash Handover §16.4-16.9)
+{
+  _id: ObjectId,
+  distributorId: String,
+  idempotencyKey: String,
+  recoveryCode: String,
+  customerId: ObjectId,
+  recoveryOfficerId: ObjectId,
+  dispatchSheetId: ObjectId,
+  outcome: "COLLECTED|RECOVERY_SKIP", // SKIP generates Recovery Result; never collected payment (§16.7)
+  recoverySkipInfo: { skipReason: String, skipStatus: String, remarks: String },
+  paymentEntries: [{
+    paymentMethod: "CASH|CHECK|ONLINE|BANK_ACCOUNT|EASY_PAISA|JAZZ_CASH", // PRD §17.3
+    paymentAccount: String,
+    refNo: String,
+    dueDate: Date,
+    paidAmountPkr: Number
+  }],
+  extraReturns: [{
+    productId: ObjectId,
+    batchId: ObjectId,
+    returnType: "DAMAGE|EXPIRE|RETURN",
+    qty: Number,
+    valuePkr: Number,
+    putAwayCompleted: Boolean
+  }],
+  // Field Expenses & Cash Handover Reconciliation (PRD §16.8, §22.8)
+  fieldExpenses: {
+    gasPetrolPkr: Number,
+    enjoymentPkr: Number,
+    worksPkr: Number,
+    remarks: String
+  },
+  cashHandover: {
+    totalDueCashPkr: Number,      // Cash Collected - Approved Field Expenses
+    totalCashReceivedPkr: Number, // Physical cash counted at depot
+    shortageOrExtraPkr: Number    // Cash Received - Due Cash
+  },
+  linkedTaskId: ObjectId,
+  status: "DRAFT|FRESH|COMPLETE|SKIPPED",
+  createdAt: Date
+}
+
+// visit_logs (Independent Booker Visit Completion Tag = 'Visited' §12.3-12.4)
+{
+  _id: ObjectId,
+  distributorId: String,
+  beatPlanId: ObjectId,
+  bookerId: ObjectId,
+  customerId: ObjectId,
+  visitStatus: "VISITED", // Completes solely by visit regardless of order/recovery outcome (§12.3)
+  bookingActionOutcome: "BOOKED|RECOVERED|BOOKING_SKIP|NO_ORDER_VISITED",
+  bookingSkipReason: String,
+  gps: { lat: Number, lng: Number },
+  visitedAt: Date
+}
+4.14 operational_ledgers & general_expenses (Replaces Conventional GL per PRD §9.9-9.10, §17, §22.15, §29)
+JavaScript
+// operational_ledgers (Stores all 10 Operational Account types & 5 Invoice/Recovery Ledger event categories)
+{
+  _id: ObjectId,
+  distributorId: String,
+  idempotencyKey: String,
+  ledgerDomain: "CUSTOMER_LEDGER|RECOVERY_LEDGER|INVOICE_LEDGER|COMPANY_PAYABLE_LEDGER|PAYMENT_HISTORY|OUTSTANDING|RECOVERY_RESULT|PURCHASE_PAYMENT_HISTORY|CASH_ACCOUNT_RECORD",
+  invoiceRecoveryEventType: "EXTRA_RETURN|EXTRA_ITEM|EXTRA_DISCOUNT|CHARGE_OFF|PAID_PAYMENT|NONE", // PRD §22.15 5 Types
+  companyId: ObjectId,  // Populated for Company-Wise Payable Ledger (§9.9)
+  customerId: ObjectId, // Populated for shop-isolated AR ledger (§10.2)
+  sourceTransactionRef: String,
+  sourceModel: "StockMovement|SaleInvoice|Recovery|Payment",
+  paymentMethod: "CASH|CHECK|ONLINE|BANK_ACCOUNT|EASY_PAISA|JAZZ_CASH",
+  paymentAccount: String,
+  refNo: String,
+  dueDate: Date,
+  debitOrIncreasePkr: Number,
+  creditOrDecreasePkr: Number,
+  runningBalancePkr: Number,
+  remarks: String,
+  createdById: ObjectId,
+  createdAt: Date
+}
+
+// general_expenses (Loading, Transport & Other Expenses — NEVER allocated into StockBatch.purchaseRate §9.10)
+{
+  _id: ObjectId,
+  distributorId: String,
+  expenseCategory: "LOADING|TRANSPORT|OTHER_GENERAL_BUSINESS_EXPENSE|RECOVERY_FIELD_EXPENSE",
+  linkedMovementOrDispatchRef: String,
+  amountPkr: Number,
+  paymentMethod: "CASH|BANK_ACCOUNT|EASY_PAISA|JAZZ_CASH",
+  description: String,
+  recordedById: ObjectId,
+  expenseDate: Date
+}
+4.15 distributor_policies, idempotency_records & report_templates (SaaS Policy & Shared Templates §6.3, §21, §26.4)
+JavaScript
+// distributor_policies
+{
+  _id: ObjectId,
+  distributorId: String, // Unique
+  distributorName: String,
+  stockIssuePolicy: "FIFO|FEFO|MANUAL", // Admin selectable (PRD §6.3)
+  customStockConditions: [{ label: String, mappedSystemCondition: "FRESH|NORMAL|DAMAGE|EXPIRE" }], // §6.5
+  defaultInvoiceStyle: String,
+  subscriptionTier: "DUA_INTERNAL|SAAS_STANDARD|SAAS_ENTERPRISE",
+  status: "ACTIVE|SUSPENDED"
+}
+
+// idempotency_records (Duplicate Submission Prevention Across 7 Critical Ops §26.4)
+{
+  _id: ObjectId,
+  distributorId: String,
+  operationType: "PURCHASE_MOVEMENT|STOCK_MOVEMENT|PAYMENT|ORDER|SALES_RESULT|RECOVERY_RESULT|ADJUSTMENT",
+  idempotencyKey: String, // Unique compound { distributorId, operationType, idempotencyKey }
+  responseStatus: Number,
+  resourceId: ObjectId,
+  expiresAt: Date
+}
+
+// print_templates / custom_report_templates (Official System vs Shareable Custom Templates §18.9, §21.2)
+{
+  _id: ObjectId,
+  distributorId: String, // "PLATFORM_GLOBAL" for official templates
+  templateScope: "OFFICIAL_ELITE_DIST|USER_CUSTOM_PRIVATE|USER_CUSTOM_SHARED",
+  isProtectedOfficial: Boolean, // Blocks tenant edits (PRD §18.15)
+  category: "PRINT_LAYOUT|INVOICE_TEMPLATE|DELIVERY_DOC|SUPPLY_DOC|REPORT_DOC|CUSTOM_REPORT_DEFINITION",
+  subType: String, // e.g., "Landscape", "Delivery Dispatch", "Salesman Sheet", "Recovery Sheet", "Booking Sheet"
+  sanitizedSchemaConfig: Object // Pure layout/column/filter structure — ZERO tenant business data (§25.2)
+}
+5. REST API & Frontend Route Architecture (Aligned to 16 Nav Parts, 15 Official Reports & §29 Exclusions)
 5.1 Backend REST API Endpoints (/api/v1)
-/api/v1/auth -> POST /login, POST /register, POST /refresh, POST /logout, GET /me
+/api/v1/auth -> POST /login, POST /register (501/Gated Coming Soon while Super Admin controlled provisioning is active), POST /refresh, POST /logout, GET /me
+
+/api/v1/distributor -> GET/PATCH /policy (Stock Issue Policy FIFO/FEFO/Manual, Custom Stock Conditions), Super Admin tenant provisioning
 
 /api/v1/upload -> POST /image (Cloudinary multipart upload returning { url, publicId }), DELETE /image
 
-/api/v1/inventory -> CRUD + Bulk Rules for /companies, /brands, /categories, /sub-categories, /products
+/api/v1/inventory -> CRUD + Bulk Rules for /companies (no separate Supplier Master), /brands, /categories, /sub-categories, /products (optional purchaseRate, purchasePriceVisibility projection filter, unitVersions)
 
-/api/v1/warehouses -> CRUD + Zero-Qty Delete Guard for /warehouses, /zones, /areas
+/api/v1/warehouses -> CRUD + 4-Step Zero-Qty Delete Guard for /warehouses, /zones, /areas (strict Warehouse -> Zone -> Area hierarchy)
 
-/api/v1/stocks -> GET /batches, POST /rules, GET /valuation, POST /movements (Transfer, Same Transfer, Adjustment, Purchase, Expiry/Damage Back)
+/api/v1/stocks -> GET /batches (RBAC-filtered cost), PATCH /policy-select, GET /valuation (RBAC-filtered), POST /movements (Idempotency guarded: Purchase Receiving 5-Step, Transfer, Same Transfer, Adjustment, Physical Count, Expiry/Damage Back)
 
-/api/v1/crm -> CRUD + Bulk Rule Assignment for /customers, /areas, /routes, /territories, /beats
+/api/v1/crm -> CRUD + Apply Rules for /customers (Multi-Shop ownerGroupKey), /areas, /routes, /territories (5D Authorization), /beats
 
-/api/v1/rules -> CRUD for /taxes, /discounts, /charges, /schemes, /templates
+/api/v1/rules -> CRUD for /discounts, /charges, /schemes (partial Coming Soon §30.2), /templates (Official vs Shared Custom); NOTE: /taxes returns 501 Coming Soon (§18.2, §30.2)
 
-/api/v1/orders -> GET /, POST /calculate-preview (2-Level Engine), POST /, PATCH /approve-batch, POST /delivery-plan
+/api/v1/orders -> GET /, POST /calculate-preview (2-Level Engine), POST / (Online/Booker/Admin/Official + Write Your Own + idempotencyKey), PATCH /approve-batch (FIFO/FEFO/Manual reservation), POST /delivery-plan
 
-/api/v1/sales-recovery -> GET /sales, POST /recovery-assign, POST /recovery-collect, POST /extra-return
+/api/v1/sales-recovery -> GET /sales, POST /deal-edit (preserves Original Invoice Snapshot §15.3), POST /sales-skip, POST /recovery-assign, POST /recovery-collect (split payments), POST /recovery-skip, POST /extra-return, POST /cash-handover
 
 /api/v1/tasks -> GET /my-tasks, PATCH /:id/start, PATCH /:id/dispatch, PATCH /:id/put-away, PATCH /:id/stock-count, PATCH /:id/complete
 
-/api/v1/portals -> Dedicated mobile endpoints for /booker/*, /pos/*, and /salesman/*
+/api/v1/portals -> Dedicated mobile endpoints for /booker/* (Visited tag + Booking Skip), /pos/* (posPermission enforced + Write Your Own), and /salesman/*
 
-/api/v1/hrm -> /employees, /work-assignments, /attendance, /payroll
+/api/v1/hrm -> /employees, /work-assignments, /permissions-matrix (13-point matrix); NOTE: /attendance, /payroll, /history-reports gated Coming Soon (§20.5, §30.2)
 
-/api/v1/accounts -> /movements, /approve, /ledgers, /trial-balance, /profit-loss, /balance-sheet, /cash-flow
+/api/v1/accounts -> /ledgers (Customer, Recovery, Invoice [5 Event Types]), /company-payables, /general-expenses (Loading/Transport isolated), /cash-accounts (NOTE: Conventional GL/Journal Entries/Trial Balance/Balance Sheet Excluded per PRD §29)
 
-/api/v1/dashboards-reports -> /dashboards/:moduleSlug (10 Dashboards), /reports/:reportSlug (19+ Reports + PDF/Excel/CSV/Share)
+/api/v1/dashboards-reports -> /dashboards/:moduleSlug (4 Confirmed Module Dashboards: Product, Stock, Customer, Warehouse), /reports/:reportSlug (All 15 Official Reports §22.1-22.15 + 20 Global Filter Dimensions + Anonymized Custom Report Templates)
 
-5.2 Frontend React Router Map (client/src/routes/AppRoutes.jsx)
-/auth/login, /auth/signup -> Public Auth Screens
+5.2 Frontend React Router Map (16 Main Navigation Parts per PRD §24.1)
+/auth/login -> Public Login Screen (/auth/signup gated with Coming Soon per single-tenant/controlled onboarding guard)
 
-/dashboard -> Role-aware redirect or Executive Dashboard (with tabs/links to all 10 Module Dashboards)
+/dashboard -> Executive & 4 Confirmed Module Dashboards (Product, Stock, Customer, Warehouse); /quick-start -> Quick Start Guide
 
 /inventory/products, /inventory/companies, /inventory/brands, /inventory/categories, /inventory/sub-categories
 
-/stock/overview, /stock/list, /stock/warehouses, /stock/zones, /stock/areas, /stock/movements, /stock/movements/create
+/stock/overview, /stock/list, /stock/warehouses, /stock/zones, /stock/areas, /stock/movements, /stock/movements/create, /stock/purchase-receiving
 
 /crm/dashboard, /crm/customers, /crm/areas-routes, /crm/territories, /crm/beats
 
-/orders/master, /orders/create-normal, /orders/create-advance, /orders/operations
+/booking/order-for-booking, /orders/master, /orders/create-normal, /orders/create-advance, /orders/operations
 
-/sales/master, /recovery/assign, /recovery/ledger
+/sales/master, /recovery/assign, /recovery/ledger, /recovery/cash-handover
 
-/settings/rules, /settings/templates
+/settings/rules, /settings/templates, /settings/stock-policy, /settings/users-logging
 
 /tasks/pending, /tasks/execute/:taskId
 
-/portal/booker, /portal/pos, /portal/salesman
+/portal/booker, /portal/pos, /portal/salesman, /sfa/overview
 
-/hrm/employees, /hrm/attendance, /hrm/payroll, /hrm/reports
+/hrm/employees, /hrm/work-assignments (History & Reports, Payroll & Salary, Attendance & Leaving route to <ComingSoonModal />)
 
-/accounts/movements, /accounts/ledgers, /accounts/statements
+/accounts/movements, /accounts/ledgers, /accounts/company-payables, /accounts/expenses
 
-/reports/center, /reports/company-share
+/reports/center (15 Official Reports §22.1-22.15 + Custom Shared Templates), /reports/company-share
 
 * -> NotFound404.jsx (Theme-Aware Custom 404 Safety Net)
 
