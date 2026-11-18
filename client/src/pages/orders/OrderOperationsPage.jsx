@@ -45,11 +45,24 @@ export default function OrderOperationsPage() {
     queryFn: async () => extractListPayload(await apiClient.get('/hrm/employees', { params: { limit: 100 } })).data,
   });
 
+  const policyQuery = useQuery({
+    queryKey: ['stock-policy'],
+    queryFn: async () =>
+      (await apiClient.get('/stocks/policy')).data?.data || {
+        stockIssuePolicy: 'FEFO',
+        customStockConditions: [],
+      },
+  });
+  const activePolicy = policyQuery.data?.stockIssuePolicy || 'FEFO';
+  const [policyOverride, setPolicyOverride] = useState('');
+
   const approveMutation = useMutation({
-    mutationFn: (orderIds) => apiClient.patch('/orders/approve-batch', { orderIds }),
+    mutationFn: ({ orderIds, stockIssuePolicy }) =>
+      apiClient.patch('/orders/approve-batch', { orderIds, stockIssuePolicy }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['orders-pending'] });
       queryClient.invalidateQueries({ queryKey: ['orders-approved'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-batches'] });
       addToast({ type: 'success', message: `Approved ${res.data?.data?.approvedCount || 0} order(s) & reserved stock.` });
       setApproveConfirmOpen(false);
       pendingTable.setSelectedKeys([]);
@@ -94,6 +107,7 @@ export default function OrderOperationsPage() {
     { key: 'weight', header: 'Weight', numeric: true, accessor: (r) => formatWeight(r.grandSummary?.totalWeightKg) },
     { key: 'volume', header: 'Volume', numeric: true, accessor: (r) => `${Number(r.grandSummary?.totalVolumeCubic || 0).toFixed(2)} Cu.Ft` },
     { key: 'net', header: 'Order Value', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.grandSummary?.netPayableAmount) },
+    { key: 'policy', header: 'Policy', render: (r) => <StatusBadge status={r.stockIssuePolicyApplied || activePolicy || 'FEFO'} /> },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.approvalInfo?.status} /> },
   ];
 
@@ -165,19 +179,38 @@ export default function OrderOperationsPage() {
       )}
 
       {tab === 'approve' && (
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-[var(--bg-surface)] px-4 py-2.5">
-          <span className="text-xs text-[var(--text-secondary)]">
-            Selected pending orders: <strong className="tabular-nums">{pendingTable.selectedKeys.length}</strong>
-          </span>
-          <button
-            type="button"
-            disabled={pendingTable.selectedKeys.length === 0 || approveMutation.isPending}
-            onClick={() => setApproveConfirmOpen(true)}
-            className="inline-flex items-center gap-1.5 min-h-[40px] sm:h-9 px-4 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold disabled:opacity-50"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Approve Selected &amp; Lock Stock</span>
-          </button>
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border bg-[var(--bg-surface)] px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs text-[var(--text-secondary)]">
+              Selected pending orders: <strong className="tabular-nums">{pendingTable.selectedKeys.length}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+              <span>Stock Issue Policy:</span>
+              <StatusBadge status={activePolicy} />
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Override stock issue policy"
+              value={policyOverride}
+              onChange={(e) => setPolicyOverride(e.target.value)}
+              className="min-h-[44px] sm:h-9 sm:min-h-0 px-2.5 rounded-lg border bg-[var(--bg-elevated)] text-xs"
+            >
+              <option value="">Default Policy ({activePolicy})</option>
+              <option value="FIFO">FIFO (Purchase Date)</option>
+              <option value="FEFO">FEFO (Earliest Expiry)</option>
+              <option value="MANUAL">MANUAL</option>
+            </select>
+            <button
+              type="button"
+              disabled={pendingTable.selectedKeys.length === 0 || approveMutation.isPending}
+              onClick={() => setApproveConfirmOpen(true)}
+              className="inline-flex items-center gap-1.5 min-h-[44px] sm:h-9 sm:min-h-0 px-4 rounded-lg bg-[var(--status-success)] text-white text-xs font-semibold disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Approve Selected &amp; Lock Stock</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -259,7 +292,12 @@ export default function OrderOperationsPage() {
       <ConfirmModal
         isOpen={approveConfirmOpen}
         onClose={() => setApproveConfirmOpen(false)}
-        onConfirm={() => approveMutation.mutate(pendingTable.selectedKeys)}
+        onConfirm={() =>
+          approveMutation.mutate({
+            orderIds: pendingTable.selectedKeys,
+            stockIssuePolicy: policyOverride || undefined,
+          })
+        }
         isLoading={approveMutation.isPending}
         variant="primary"
         title="Approve selected pending orders?"

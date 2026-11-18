@@ -74,6 +74,7 @@ const orderSchema = new Schema(
     routeId: { type: Schema.Types.ObjectId, default: null },
     lineItems: { type: [orderLineItemSchema], default: [] },
     grandSummary: { type: orderGrandSummarySchema, default: () => ({}) },
+    stockIssuePolicyApplied: { type: String, enum: ['FIFO', 'FEFO', 'MANUAL'], default: 'FEFO' },
     invoiceStyle: { type: invoiceStyleSchema, default: () => ({}) },
     approvalInfo: { type: approvalInfoSchema, default: () => ({}) },
     assignedSalesmanId: { type: Schema.Types.ObjectId, ref: 'User', default: null },

@@ -1,6 +1,6 @@
 import { cloudinaryImageSchema } from './shared.schemas.js';
 import { User } from './User.model.js';
-import { Distributor } from './Distributor.model.js';
+import { Distributor, DistributorPolicy } from './Distributor.model.js';
 import { Company } from './Company.model.js';
 import { Brand } from './Brand.model.js';
 import { Category } from './Category.model.js';
@@ -104,6 +104,7 @@ for (const Model of Object.values(allModels)) {
 export {
   User,
   Distributor,
+  DistributorPolicy,
   Company,
   Brand,
   Category,

@@ -9,10 +9,13 @@ import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { canViewPurchasePrice, stripBatchPurchaseRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import {
+  applyBatchConditionAndStatus,
   deriveBatchStatus,
   formatDualUnitQty,
+  getDistributorStockPolicy,
   getProductUnitMeta,
   runWithTransaction,
+  saveDistributorStockPolicy,
   syncProductUnitVersionLifecycle,
 } from '../services/stockLedger.service.js';
 import { recordAuditLog } from '../services/accountingPost.service.js';
@@ -55,9 +58,28 @@ export const listStockBatches = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: enriched, pagination: buildPaginationMeta(totalRecords) });
 });
 
+export const getStockPolicy = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: await getDistributorStockPolicy(req.distributorId) });
+});
+
+export const updateStockPolicy = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: await saveDistributorStockPolicy(req.distributorId, req.body) });
+});
+
+export const updateBatchStatusAndCondition = asyncHandler(async (req, res) => {
+  const { StockBatch } = m();
+  const batch = await StockBatch.findOne({ _id: req.params.id, distributorId: req.distributorId })
+    .populate('productId', 'baseUnit packingUnits unitVersions');
+  if (!batch) throw new AppError('Stock batch not found.', 404, 'BATCH_NOT_FOUND');
+  const conv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : getProductUnitMeta(batch.productId, batch.unitName, batch.unitVersionId).conversionQty;
+  applyBatchConditionAndStatus(batch, req.body, conv);
+  await batch.save();
+  res.status(200).json({ success: true, data: stripBatchPurchaseRates(batch.toObject(), req.user) });
+});
+
 export const applyStockRules = asyncHandler(async (req, res) => {
   const { StockBatch } = m();
-  const { batchIds = [], productId, warehouseId, minStockPack, maxStockPack, expiryAlertDays } = req.body;
+  const { batchIds = [], productId, warehouseId, minStockPack, maxStockPack, expiryAlertDays, status, condition, customConditionLabel } = req.body;
   const filter = { distributorId: req.distributorId };
   if (batchIds.length > 0) filter._id = { $in: batchIds };
   else {
@@ -66,13 +88,11 @@ export const applyStockRules = asyncHandler(async (req, res) => {
   }
   const batches = await StockBatch.find(filter).populate('productId', 'baseUnit packingUnits unitVersions');
   for (const batch of batches) {
-    if (minStockPack !== undefined) batch.thresholds.minStockPack = Number(minStockPack) || 0;
-    if (maxStockPack !== undefined) batch.thresholds.maxStockPack = Number(maxStockPack) || 0;
-    if (expiryAlertDays !== undefined) batch.thresholds.expiryAlertDays = Number(expiryAlertDays) || 90;
-    const conv = Number(batch.conversionQty) > 1
-      ? Number(batch.conversionQty)
-      : getProductUnitMeta(batch.productId, batch.unitName, batch.unitVersionId).conversionQty;
-    batch.status = deriveBatchStatus(batch, conv);
+    if (minStockPack !== undefined && minStockPack !== '') batch.thresholds.minStockPack = Number(minStockPack) || 0;
+    if (maxStockPack !== undefined && maxStockPack !== '') batch.thresholds.maxStockPack = Number(maxStockPack) || 0;
+    if (expiryAlertDays !== undefined && expiryAlertDays !== '') batch.thresholds.expiryAlertDays = Number(expiryAlertDays) || 90;
+    const conv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : getProductUnitMeta(batch.productId, batch.unitName, batch.unitVersionId).conversionQty;
+    applyBatchConditionAndStatus(batch, { status, condition, customConditionLabel }, conv);
     await batch.save();
   }
   await evaluateLowStockAndExpiryAlerts({ distributorId: req.distributorId, warehouseId });
@@ -137,6 +157,13 @@ function resolvePurchaseRates(raw, item, product, meta, conv, movedQty) {
   return { ratePerBase, ratePerPack };
 }
 
+async function saveBatchWeightAndStatus(batch, baseWeightKg, conv, session, depletedProducts = null) {
+  batch.totalWeightKg = Number((batch.currentBaseQty * baseWeightKg).toFixed(3));
+  batch.status = deriveBatchStatus(batch, conv);
+  await batch.save(session ? { session } : undefined);
+  if (depletedProducts && batch.currentBaseQty === 0 && batch.productId) depletedProducts.add(String(batch.productId));
+}
+
 async function applyMovementEffects(movement, distributorId, actorId, session, rawItems = null) {
   const { StockBatch, Product } = m();
   const depletedProducts = new Set();
@@ -169,15 +196,16 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
           unitVersionId: raw.unitVersionId || meta.unitVersionId || 'UV-1', unitName: batchUnitName,
           packingSpecification: raw.packingSpecification || meta.packingSpecification || '', conversionQty: conv,
           purchaseRatePerBase: ratePerBase, purchaseRatePerPack: ratePerPack,
+          condition: raw.condition || item.condition || 'FRESH',
+          customConditionLabel: raw.customConditionLabel || item.customConditionLabel || '',
         });
-      } else if (ratePerBase > 0 || ratePerPack > 0) {
-        batch.purchaseRatePerBase = ratePerBase;
-        batch.purchaseRatePerPack = ratePerPack;
+      } else {
+        if (ratePerBase > 0 || ratePerPack > 0) Object.assign(batch, { purchaseRatePerBase: ratePerBase, purchaseRatePerPack: ratePerPack });
+        if (raw.condition || item.condition) batch.condition = raw.condition || item.condition;
+        if (raw.customConditionLabel || item.customConditionLabel) batch.customConditionLabel = raw.customConditionLabel || item.customConditionLabel;
       }
       batch.currentBaseQty += movedQty;
-      batch.totalWeightKg = Number((batch.currentBaseQty * meta.baseWeightKg).toFixed(3));
-      batch.status = deriveBatchStatus(batch, batch.conversionQty || conv);
-      await batch.save(session ? { session } : undefined);
+      await saveBatchWeightAndStatus(batch, meta.baseWeightKg, batch.conversionQty || conv, session);
     } else if (movement.movementType === 'TRANSFER' || movement.movementType === 'SAME_TRANSFER') {
       const src = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
       const srcMeta = getProductUnitMeta(product, item.unitName || src?.unitName, src?.unitVersionId);
@@ -185,10 +213,7 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
       const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * srcConv;
       if (!src || src.availableBaseQty < movedQty) throw new AppError(`Insufficient stock in batch ${item.batchNo || item.batchId}.`, 400, 'INSUFFICIENT_STOCK');
       src.currentBaseQty -= movedQty;
-      src.totalWeightKg = Number((src.currentBaseQty * srcMeta.baseWeightKg).toFixed(3));
-      src.status = deriveBatchStatus(src, src.conversionQty || srcConv);
-      await src.save(session ? { session } : undefined);
-      if (src.currentBaseQty === 0 && src.productId) depletedProducts.add(String(src.productId));
+      await saveBatchWeightAndStatus(src, srcMeta.baseWeightKg, src.conversionQty || srcConv, session, depletedProducts);
 
       const destWh = movement.movementType === 'SAME_TRANSFER' ? movement.fromWarehouseId : movement.toWarehouseId;
       let dest = await StockBatch.findOne({ distributorId, batchNo: src.batchNo, productId: src.productId, warehouseId: destWh, areaId: item.toAreaId }).session(session);
@@ -199,13 +224,12 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
           unitVersionId: src.unitVersionId || 'UV-1', unitName: src.unitName || srcMeta.packUnitName || 'Carton',
           packingSpecification: src.packingSpecification || srcMeta.packingSpecification || '',
           conversionQty: src.conversionQty || srcConv || 1,
-          purchaseRatePerBase: src.purchaseRatePerBase || 0, purchaseRatePerPack: src.purchaseRatePerPack || 0, condition: src.condition,
+          purchaseRatePerBase: src.purchaseRatePerBase || 0, purchaseRatePerPack: src.purchaseRatePerPack || 0,
+          condition: src.condition, customConditionLabel: src.customConditionLabel || '',
         });
       }
       dest.currentBaseQty += movedQty;
-      dest.totalWeightKg = Number((dest.currentBaseQty * srcMeta.baseWeightKg).toFixed(3));
-      dest.status = deriveBatchStatus(dest, dest.conversionQty || srcConv);
-      await dest.save(session ? { session } : undefined);
+      await saveBatchWeightAndStatus(dest, srcMeta.baseWeightKg, dest.conversionQty || srcConv, session);
     } else if (movement.movementType === 'ADJUSTMENT') {
       const batch = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
       if (!batch) throw new AppError('Batch not found for adjustment.', 404, 'BATCH_NOT_FOUND');
@@ -213,10 +237,7 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
       const batchConv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : batchMeta.conversionQty;
       const before = batch.currentBaseQty;
       batch.currentBaseQty = Math.max(0, Number(item.physicalCountBaseQty) || 0);
-      batch.totalWeightKg = Number((batch.currentBaseQty * batchMeta.baseWeightKg).toFixed(3));
-      batch.status = deriveBatchStatus(batch, batchConv);
-      await batch.save(session ? { session } : undefined);
-      if (batch.currentBaseQty === 0 && batch.productId) depletedProducts.add(String(batch.productId));
+      await saveBatchWeightAndStatus(batch, batchMeta.baseWeightKg, batchConv, session, depletedProducts);
       await recordAuditLog({
         distributorId, actorId, module: 'STOCK_ADJUSTMENT', action: 'ADJUST_BATCH', entityModel: 'StockBatch', entityId: batch._id,
         beforeState: { currentBaseQty: before }, afterState: { currentBaseQty: batch.currentBaseQty, missing: item.missingBaseQty, damaged: item.damagedBaseQty }, session,
@@ -228,16 +249,10 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
       const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * batchConv;
       if (!batch || batch.currentBaseQty < movedQty) throw new AppError('Insufficient quarantine stock for supplier return.', 400, 'INSUFFICIENT_STOCK');
       batch.currentBaseQty -= movedQty;
-      batch.totalWeightKg = Number((batch.currentBaseQty * batchMeta.baseWeightKg).toFixed(3));
-      batch.status = deriveBatchStatus(batch, batchConv);
-      await batch.save(session ? { session } : undefined);
-      if (batch.currentBaseQty === 0 && batch.productId) depletedProducts.add(String(batch.productId));
+      await saveBatchWeightAndStatus(batch, batchMeta.baseWeightKg, batchConv, session, depletedProducts);
     }
   }
-
-  for (const productId of depletedProducts) {
-    await syncProductUnitVersionLifecycle({ distributorId, productId, session });
-  }
+  for (const productId of depletedProducts) await syncProductUnitVersionLifecycle({ distributorId, productId, session });
 }
 
 function sanitizeMovementCost(movement, user) {
@@ -351,4 +366,8 @@ export const toggleHideMovement = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: movement });
 });
 
-export default { listStockBatches, applyStockRules, getStockValuation, listMovements, getMovementById, createMovement, approveMovement, toggleHideMovement };
+export default {
+  getStockPolicy, updateStockPolicy, updateBatchStatusAndCondition, listStockBatches,
+  applyStockRules, getStockValuation, listMovements, getMovementById,
+  createMovement, approveMovement, toggleHideMovement,
+};

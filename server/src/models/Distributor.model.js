@@ -26,6 +26,18 @@ const businessProfileSchema = new Schema(
   { _id: false }
 );
 
+const customStockConditionSchema = new Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    mappedSystemCondition: {
+      type: String,
+      enum: ['FRESH', 'NORMAL', 'DAMAGE', 'EXPIRE'],
+      default: 'NORMAL',
+    },
+  },
+  { _id: false }
+);
+
 const distributorSchema = new Schema(
   {
     distributorId: { type: String, required: true, trim: true, uppercase: true },
@@ -36,6 +48,8 @@ const distributorSchema = new Schema(
     whatsappNo: { type: String, trim: true, default: '' },
     mongodbUri: { type: String, trim: true, default: '', select: false },
     businessProfile: { type: businessProfileSchema, default: () => ({}) },
+    stockIssuePolicy: { type: String, enum: ['FIFO', 'FEFO', 'MANUAL'], default: 'FEFO' },
+    customStockConditions: { type: [customStockConditionSchema], default: [] },
     onboardingCompleted: { type: Boolean, default: false },
     onboardingSkipped: { type: Boolean, default: false },
     status: {
@@ -69,4 +83,5 @@ distributorSchema.index({ email: 1 });
 export const Distributor =
   mongoose.models.Distributor ||
   mongoose.model('Distributor', distributorSchema, 'distributors');
+export const DistributorPolicy = Distributor;
 export default Distributor;

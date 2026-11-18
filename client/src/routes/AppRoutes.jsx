@@ -43,6 +43,7 @@ import RecoveryLedgerPage from '../pages/sales/RecoveryLedgerPage';
 import RulesPage from '../pages/settings/RulesPage';
 import TemplatesPage from '../pages/settings/TemplatesPage';
 import AutomationRulesPage from '../pages/settings/AutomationRulesPage';
+import StockPolicyPage from '../pages/settings/StockPolicyPage';
 
 import PendingTasksPage from '../pages/tasks/PendingTasksPage';
 import ExecuteTaskPage from '../pages/tasks/ExecuteTaskPage';
@@ -161,6 +162,7 @@ export default function AppRoutes() {
           <Route path="/settings/rules" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><RulesPage /></ProtectedRoute>} />
           <Route path="/settings/templates" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><TemplatesPage /></ProtectedRoute>} />
           <Route path="/settings/automation" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><AutomationRulesPage /></ProtectedRoute>} />
+          <Route path="/settings/stock-policy" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER']}><StockPolicyPage /></ProtectedRoute>} />
 
           <Route path="/tasks/pending" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER', 'SALESMAN', 'BOOKER']}><PendingTasksPage /></ProtectedRoute>} />
           <Route path="/tasks/execute/:taskId" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER', 'SALESMAN', 'BOOKER']}><ExecuteTaskPage /></ProtectedRoute>} />

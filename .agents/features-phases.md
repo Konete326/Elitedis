@@ -658,7 +658,7 @@
   - `Test Case`: Create SKU without `purchaseRate` (201); create Unit Version v2 (`50 pcs`) with existing v1 stock (`48 pcs`); verify dual-version transactions and cost column masking for non-authorized employee.
   - `Status`: Complete
 
-### [ ] Phase 102: Stock Issue Policy (`FIFO` / `FEFO` / `Manual`), Custom Condition Labels & `Blocked` Status Control
+### [x] Phase 102: Stock Issue Policy (`FIFO` / `FEFO` / `Manual`), Custom Condition Labels & `Blocked` Status Control
 - **Scope:** Add `DistributorPolicy.model.js` storing `stockIssuePolicy` (`FIFO|FEFO|MANUAL`) and `customStockConditions[]` mapped cleanly onto official conditions (`FRESH|NORMAL|DAMAGE|EXPIRE`). Update `stockLedger.service.js` batch reservation sorting to obey distributor policy and block `BLOCKED`/`QUARANTINED`/`DAMAGE`/`EXPIRE` stock from normal allocation.
 - **Traceability (§30.5):**
   - `PRD Section`: §6.1–6.7
@@ -666,7 +666,7 @@
   - `Classification`: Confirmed / Extended
   - `Acceptance Criteria`: AC-06
   - `Test Case`: Switch policy from `FIFO` to `FEFO` and approve order; verify earliest-expiring non-expired batch is reserved while `Blocked` batches are skipped and `Available = Current - Reserved`.
-  - `Status`: Pending
+  - `Status`: Complete
 
 ### [ ] Phase 103: Warehouse Hierarchy (`Warehouse -> Zone -> Area`), Physical Stock Count Variance & 4-Step Zero-Stock Guard
 - **Scope:** Standardize UI, routes, and labels to strict `Warehouse -> Zone -> Area` (`Normal/Mix/Temperature/Cold Store`; `Floor/Rack/Walked`), capture explicit Physical Stock Count columns (`System Qty`, `Physical Count Qty`, `Difference Qty`, `Updated Balance`), expose all 8 Warehouse Dashboard KPIs, and enforce the 4-step zero-stock deletion guard across all three levels.

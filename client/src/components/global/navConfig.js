@@ -58,6 +58,7 @@ export const NAV_GROUPS = [
     key: 'Rules & Templates',
     items: [
       { to: '/settings/rules', label: 'Rules & Schemes', icon: SlidersHorizontal, roles: ADM },
+      { to: '/settings/stock-policy', label: 'Stock Issue Policy', icon: SlidersHorizontal, roles: [...ADM, 'WAREHOUSE_MANAGER'] },
       { to: '/settings/templates', label: 'Print Templates', icon: Printer, roles: ADM },
       { to: '/settings/automation', label: 'Automation Rules', icon: SlidersHorizontal, roles: ADM },
     ],

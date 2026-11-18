@@ -123,7 +123,11 @@ router.use('/warehouses', whRouter);
 
 // Stock & Movement routes (/api/v1/stocks)
 const stockRouter = express.Router();
+stockRouter.get('/policy', mvCtrl.getStockPolicy);
+stockRouter.put('/policy', requireRole('ADMIN', 'WAREHOUSE_MANAGER'), mvCtrl.updateStockPolicy);
+stockRouter.patch('/policy', requireRole('ADMIN', 'WAREHOUSE_MANAGER'), mvCtrl.updateStockPolicy);
 stockRouter.get('/batches', mvCtrl.listStockBatches);
+stockRouter.patch('/batches/:id/status-condition', requireRole('ADMIN', 'WAREHOUSE_MANAGER'), mvCtrl.updateBatchStatusAndCondition);
 stockRouter.post('/rules', requireRole('ADMIN', 'WAREHOUSE_MANAGER'), mvCtrl.applyStockRules);
 stockRouter.get('/valuation', mvCtrl.getStockValuation);
 stockRouter.get('/movements', mvCtrl.listMovements);

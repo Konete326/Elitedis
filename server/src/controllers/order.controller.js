@@ -164,7 +164,7 @@ export const updateOrder = asyncHandler(async (req, res) => {
 
 export const approveOrdersBatch = asyncHandler(async (req, res) => {
   const { Order } = m();
-  const { orderIds = [] } = req.body;
+  const { orderIds = [], stockIssuePolicy = null } = req.body;
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
     throw new AppError('Select at least one pending order to approve.', 400, 'NO_ORDERS_SELECTED');
   }
@@ -178,7 +178,13 @@ export const approveOrdersBatch = asyncHandler(async (req, res) => {
     if (orders.length === 0) throw new AppError('No eligible pending orders found for approval.', 400, 'NO_PENDING_ORDERS');
 
     for (const order of orders) {
-      await reserveStockForOrder({ distributorId: req.distributorId, lineItems: order.lineItems, session });
+      const allocations = await reserveStockForOrder({
+        distributorId: req.distributorId,
+        lineItems: order.lineItems,
+        policyOverride: stockIssuePolicy,
+        session,
+      });
+      order.stockIssuePolicyApplied = allocations.policyApplied || 'FEFO';
       order.approvalInfo.status = 'APPROVED';
       order.approvalInfo.approvedById = req.user._id;
       order.approvalInfo.approvedAt = new Date();
@@ -190,7 +196,7 @@ export const approveOrdersBatch = asyncHandler(async (req, res) => {
         action: 'APPROVE_ORDER',
         entityModel: 'Order',
         entityId: order._id,
-        afterState: { orderCode: order.orderCode, netPayable: order.grandSummary?.netPayableAmount },
+        afterState: { orderCode: order.orderCode, netPayable: order.grandSummary?.netPayableAmount, stockIssuePolicyApplied: order.stockIssuePolicyApplied },
         session,
       });
     }
