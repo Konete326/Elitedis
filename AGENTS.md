@@ -67,3 +67,13 @@ Before completing any phase or task:
 - [ ] Verify zero `useEffect` fetch loops, zero console/runtime errors, and clean `node --check src/server.js` + `npm run build` in `client/`.
 - [ ] Verify Light Mode (Blue & White) and Dark Mode (Blue & Black) contrast with zero purple classes, desktop `100dvh` fit, and `375px` mobile stacked cards.
 - [ ] Verify `.env` secrets are untracked (`git status`), mark completed phase `[x]` in `.agents/features-phases.md`, and commit using `<type>(phase-<XXX>): <summary>` per `.agents/git-sync.md`.
+
+## 8. Communication Language, Smart Form UX & Modern Web Defaults
+- **Roman Urdu Response Lock**: Always reply to the user in clear, natural **Roman Urdu** (never Hindi/Devanagari script), while keeping technical file paths, CLI commands, and code identifiers exact.
+- **Zero-Friction Smart Forms**:
+  - Pre-fill auto-suggested codes (`suggestCode`) whenever opening "Add New" modals.
+  - Auto-select linked parent entities bidirectionally whenever child/filter context determines them (e.g., selecting `Brand` -> auto-sets `companyId`; selecting `Parent Category` / `Sub-Category` -> inherits `companyId` & `categoryId`; selecting `Warehouse` -> selects first `Zone`; single-option dropdowns auto-select).
+- **Modern Web Baseline UI/UX Standards (`design.md` §5–8)**:
+  - Keep `<meta name="color-scheme" content="light dark">` in HTML + `:root { color-scheme: light dark; interpolate-size: allow-keywords; }` with `light-dark()` + `html.light`/`html.dark` explicit overrides and contrast-checked `scrollbar-color` (never animate `scrollbar-color`).
+  - Use `:user-invalid` + `:has(:user-invalid)` (never bare `:invalid` on untouched inputs), `textarea { field-sizing: content; resize: vertical; }`, standardized `autocomplete` tokens, IME composition guards (`if (e.isComposing || e.keyCode === 229) return`) on Enter handlers, and drag-safe dialog backdrop light-dismiss (`onPointerDown` target check).
+  - Follow Outside-In region budgets (`SideNav` 240–280px, `DetailPanel` 340–420px, capped forms `640px` vs full-bleed tables), weakest container grouping (`gap -> Divider -> Section -> Card`, no Card soup), concentric inner radius (`max(0px, calc(outer - padding))`), `--duration-*`/`--ease-*` motion bands, and **zero transition delay on high-frequency `<tr>` / list item hovers**.
