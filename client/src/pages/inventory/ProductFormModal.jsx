@@ -1,112 +1,26 @@
 import { useMemo, useState } from 'react';
 import { FormModal } from '../../components/global';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
-import ProductUnitPanels from './ProductUnitPanels';
+import ProductUnitPanels, {
+  PRODUCT_RATE_LIST_COLUMNS,
+  buildEmptyProduct,
+  buildProductPayload,
+  computeBaseWeightKg,
+  computePackingMath,
+} from './ProductUnitPanels';
+import { useAuth } from '../../context/AuthContext';
 import { suggestCode, validateField } from '../../utils/validation';
 
-export const PRODUCT_RATE_LIST_COLUMNS = [
-  { key: 'skuCode', header: 'SKU', numeric: true },
-  { key: 'productName', header: 'Product Name' },
-  { key: 'wholesale', header: 'Wholesale Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.wholesaleSaleRate || r.baseUnit?.wholesaleSaleRate || 0 },
-  { key: 'retail', header: 'POS End Rate', numeric: true, accessor: (r) => r.packingUnits?.[0]?.posRetailEndRate || r.baseUnit?.posRetailEndRate || 0 },
-];
+export { PRODUCT_RATE_LIST_COLUMNS, buildEmptyProduct, buildProductPayload, computeBaseWeightKg, computePackingMath };
 
-export function buildEmptyProduct() {
-  return {
-    skuCode: '',
-    barcode: '',
-    productName: '',
-    companyId: '',
-    brandId: '',
-    categoryId: '',
-    subCategoryId: '',
-    status: 'ACTIVE',
-    showOnMarketplace: false,
-    shortDescription: '',
-    baseUnit: {
-      unitName: 'Piece',
-      weightValue: 0,
-      weightUnit: 'Kg',
-      traderPurchaseRate: 0,
-      wholesaleSaleRate: 0,
-      posRetailEndRate: 0,
-      image: null,
-    },
-    packingUnits: [
-      {
-        unitName: 'Carton',
-        conversionQty: 24,
-        weightUnit: 'Kg',
-        traderPurchaseRate: 0,
-        wholesaleSaleRate: 0,
-        posRetailEndRate: 0,
-        dimensions: { sizeUnit: 'Inch', width: 0, length: 0, height: 0 },
-        image: null,
-        isDefaultStockUnit: true,
-      },
-    ],
-  };
-}
-
-export function computeBaseWeightKg(baseUnit) {
-  const val = Number(baseUnit?.weightValue) || 0;
-  const isSmall = baseUnit?.weightUnit === 'g' || baseUnit?.weightUnit === 'ml';
-  return Number((isSmall ? val / 1000 : val).toFixed(4));
-}
-
-export function computePackingMath(baseWeightKg, pack0) {
-  const conv = Math.max(1, Number(pack0?.conversionQty) || 1);
-  const w = Number(pack0?.dimensions?.width) || 0;
-  const l = Number(pack0?.dimensions?.length) || 0;
-  const h = Number(pack0?.dimensions?.height) || 0;
-  return {
-    packingWeightKg: Number((baseWeightKg * conv).toFixed(4)),
-    areaSq: Number((w * l).toFixed(3)),
-    volumeCubic: Number((w * l * h).toFixed(3)),
-  };
-}
-
-export function buildProductPayload(form, baseWeightKg, pack0, packingMath) {
-  return {
-    ...form,
-    companyId: form.companyId || null,
-    brandId: form.brandId || null,
-    categoryId: form.categoryId || null,
-    subCategoryId: form.subCategoryId || null,
-    baseUnit: {
-      ...form.baseUnit,
-      weightValue: Number(form.baseUnit.weightValue) || 0,
-      weightInKg: baseWeightKg,
-      traderPurchaseRate: Number(form.baseUnit.traderPurchaseRate) || 0,
-      wholesaleSaleRate: Number(form.baseUnit.wholesaleSaleRate) || 0,
-      posRetailEndRate: Number(form.baseUnit.posRetailEndRate) || 0,
-    },
-    packingUnits: [
-      {
-        ...pack0,
-        conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
-        packingWeightKg: packingMath.packingWeightKg,
-        traderPurchaseRate: Number(pack0.traderPurchaseRate) || 0,
-        wholesaleSaleRate: Number(pack0.wholesaleSaleRate) || 0,
-        posRetailEndRate: Number(pack0.posRetailEndRate) || 0,
-        dimensions: {
-          ...(pack0.dimensions || {}),
-          width: Number(pack0.dimensions?.width) || 0,
-          length: Number(pack0.dimensions?.length) || 0,
-          height: Number(pack0.dimensions?.height) || 0,
-          areaSq: packingMath.areaSq,
-          volumeCubic: packingMath.volumeCubic,
-        },
-      },
-    ],
-  };
-}
+const getId = (ref) => (ref && typeof ref === 'object' ? String(ref._id || '') : String(ref || ''));
 
 export default function ProductFormModal({
   isOpen,
   onClose,
   initialValue,
   isEditing,
+  canViewPurchasePrice: canViewPurchasePriceProp,
   existingCount = 0,
   existingCodes = [],
   companies = [],
@@ -116,8 +30,11 @@ export default function ProductFormModal({
   onSave,
   isSubmitting,
 }) {
+  const { canViewPurchasePrice: authCanViewPurchasePrice } = useAuth();
+  const canViewPurchasePrice = canViewPurchasePriceProp ?? authCanViewPurchasePrice;
   const [form, setForm] = useState(() => initialValue || buildEmptyProduct());
   const [touched, setTouched] = useState({});
+  const [draftVersionId, setDraftVersionId] = useState(null);
 
   const skuError = touched.skuCode ? validateField('sku', form.skuCode, { required: true, label: 'SKU Code' }) : '';
   const nameError = touched.productName ? validateField('required', form.productName, { required: true, minLength: 2, label: 'Product Name' }) : '';
@@ -128,27 +45,129 @@ export default function ProductFormModal({
   const packingMath = useMemo(() => computePackingMath(baseWeightKg, pack0), [baseWeightKg, pack0]);
 
   const filteredBrands = useMemo(
-    () =>
-      form.companyId
-        ? brands.filter((b) => String(b.companyId?._id || b.companyId) === String(form.companyId))
-        : brands,
+    () => (form.companyId ? brands.filter((b) => getId(b.companyId) === String(form.companyId)) : brands),
     [brands, form.companyId]
   );
 
   const filteredSubCategories = useMemo(
-    () =>
-      form.categoryId
-        ? subCategories.filter(
-            (s) => String(s.parentCategoryId?._id || s.parentCategoryId) === String(form.categoryId)
-          )
-        : subCategories,
+    () => (form.categoryId ? subCategories.filter((s) => getId(s.parentCategoryId) === String(form.categoryId)) : subCategories),
     [subCategories, form.categoryId]
   );
 
   const updateBase = (key, val) => setForm((p) => ({ ...p, baseUnit: { ...p.baseUnit, [key]: val } }));
-  const updatePack0 = (key, val) => setForm((p) => ({ ...p, packingUnits: [{ ...pack0, [key]: val }] }));
+  const updatePack0 = (key, val) =>
+    setForm((p) => {
+      const nextPack = { ...pack0, [key]: val };
+      const nextVersions =
+        draftVersionId && Array.isArray(p.unitVersions)
+          ? p.unitVersions.map((v) =>
+              v.unitVersionId === draftVersionId
+                ? { ...v, unitName: nextPack.unitName || 'Carton', conversionQty: Math.max(1, Number(nextPack.conversionQty) || 1) }
+                : v
+            )
+          : p.unitVersions;
+      return { ...p, packingUnits: [nextPack], unitVersions: nextVersions };
+    });
   const updatePackDim = (key, val) =>
     setForm((p) => ({ ...p, packingUnits: [{ ...pack0, dimensions: { ...(pack0.dimensions || {}), [key]: val } }] }));
+
+  const handleCompanyChange = (nextCompanyId) => {
+    const matchingBrands = nextCompanyId ? brands.filter((b) => getId(b.companyId) === nextCompanyId) : [];
+    const matchingCats = nextCompanyId ? categories.filter((c) => getId(c.companyId) === nextCompanyId) : [];
+    setForm((p) => {
+      const nextBrandId = matchingBrands.length === 1 ? getId(matchingBrands[0]) : '';
+      const nextCatId = matchingCats.length === 1 ? getId(matchingCats[0]) : p.categoryId;
+      const matchingSubs = nextCatId ? subCategories.filter((s) => getId(s.parentCategoryId) === nextCatId) : [];
+      return {
+        ...p,
+        companyId: nextCompanyId,
+        brandId: nextBrandId,
+        categoryId: nextCatId,
+        subCategoryId: nextCatId !== p.categoryId ? (matchingSubs.length === 1 ? getId(matchingSubs[0]) : '') : p.subCategoryId,
+      };
+    });
+  };
+
+  const handleBrandChange = (nextBrandId) => {
+    const brand = brands.find((b) => getId(b) === nextBrandId);
+    const brandCompId = getId(brand?.companyId);
+    setForm((p) => {
+      const nextCompId = brandCompId || p.companyId;
+      const linkedCats = nextBrandId ? categories.filter((c) => (c.linkedBrandIds || []).some((lb) => getId(lb) === nextBrandId)) : [];
+      const compCats = nextCompId ? categories.filter((c) => getId(c.companyId) === nextCompId) : [];
+      const catPool = linkedCats.length > 0 ? linkedCats : compCats;
+      const nextCatId = catPool.length === 1 ? getId(catPool[0]) : p.categoryId;
+      const matchingSubs = nextCatId ? subCategories.filter((s) => getId(s.parentCategoryId) === nextCatId) : [];
+      return {
+        ...p,
+        brandId: nextBrandId,
+        companyId: nextCompId,
+        categoryId: nextCatId,
+        subCategoryId: nextCatId !== p.categoryId ? (matchingSubs.length === 1 ? getId(matchingSubs[0]) : '') : p.subCategoryId,
+      };
+    });
+  };
+
+  const handleCategoryChange = (nextCatId) => {
+    const cat = categories.find((c) => getId(c) === nextCatId);
+    const linkedBrandIds = (cat?.linkedBrandIds || []).map(getId).filter(Boolean);
+    const matchingSubs = nextCatId ? subCategories.filter((s) => getId(s.parentCategoryId) === nextCatId) : [];
+    setForm((p) => {
+      const nextBrandId = linkedBrandIds.length === 1 ? linkedBrandIds[0] : p.brandId;
+      const singleBrandCompId = linkedBrandIds.length === 1 ? getId(brands.find((b) => getId(b) === nextBrandId)?.companyId) : '';
+      return {
+        ...p,
+        categoryId: nextCatId,
+        companyId: p.companyId || getId(cat?.companyId) || singleBrandCompId,
+        brandId: nextBrandId,
+        subCategoryId: matchingSubs.length === 1 ? getId(matchingSubs[0]) : '',
+      };
+    });
+  };
+
+  const handleSubCategoryChange = (nextSubId) => {
+    const sub = subCategories.find((s) => getId(s) === nextSubId);
+    const parentCatId = getId(sub?.parentCategoryId);
+    const parentCat = categories.find((c) => getId(c) === parentCatId);
+    setForm((p) => ({
+      ...p,
+      subCategoryId: nextSubId,
+      categoryId: parentCatId || p.categoryId,
+      companyId: p.companyId || getId(sub?.companyId) || getId(parentCat?.companyId),
+    }));
+  };
+
+  const handleCreateUnitVersion = () => {
+    const currentList = form.unitVersions?.length
+      ? form.unitVersions
+      : [
+          {
+            versionNo: 1,
+            unitVersionId: 'UV-1',
+            unitName: pack0.unitName || 'Carton',
+            conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
+            packingWeightKg: packingMath.packingWeightKg,
+            effectiveFrom: new Date().toISOString(),
+            versionStatus: 'ACTIVE_DEFAULT',
+          },
+        ];
+    const nextNo = currentList.reduce((max, v) => Math.max(max, Number(v.versionNo) || 0), 0) + 1;
+    const nextId = `UV-${nextNo}`;
+    const updated = currentList.map((v) =>
+      v.versionStatus === 'ACTIVE_DEFAULT' ? { ...v, versionStatus: isEditing ? 'COEXISTING' : 'DEPLETED' } : v
+    );
+    updated.push({
+      versionNo: nextNo,
+      unitVersionId: nextId,
+      unitName: pack0.unitName || 'Carton',
+      conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
+      packingWeightKg: packingMath.packingWeightKg,
+      effectiveFrom: new Date().toISOString(),
+      versionStatus: 'ACTIVE_DEFAULT',
+    });
+    setDraftVersionId(nextId);
+    setForm((p) => ({ ...p, unitVersions: updated }));
+  };
 
   const applySuggestedRates = (rates) => {
     setForm((p) => ({
@@ -180,7 +199,7 @@ export default function ProductFormModal({
     ) {
       return;
     }
-    onSave(buildProductPayload(form, baseWeightKg, pack0, packingMath));
+    onSave(buildProductPayload(form, baseWeightKg, pack0, packingMath, canViewPurchasePrice));
   };
 
   return (
@@ -253,7 +272,7 @@ export default function ProductFormModal({
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <select value={form.companyId} onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value, brandId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+            <select value={form.companyId} onChange={(e) => handleCompanyChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">None / Optional...</option>
               {companies.map((c) => (
                 <option key={c._id} value={c._id}>
@@ -264,7 +283,7 @@ export default function ProductFormModal({
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Brand <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <select value={form.brandId} onChange={(e) => setForm((p) => ({ ...p, brandId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+            <select value={form.brandId} onChange={(e) => handleBrandChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">None / Optional...</option>
               {filteredBrands.map((b) => (
                 <option key={b._id} value={b._id}>
@@ -275,7 +294,7 @@ export default function ProductFormModal({
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <select value={form.categoryId} onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value, subCategoryId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+            <select value={form.categoryId} onChange={(e) => handleCategoryChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">None / Optional...</option>
               {categories.map((c) => (
                 <option key={c._id} value={c._id}>
@@ -286,7 +305,7 @@ export default function ProductFormModal({
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Sub-Category <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
-            <select value={form.subCategoryId} onChange={(e) => setForm((p) => ({ ...p, subCategoryId: e.target.value }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+            <select value={form.subCategoryId} onChange={(e) => handleSubCategoryChange(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
               <option value="">None / Optional...</option>
               {filteredSubCategories.map((s) => (
                 <option key={s._id} value={s._id}>
@@ -309,10 +328,13 @@ export default function ProductFormModal({
           baseWeightKg={baseWeightKg}
           pack0={pack0}
           packingMath={packingMath}
+          canViewPurchasePrice={canViewPurchasePrice}
           updateBase={updateBase}
           updatePack0={updatePack0}
           updatePackDim={updatePackDim}
           onApplyRates={applySuggestedRates}
+          onToggleField={(k, v) => setForm((p) => ({ ...p, [k]: v }))}
+          onCreateUnitVersion={handleCreateUnitVersion}
           isSubmitting={isSubmitting}
         />
       </div>

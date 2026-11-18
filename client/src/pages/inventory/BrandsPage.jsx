@@ -86,10 +86,18 @@ export default function BrandsPage() {
     },
   });
 
+  const companies = companiesQuery.data || [];
+
   const openCreate = () => {
+    const defaultCompanyId =
+      table.filters.companyId || (companies.length === 1 ? companies[0]._id : '');
     setEditingId(null);
     setTouched({});
-    setForm(INITIAL_FORM);
+    setForm({
+      ...INITIAL_FORM,
+      brandCode: suggestCode('BR', table.pagination.totalRecords, table.rows.map((r) => r.brandCode)),
+      companyId: defaultCompanyId,
+    });
     setModalOpen(true);
   };
 
@@ -130,8 +138,6 @@ export default function BrandsPage() {
     { key: 'brandManager', header: 'Brand Manager', accessor: (r) => r.brandManager || '—' },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
-
-  const companies = companiesQuery.data || [];
 
   return (
     <div className="lg:flex-1 lg:min-h-0 flex flex-col gap-3 animate-fade-in">

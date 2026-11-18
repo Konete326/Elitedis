@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0284C7" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -24,13 +25,18 @@
           var saved = localStorage.getItem('elitedist_theme');
           var isDark =
             saved === 'dark' ||
-            (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            (saved !== 'light' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
           if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.colorScheme = 'dark';
+            root.classList.add('dark');
+            root.classList.remove('light');
+            root.style.colorScheme = 'dark';
           } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.style.colorScheme = 'light';
+            root.classList.add('light');
+            root.classList.remove('dark');
+            root.style.colorScheme = 'light';
           }
         } catch (e) {}
 

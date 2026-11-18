@@ -2,7 +2,9 @@ import { Company, Brand, Category, Product, StockBatch } from '../models/index.j
 import { destroyImage } from '../config/cloudinary.js';
 import { getTenantModel, getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
+import { preserveHiddenProductRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
+import { applyProductUnitVersionChange } from '../services/stockLedger.service.js';
 
 async function safeDestroyImages(publicIds = []) {
   const uniqueIds = [...new Set(publicIds.filter(Boolean))];
@@ -45,7 +47,7 @@ function sanitizeInventoryPayload(payload) {
 }
 
 function buildResourceHandlers(config) {
-  const { Model, name, searchFields, filterKeys = [], populate = '', defaultSortBy = 'createdAt', beforeCreate, beforeUpdate, beforeDelete, extractPublicIds } = config;
+  const { Model, name, searchFields, filterKeys = [], populate = '', defaultSortBy = 'createdAt', beforeCreate, beforeUpdate, beforeDelete, extractPublicIds, afterRead } = config;
 
   return {
     list: asyncHandler(async (req, res) => {
@@ -61,7 +63,8 @@ function buildResourceHandlers(config) {
       const query = M.find(filter).sort(sort).skip(skip).limit(limit);
       if (populate) query.populate(populate);
       const [records, totalRecords] = await Promise.all([query.lean(), M.countDocuments(filter)]);
-      res.status(200).json({ success: true, data: records, pagination: buildPaginationMeta(totalRecords) });
+      const data = afterRead ? records.map((r) => afterRead(r, req)) : records;
+      res.status(200).json({ success: true, data, pagination: buildPaginationMeta(totalRecords) });
     }),
 
     getById: asyncHandler(async (req, res) => {
@@ -80,7 +83,8 @@ function buildResourceHandlers(config) {
         ]);
         extraStats = { totalProducts, activeProducts, inactiveProducts: totalProducts - activeProducts };
       }
-      res.status(200).json({ success: true, data: extraStats ? { ...record, stats: extraStats } : record });
+      const shaped = afterRead ? afterRead(record, req) : record;
+      res.status(200).json({ success: true, data: extraStats ? { ...shaped, stats: extraStats } : shaped });
     }),
 
     create: asyncHandler(async (req, res) => {
@@ -88,7 +92,8 @@ function buildResourceHandlers(config) {
       const payload = { ...req.body, distributorId: req.distributorId, ...(config.fixedFilter || {}) };
       if (beforeCreate) await beforeCreate(payload, req);
       const created = await M.create(payload);
-      res.status(201).json({ success: true, data: created });
+      const data = afterRead ? afterRead(created, req) : created;
+      res.status(201).json({ success: true, data });
     }),
 
     update: asyncHandler(async (req, res) => {
@@ -103,7 +108,8 @@ function buildResourceHandlers(config) {
       const newIds = new Set(extractPublicIds ? extractPublicIds(existing) : []);
       const removedIds = oldIds.filter((id) => !newIds.has(id));
       if (removedIds.length > 0) await safeDestroyImages(removedIds);
-      res.status(200).json({ success: true, data: existing });
+      const data = afterRead ? afterRead(existing, req) : existing;
+      res.status(200).json({ success: true, data });
     }),
 
     remove: asyncHandler(async (req, res) => {
@@ -182,6 +188,31 @@ const categoryGuard = async (doc, req) => {
   if (hasChildren || hasProducts) throw new AppError('Cannot delete category with linked sub-categories or products.', 400, 'CATEGORY_IN_USE');
 };
 
+async function resolveCategoryBrandCompany(payload, existing, req) {
+  const companyId = 'companyId' in payload ? payload.companyId : existing?.companyId;
+  const brandIds = 'linkedBrandIds' in payload ? payload.linkedBrandIds : existing?.linkedBrandIds;
+  if (!companyId && Array.isArray(brandIds) && brandIds.length > 0) {
+    const brand = await getTenantModel('Brand', Brand).findOne({ _id: brandIds[0], distributorId: req.distributorId }).select('companyId').lean();
+    if (brand?.companyId) payload.companyId = brand.companyId;
+  }
+}
+
+async function resolveSubCategoryParentDefaults(payload, existing, req) {
+  const parentId = 'parentCategoryId' in payload ? payload.parentCategoryId : existing?.parentCategoryId;
+  const companyId = 'companyId' in payload ? payload.companyId : existing?.companyId;
+  if (!parentId) return;
+  const parent = await getTenantModel('Category', Category).findOne({ _id: parentId, distributorId: req.distributorId, level: 'CATEGORY' }).select('companyId linkedBrandIds').lean();
+  if ('parentCategoryId' in payload && payload.parentCategoryId && !parent) {
+    throw new AppError('Parent Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
+  }
+  if (!parent) return;
+  if (!companyId && parent.companyId) payload.companyId = parent.companyId;
+  const brandIds = 'linkedBrandIds' in payload ? payload.linkedBrandIds : existing?.linkedBrandIds;
+  if ((!Array.isArray(brandIds) || brandIds.length === 0) && parent.linkedBrandIds?.length > 0) {
+    payload.linkedBrandIds = parent.linkedBrandIds;
+  }
+}
+
 export const categoryHandlers = buildResourceHandlers({
   Model: Category,
   name: 'Category',
@@ -196,9 +227,10 @@ export const categoryHandlers = buildResourceHandlers({
     if (payload.companyId && !(await getTenantModel('Company', Company).exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
       throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
     }
+    await resolveCategoryBrandCompany(payload, null, req);
     if (!payload.code) payload.code = `CAT-${Date.now().toString().slice(-5)}`;
   },
-  beforeUpdate: async (payload, _existing, req) => {
+  beforeUpdate: async (payload, existing, req) => {
     sanitizeInventoryPayload(payload);
     if ('companyId' in payload) {
       payload.companyId = nullIfEmpty(payload.companyId);
@@ -206,6 +238,7 @@ export const categoryHandlers = buildResourceHandlers({
         throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
       }
     }
+    await resolveCategoryBrandCompany(payload, existing, req);
   },
   beforeDelete: categoryGuard,
 });
@@ -222,20 +255,14 @@ export const subCategoryHandlers = buildResourceHandlers({
     sanitizeInventoryPayload(payload);
     payload.companyId = nullIfEmpty(payload.companyId);
     payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
-    if (payload.parentCategoryId && !(await getTenantModel('Category', Category).exists({ _id: payload.parentCategoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
-      throw new AppError('Parent Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
-    }
+    await resolveSubCategoryParentDefaults(payload, null, req);
     if (!payload.code) payload.code = `SUB-${Date.now().toString().slice(-5)}`;
   },
-  beforeUpdate: async (payload, _existing, req) => {
+  beforeUpdate: async (payload, existing, req) => {
     sanitizeInventoryPayload(payload);
     if ('companyId' in payload) payload.companyId = nullIfEmpty(payload.companyId);
-    if ('parentCategoryId' in payload) {
-      payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
-      if (payload.parentCategoryId && !(await getTenantModel('Category', Category).exists({ _id: payload.parentCategoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
-        throw new AppError('Parent Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
-      }
-    }
+    if ('parentCategoryId' in payload) payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
+    await resolveSubCategoryParentDefaults(payload, existing, req);
   },
   beforeDelete: categoryGuard,
 });
@@ -266,14 +293,17 @@ export const productHandlers = buildResourceHandlers({
   filterKeys: ['companyId', 'brandId', 'categoryId', 'subCategoryId', 'status', 'showOnMarketplace'],
   populate: 'companyId brandId categoryId subCategoryId',
   extractPublicIds: (doc) => [doc.baseUnit?.image?.publicId, ...(doc.packingUnits || []).map((u) => u.image?.publicId)],
+  afterRead: (doc, req) => stripProductPurchaseRates(doc, req.user),
   beforeCreate: async (payload, req) => {
     sanitizeInventoryPayload(payload);
     await assertOptionalProductRefs(payload, req);
     if (!payload.skuCode) payload.skuCode = `SKU-${Date.now().toString().slice(-6)}`;
   },
-  beforeUpdate: async (payload, _existing, req) => {
+  beforeUpdate: async (payload, existing, req) => {
     sanitizeInventoryPayload(payload);
     await assertOptionalProductRefs(payload, req);
+    preserveHiddenProductRates(payload, existing, req.user);
+    await applyProductUnitVersionChange({ distributorId: req.distributorId, payload, existingProduct: existing });
   },
   beforeDelete: async (doc, req) => {
     if (await getTenantModel('StockBatch', StockBatch).exists({ distributorId: req.distributorId, productId: doc._id, currentBaseQty: { $gt: 0 } })) {
@@ -317,9 +347,10 @@ export const getInventoryDashboard = asyncHandler(async (req, res) => {
     ]),
     ProductM.find({ distributorId }).sort({ createdAt: -1 }).limit(5).populate('companyId brandId categoryId', 'companyName brandName name').lean(),
   ]);
+  const safeRecent = recentProducts.map((p) => stripProductPurchaseRates(p, req.user));
   res.status(200).json({
     success: true,
-    data: { kpis: { totalProducts, activeProducts, inactiveProducts: totalProducts - activeProducts, totalCompanies, totalBrands, totalCategories }, brandBreakdown, recentProducts },
+    data: { kpis: { totalProducts, activeProducts, inactiveProducts: totalProducts - activeProducts, totalCompanies, totalBrands, totalCategories }, brandBreakdown, recentProducts: safeRecent },
   });
 });
 
@@ -333,5 +364,6 @@ export const getProductRateList = asyncHandler(async (req, res) => {
     ProductM.find(filter).sort(sort).skip(skip).limit(limit).populate('companyId brandId categoryId', 'companyName brandName name').lean(),
     ProductM.countDocuments(filter),
   ]);
-  res.status(200).json({ success: true, data: products, pagination: buildPaginationMeta(total) });
+  const safeProducts = products.map((p) => stripProductPurchaseRates(p, req.user));
+  res.status(200).json({ success: true, data: safeProducts, pagination: buildPaginationMeta(total) });
 });

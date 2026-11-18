@@ -1,24 +1,23 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckSquare, Edit, Package, Plus, Printer, Trash2 } from 'lucide-react';
+import { CheckSquare, Copy, Edit, Package, Plus, Printer, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import {
-  ConfirmModal,
-  FilterToolbar,
-  MetricCard,
-  PrintPreviewModal,
-  SmartDataTable,
-} from '../../components/global';
+import { ConfirmModal, FilterToolbar, MetricCard, PrintPreviewModal, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import ProductFormModal, { PRODUCT_RATE_LIST_COLUMNS, buildEmptyProduct } from './ProductFormModal';
 import { extractListPayload, formatCurrency } from '../../utils/formatters';
+import { suggestCode } from '../../utils/validation';
+
+const getId = (ref) => (ref && typeof ref === 'object' ? String(ref._id || '') : String(ref || ''));
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
+  const { canViewPurchasePrice } = useAuth();
   const { addToast } = useShell();
 
   const table = useServerTable({
@@ -85,26 +84,50 @@ export default function ProductsPage() {
   });
 
   const openCreate = () => {
-    setModalState((prev) => ({
-      open: true,
-      initial: buildEmptyProduct(),
-      editingId: null,
-      key: prev.key + 1,
-    }));
-  };
+    let defaultCompanyId = table.filters.companyId || (companies.length === 1 ? companies[0]._id : '');
+    const companyBrands = defaultCompanyId ? brands.filter((b) => getId(b.companyId) === defaultCompanyId) : brands;
+    const defaultBrandId = table.filters.brandId || (companyBrands.length === 1 ? companyBrands[0]._id : '');
+    if (!defaultCompanyId && defaultBrandId) defaultCompanyId = getId(brands.find((b) => b._id === defaultBrandId)?.companyId);
+    const defaultCategoryId = table.filters.categoryId || (categories.length === 1 ? categories[0]._id : '');
+    const subs = subCategoriesQuery.data || [];
+    const matchingSubs = defaultCategoryId ? subs.filter((s) => getId(s.parentCategoryId) === defaultCategoryId) : [];
 
-  const openEdit = (row) => {
     setModalState((prev) => ({
       open: true,
-      editingId: row._id,
+      editingId: null,
       key: prev.key + 1,
       initial: {
         ...buildEmptyProduct(),
-        ...row,
-        companyId: row.companyId?._id || row.companyId || '',
-        brandId: row.brandId?._id || row.brandId || '',
-        categoryId: row.categoryId?._id || row.categoryId || '',
-        subCategoryId: row.subCategoryId?._id || row.subCategoryId || '',
+        skuCode: suggestCode('SKU', table.pagination.totalRecords, table.rows.map((r) => r.skuCode)),
+        companyId: defaultCompanyId,
+        brandId: defaultBrandId,
+        categoryId: defaultCategoryId,
+        subCategoryId: matchingSubs.length === 1 ? matchingSubs[0]._id : '',
+      },
+    }));
+  };
+
+  const openEdit = (row, duplicate = false) => {
+    const { _id, createdAt, updatedAt, ...rowFields } = row;
+    const existingSkus = table.rows.map((r) => String(r.skuCode || '').toUpperCase());
+    const copyCandidate = `${String(row.skuCode || 'SKU').toUpperCase()}-COPY`.slice(0, 32);
+    const clonedSku = existingSkus.includes(copyCandidate) ? suggestCode('SKU', table.pagination.totalRecords, existingSkus) : copyCandidate;
+
+    setModalState((prev) => ({
+      open: true,
+      editingId: duplicate ? null : _id,
+      key: prev.key + 1,
+      initial: {
+        ...buildEmptyProduct(),
+        ...(duplicate ? rowFields : row),
+        skuCode: duplicate ? clonedSku : row.skuCode,
+        companyId: getId(row.companyId),
+        brandId: getId(row.brandId),
+        categoryId: getId(row.categoryId),
+        subCategoryId: getId(row.subCategoryId),
+        posPermission: row.posPermission !== false,
+        bookingPermission: row.bookingPermission !== false,
+        unitVersions: duplicate ? [] : row.unitVersions || [],
         packingUnits: row.packingUnits?.length ? row.packingUnits : buildEmptyProduct().packingUnits,
       },
     }));
@@ -122,15 +145,11 @@ export default function ProductsPage() {
           {r.baseUnit?.image?.url ? (
             <img src={r.baseUnit.image.url} alt={r.productName} className="w-8 h-8 rounded-lg object-cover border shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center shrink-0">
-              <Package className="w-4 h-4" />
-            </div>
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] text-[var(--accent-primary)] flex items-center justify-center shrink-0"><Package className="w-4 h-4" /></div>
           )}
           <div className="min-w-0">
             <p className="font-semibold truncate">{r.productName}</p>
-            <p className="text-[11px] text-[var(--text-muted)] truncate">
-              {r.brandId?.brandName || '—'} · {r.categoryId?.name || '—'}
-            </p>
+            <p className="text-[11px] text-[var(--text-muted)] truncate">{r.brandId?.brandName || '—'} · {r.categoryId?.name || '—'}</p>
           </div>
         </div>
       ),
@@ -139,32 +158,25 @@ export default function ProductsPage() {
       key: 'pack',
       header: 'Pack Ratio',
       numeric: true,
-      accessor: (r) => {
+      render: (r) => {
+        const versions = Array.isArray(r.unitVersions) ? r.unitVersions : [];
+        const activeVer = versions.find((v) => v.versionStatus === 'ACTIVE_DEFAULT') || versions[0];
+        const coexisting = versions.filter((v) => v.versionStatus === 'COEXISTING').length;
         const p = r.packingUnits?.[0];
-        return p ? `1 ${p.unitName} = ${p.conversionQty} ${r.baseUnit?.unitName || 'Pcs'}` : r.baseUnit?.unitName || '—';
+        const unitLabel = activeVer?.unitName || p?.unitName;
+        const convQty = activeVer?.conversionQty || p?.conversionQty;
+        const ratio = unitLabel ? `1 ${unitLabel} = ${convQty} ${r.baseUnit?.unitName || 'Pcs'} (${activeVer?.unitVersionId || 'UV-1'})` : r.baseUnit?.unitName || '—';
+        return (
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span>{ratio}</span>
+            {coexisting > 0 && <span className="px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--accent-soft)] text-[var(--accent-primary)]">+{coexisting} coexisting</span>}
+          </span>
+        );
       },
     },
-    {
-      key: 'traderRate',
-      header: 'Purchase',
-      numeric: true,
-      align: 'right',
-      accessor: (r) => formatCurrency(r.packingUnits?.[0]?.traderPurchaseRate || r.baseUnit?.traderPurchaseRate || 0),
-    },
-    {
-      key: 'wholesaleRate',
-      header: 'Wholesale',
-      numeric: true,
-      align: 'right',
-      accessor: (r) => formatCurrency(r.packingUnits?.[0]?.wholesaleSaleRate || r.baseUnit?.wholesaleSaleRate || 0),
-    },
-    {
-      key: 'retailRate',
-      header: 'Retail POS',
-      numeric: true,
-      align: 'right',
-      accessor: (r) => formatCurrency(r.packingUnits?.[0]?.posRetailEndRate || r.baseUnit?.posRetailEndRate || 0),
-    },
+    ...(canViewPurchasePrice ? [{ key: 'traderRate', header: 'Purchase', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.packingUnits?.[0]?.traderPurchaseRate || r.baseUnit?.traderPurchaseRate || 0) }] : []),
+    { key: 'wholesaleRate', header: 'Wholesale', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.packingUnits?.[0]?.wholesaleSaleRate || r.baseUnit?.wholesaleSaleRate || 0) },
+    { key: 'retailRate', header: 'Retail POS', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.packingUnits?.[0]?.posRetailEndRate || r.baseUnit?.posRetailEndRate || 0) },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
 
@@ -298,6 +310,9 @@ export default function ProductsPage() {
               <Edit className="w-3.5 h-3.5" />
               <span>Edit</span>
             </button>
+            <button type="button" onClick={() => openEdit(row, true)} title="Duplicate SKU" className="px-2 py-1.5 rounded-lg border text-xs hover:bg-[var(--bg-elevated)]">
+              <Copy className="w-3.5 h-3.5" />
+            </button>
             <button type="button" onClick={() => setDeleteTarget(row)} className="px-2 py-1.5 rounded-lg border border-[var(--status-danger)]/30 text-[var(--status-danger)] text-xs">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -312,6 +327,7 @@ export default function ProductsPage() {
           onClose={() => setModalState((p) => ({ ...p, open: false }))}
           initialValue={modalState.initial}
           isEditing={Boolean(modalState.editingId)}
+          canViewPurchasePrice={canViewPurchasePrice}
           existingCount={table.pagination.totalRecords}
           existingCodes={table.rows.map((r) => r.skuCode)}
           companies={companies}

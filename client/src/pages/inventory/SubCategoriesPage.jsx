@@ -79,6 +79,23 @@ export default function SubCategoriesPage() {
     },
   });
 
+  const categories = categoriesQuery.data || [];
+
+  const openCreate = () => {
+    const defaultParentId = table.filters.parentCategoryId || categories[0]?._id || '';
+    const parentCat = categories.find((c) => String(c._id) === String(defaultParentId));
+    const inheritedCompanyId = String(parentCat?.companyId?._id || parentCat?.companyId || '');
+    setEditingId(null);
+    setTouched({});
+    setForm({
+      ...INITIAL_FORM,
+      code: suggestCode('SUB', table.pagination.totalRecords, table.rows.map((r) => r.code)),
+      parentCategoryId: defaultParentId,
+      companyId: inheritedCompanyId,
+    });
+    setModalOpen(true);
+  };
+
   const openEdit = (row) => {
     setEditingId(row._id);
     setTouched({});
@@ -90,8 +107,6 @@ export default function SubCategoriesPage() {
     });
     setModalOpen(true);
   };
-
-  const categories = categoriesQuery.data || [];
 
   const columns = [
     { key: 'code', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.code}</span> },
@@ -117,12 +132,7 @@ export default function SubCategoriesPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setEditingId(null);
-                setTouched({});
-                setForm(INITIAL_FORM);
-                setModalOpen(true);
-              }}
+              onClick={openCreate}
               className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
@@ -173,11 +183,7 @@ export default function SubCategoriesPage() {
         emptyTitle="No sub-categories found"
         emptyDescription="Add sub-categories like Fresh, White, or Lemon under your parent categories."
         emptyActionLabel="Add Sub-Category"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
             <button type="button" onClick={() => openEdit(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">
@@ -253,7 +259,16 @@ export default function SubCategoriesPage() {
               <select
                 required
                 value={form.parentCategoryId}
-                onChange={(e) => setForm((p) => ({ ...p, parentCategoryId: e.target.value }))}
+                onChange={(e) => {
+                  const nextParentId = e.target.value;
+                  const parentCat = categories.find((c) => String(c._id) === String(nextParentId));
+                  const inheritedCompanyId = String(parentCat?.companyId?._id || parentCat?.companyId || '');
+                  setForm((p) => ({
+                    ...p,
+                    parentCategoryId: nextParentId,
+                    companyId: inheritedCompanyId,
+                  }));
+                }}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
                 <option value="">Select parent category...</option>

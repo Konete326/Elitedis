@@ -648,7 +648,7 @@
 ## Milestone 11: Master PRD v1.0 Final Baseline Alignment & Gap Closure (Phases 101–115)
 *(Added after reconciling the 69-page Master PRD v1.0 against Phases 001–100. All phases below carry mandatory PRD §30.5 6-field traceability metadata.)*
 
-### [ ] Phase 101: Product Master Alignment — Optional Purchase Rate, Purchase Price Visibility RBAC & 8-Step Unit Versioning Engine
+### [x] Phase 101: Product Master Alignment — Optional Purchase Rate, Purchase Price Visibility RBAC & 8-Step Unit Versioning Engine
 - **Scope:** Remove mandatory `purchaseRate` validation from Product creation/update; implement `unitVersions[]` inside `Product.model.js`, snapshot immutable `unitVersionId` & `conversionQty` onto `StockBatch.model.js`, auto-promote active default version when older batch stock hits zero, and strip/hide cost fields whenever `user.permissions.purchasePriceVisibility === false`.
 - **Traceability (§30.5):**
   - `PRD Section`: §5.2, §5.3, §5.7, §5.8
@@ -656,7 +656,7 @@
   - `Classification`: Confirmed / Extended
   - `Acceptance Criteria`: AC-03, AC-04
   - `Test Case`: Create SKU without `purchaseRate` (201); create Unit Version v2 (`50 pcs`) with existing v1 stock (`48 pcs`); verify dual-version transactions and cost column masking for non-authorized employee.
-  - `Status`: Pending
+  - `Status`: Complete
 
 ### [ ] Phase 102: Stock Issue Policy (`FIFO` / `FEFO` / `Manual`), Custom Condition Labels & `Blocked` Status Control
 - **Scope:** Add `DistributorPolicy.model.js` storing `stockIssuePolicy` (`FIFO|FEFO|MANUAL`) and `customStockConditions[]` mapped cleanly onto official conditions (`FRESH|NORMAL|DAMAGE|EXPIRE`). Update `stockLedger.service.js` batch reservation sorting to obey distributor policy and block `BLOCKED`/`QUARANTINED`/`DAMAGE`/`EXPIRE` stock from normal allocation.

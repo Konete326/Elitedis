@@ -53,8 +53,18 @@ export default function BeatsPage() {
   };
 
   const openCreateModal = () => {
+    const employees = employeesQuery.data || [];
+    const bookers = employees.filter((e) => e.primaryRole === 'BOOKER' || e.workParts?.orderBooker);
     setEditingId(null);
-    setForm(INITIAL_FORM);
+    setForm({
+      ...INITIAL_FORM,
+      beatCode: suggestCode(
+        'BAT',
+        table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+        (table.rows || []).map((r) => r.beatCode)
+      ),
+      assignedBookerId: bookers[0]?._id || employees[0]?._id || '',
+    });
     setTouched({});
     setModalOpen(true);
   };

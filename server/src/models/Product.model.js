@@ -13,7 +13,13 @@ const baseUnitSchema = new Schema(
     weightValue: { type: Number, default: 0, min: 0 },
     weightUnit: { type: String, enum: ['g', 'Kg', 'ml', 'L'], default: 'Kg' },
     weightInKg: { type: Number, default: 0, min: 0 },
-    traderPurchaseRate: { type: Number, required: true, default: 0, min: 0 },
+    traderPurchaseRate: {
+      type: Number,
+      required: false,
+      default: 0,
+      min: 0,
+      set: (v) => (v === '' || v === null || v === undefined ? 0 : v),
+    },
     wholesaleSaleRate: { type: Number, required: true, default: 0, min: 0 },
     posRetailEndRate: { type: Number, required: true, default: 0, min: 0 },
     image: { type: cloudinaryImageSchema, default: () => ({}) },
@@ -27,7 +33,13 @@ const packingUnitSchema = new Schema(
     conversionQty: { type: Number, required: true, min: 1 },
     weightUnit: { type: String, enum: ['Kg', 'g'], default: 'Kg' },
     packingWeightKg: { type: Number, default: 0, min: 0 },
-    traderPurchaseRate: { type: Number, default: 0, min: 0 },
+    traderPurchaseRate: {
+      type: Number,
+      required: false,
+      default: 0,
+      min: 0,
+      set: (v) => (v === '' || v === null || v === undefined ? 0 : v),
+    },
     wholesaleSaleRate: { type: Number, default: 0, min: 0 },
     posRetailEndRate: { type: Number, default: 0, min: 0 },
     dimensions: { type: dimensionsSchema, default: () => ({}) },
@@ -35,6 +47,23 @@ const packingUnitSchema = new Schema(
     isDefaultStockUnit: { type: Boolean, default: false },
   },
   { _id: true }
+);
+
+const unitVersionSchema = new Schema(
+  {
+    versionNo: { type: Number, required: true, min: 1 },
+    unitVersionId: { type: String, required: true, trim: true },
+    unitName: { type: String, required: true, trim: true, default: 'Carton' },
+    conversionQty: { type: Number, required: true, min: 1 },
+    packingWeightKg: { type: Number, default: 0, min: 0 },
+    effectiveFrom: { type: Date, default: Date.now },
+    versionStatus: {
+      type: String,
+      enum: ['ACTIVE_DEFAULT', 'COEXISTING', 'DEPLETED'],
+      default: 'ACTIVE_DEFAULT',
+    },
+  },
+  { _id: false }
 );
 
 const defaultRulesSchema = new Schema(
@@ -85,6 +114,9 @@ const productSchema = new Schema(
     },
     baseUnit: { type: baseUnitSchema, required: true },
     packingUnits: { type: [packingUnitSchema], default: [] },
+    unitVersions: { type: [unitVersionSchema], default: [] },
+    posPermission: { type: Boolean, default: true },
+    bookingPermission: { type: Boolean, default: true },
     defaultRules: { type: defaultRulesSchema, default: () => ({}) },
     assignedBookerIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     showOnMarketplace: { type: Boolean, default: false },
@@ -113,6 +145,20 @@ productSchema.pre('save', function () {
       pack.packingWeightKg = Number((baseKg * pack.conversionQty).toFixed(4));
     }
     syncAreaAndVolume(pack.dimensions);
+  }
+  if ((!this.unitVersions || this.unitVersions.length === 0) && this.packingUnits?.[0]) {
+    const pack0 = this.packingUnits[0];
+    this.unitVersions = [
+      {
+        versionNo: 1,
+        unitVersionId: 'UV-1',
+        unitName: pack0.unitName || 'Carton',
+        conversionQty: Math.max(1, Number(pack0.conversionQty) || 1),
+        packingWeightKg: pack0.packingWeightKg || 0,
+        effectiveFrom: new Date(),
+        versionStatus: 'ACTIVE_DEFAULT',
+      },
+    ];
   }
 });
 

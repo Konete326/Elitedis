@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Edit, MapPin, Plus, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { ConfirmModal, FilterToolbar, FormModal, MetricCard, SmartDataTable } from '../../components/global';
@@ -23,6 +24,7 @@ const INITIAL_FORM = {
 export default function WarehousesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canViewPurchasePrice } = useAuth();
   const { addToast } = useShell();
 
   const table = useServerTable({
@@ -71,6 +73,16 @@ export default function WarehousesPage() {
     },
   });
 
+  const openCreate = () => {
+    setEditingId(null);
+    setTouched({});
+    setForm({
+      ...INITIAL_FORM,
+      warehouseCode: suggestCode('WH', table.pagination.totalRecords, table.rows.map((r) => r.warehouseCode)),
+    });
+    setModalOpen(true);
+  };
+
   const openEdit = (row) => {
     setEditingId(row._id);
     setTouched({});
@@ -87,7 +99,9 @@ export default function WarehousesPage() {
     { key: 'warehouseName', header: 'Warehouse', mobilePrimary: true, accessor: 'warehouseName' },
     { key: 'warehouseType', header: 'Type', accessor: 'warehouseType' },
     { key: 'zones', header: 'Zones / Areas', numeric: true, accessor: (r) => `${r.zoneCount ?? r.zones?.length ?? 0} / ${r.areaCount ?? 0}` },
-    { key: 'stockVal', header: 'Stock Value', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.stockStats?.totalStockValuePkr || 0) },
+    ...(canViewPurchasePrice
+      ? [{ key: 'stockVal', header: 'Stock Value', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.stockStats?.totalStockValuePkr || 0) }]
+      : []),
     { key: 'utilizationPct', header: 'Utilization', numeric: true, accessor: (r) => `${r.utilizationPct || 0}%` },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
   ];
@@ -109,12 +123,7 @@ export default function WarehousesPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setEditingId(null);
-                setTouched({});
-                setForm(INITIAL_FORM);
-                setModalOpen(true);
-              }}
+              onClick={openCreate}
               className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
@@ -170,11 +179,7 @@ export default function WarehousesPage() {
         emptyTitle="No warehouses created yet"
         emptyDescription="Add your main warehouse or shop store before configuring zones and floor/rack areas."
         emptyActionLabel="Add Warehouse"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
             <button type="button" onClick={() => openEdit(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">

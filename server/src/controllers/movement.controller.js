@@ -6,8 +6,15 @@ import {
 } from '../models/index.js';
 import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
+import { canViewPurchasePrice, stripBatchPurchaseRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
-import { deriveBatchStatus, formatDualUnitQty, getProductUnitMeta, runWithTransaction } from '../services/stockLedger.service.js';
+import {
+  deriveBatchStatus,
+  formatDualUnitQty,
+  getProductUnitMeta,
+  runWithTransaction,
+  syncProductUnitVersionLifecycle,
+} from '../services/stockLedger.service.js';
 import { recordAuditLog } from '../services/accountingPost.service.js';
 import { evaluateLowStockAndExpiryAlerts } from '../services/automationAlert.service.js';
 
@@ -27,17 +34,23 @@ export const listStockBatches = asyncHandler(async (req, res) => {
   const filter = buildScopedFilter(req, extra, ['batchNo'], searchRegex);
   const [batches, totalRecords] = await Promise.all([
     StockBatch.find(filter).sort(sort).skip(skip).limit(limit)
-      .populate('productId', 'skuCode productName baseUnit packingUnits companyId brandId')
+      .populate('productId', 'skuCode productName baseUnit packingUnits unitVersions companyId brandId')
       .populate('warehouseId', 'warehouseCode warehouseName').lean(),
     StockBatch.countDocuments(filter),
   ]);
   const enriched = batches.map((batch) => {
-    const meta = getProductUnitMeta(batch.productId);
-    return {
-      ...batch,
-      dualUnitCurrent: formatDualUnitQty(batch.currentBaseQty, meta.conversionQty, meta.packUnitName, meta.baseUnitName),
-      dualUnitAvailable: formatDualUnitQty(batch.availableBaseQty, meta.conversionQty, meta.packUnitName, meta.baseUnitName),
-    };
+    const meta = getProductUnitMeta(batch.productId, batch.unitName, batch.unitVersionId);
+    const conv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : meta.conversionQty;
+    const isBaseLabel = batch.unitName && batch.unitName.toLowerCase() === meta.baseUnitName.toLowerCase();
+    const packName = batch.unitName && !isBaseLabel ? batch.unitName : meta.packUnitName;
+    return stripBatchPurchaseRates(
+      {
+        ...batch,
+        dualUnitCurrent: formatDualUnitQty(batch.currentBaseQty, conv, packName, meta.baseUnitName),
+        dualUnitAvailable: formatDualUnitQty(batch.availableBaseQty, conv, packName, meta.baseUnitName),
+      },
+      req.user
+    );
   });
   res.status(200).json({ success: true, data: enriched, pagination: buildPaginationMeta(totalRecords) });
 });
@@ -51,12 +64,14 @@ export const applyStockRules = asyncHandler(async (req, res) => {
     if (productId) filter.productId = productId;
     if (warehouseId) filter.warehouseId = warehouseId;
   }
-  const batches = await StockBatch.find(filter).populate('productId', 'packingUnits');
+  const batches = await StockBatch.find(filter).populate('productId', 'baseUnit packingUnits unitVersions');
   for (const batch of batches) {
     if (minStockPack !== undefined) batch.thresholds.minStockPack = Number(minStockPack) || 0;
     if (maxStockPack !== undefined) batch.thresholds.maxStockPack = Number(maxStockPack) || 0;
     if (expiryAlertDays !== undefined) batch.thresholds.expiryAlertDays = Number(expiryAlertDays) || 90;
-    const conv = batch.productId?.packingUnits?.[0]?.conversionQty || 1;
+    const conv = Number(batch.conversionQty) > 1
+      ? Number(batch.conversionQty)
+      : getProductUnitMeta(batch.productId, batch.unitName, batch.unitVersionId).conversionQty;
     batch.status = deriveBatchStatus(batch, conv);
     await batch.save();
   }
@@ -92,74 +107,153 @@ export const getStockValuation = asyncHandler(async (req, res) => {
       { $project: { warehouseName: { $ifNull: ['$warehouse.warehouseName', 'Unknown'] }, valuePkr: 1, weightKg: 1, batchesCount: 1 } },
     ]),
   ]);
-  res.status(200).json({ success: true, data: { summary: totals[0] || {}, byWarehouse } });
+  const allowCost = canViewPurchasePrice(req.user);
+  const summary = allowCost ? (totals[0] || {}) : { ...(totals[0] || {}), totalStockValuePkr: 0 };
+  const safeWarehouses = allowCost ? byWarehouse : byWarehouse.map((w) => ({ ...w, valuePkr: 0 }));
+  res.status(200).json({ success: true, data: { summary, byWarehouse: safeWarehouses } });
 });
 
-async function applyMovementEffects(movement, distributorId, actorId, session) {
+function resolvePurchaseRates(raw, item, product, meta, conv, movedQty) {
+  let ratePerPack = Number(raw.purchaseRatePerPack) || 0;
+  let ratePerBase = Number(raw.purchaseRatePerBase) || 0;
+  if (ratePerPack > 0 && ratePerBase <= 0 && conv > 0) ratePerBase = Number((ratePerPack / conv).toFixed(4));
+  else if (ratePerBase > 0 && ratePerPack <= 0) ratePerPack = Number((ratePerBase * conv).toFixed(2));
+  if (ratePerBase <= 0 && ratePerPack <= 0 && item.totalValuePkr > 0 && movedQty > 0) {
+    ratePerBase = Number((Number(item.totalValuePkr) / movedQty).toFixed(4));
+    ratePerPack = Number((ratePerBase * conv).toFixed(2));
+  }
+  if (ratePerBase <= 0 && ratePerPack <= 0) {
+    const pPack = (product?.packingUnits || []).find((p) => p.unitName?.toLowerCase() === meta.packUnitName?.toLowerCase()) || product?.packingUnits?.[0];
+    const optBase = Number(product?.baseUnit?.traderPurchaseRate) || 0;
+    const optPack = Number(pPack?.traderPurchaseRate) || 0;
+    if (optBase > 0) {
+      ratePerBase = optBase;
+      ratePerPack = optPack > 0 ? optPack : Number((optBase * conv).toFixed(2));
+    } else if (optPack > 0) {
+      ratePerPack = optPack;
+      ratePerBase = Number((optPack / conv).toFixed(4));
+    }
+  }
+  return { ratePerBase, ratePerPack };
+}
+
+async function applyMovementEffects(movement, distributorId, actorId, session, rawItems = null) {
   const { StockBatch, Product } = m();
-  for (const item of movement.items || []) {
+  const depletedProducts = new Set();
+
+  for (let idx = 0; idx < (movement.items || []).length; idx++) {
+    const item = movement.items[idx];
+    const raw = rawItems?.[idx] || item;
     if (item.lineDecision === 'NON_ACCEPT') continue;
     const product = await Product.findOne({ _id: item.productId, distributorId }).session(session).lean();
-    const meta = getProductUnitMeta(product, item.unitName);
-    const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * meta.conversionQty;
 
     if (movement.movementType === 'PURCHASE') {
       const targetWh = movement.toWarehouseId || movement.fromWarehouseId;
       if (!targetWh || !item.toZoneId || !item.toAreaId) {
         throw new AppError('Warehouse, Zone, and Area are required to complete purchase put-away.', 400, 'LOCATION_REQUIRED');
       }
+      const meta = getProductUnitMeta(product, raw.unitName || item.unitName, raw.unitVersionId || item.unitVersionId);
+      const conv = Math.max(1, Number(raw.conversionQty) || meta.conversionQty || 1);
+      const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * conv;
       const batchNo = (item.batchNo || `B-${Date.now().toString().slice(-5)}`).toUpperCase();
+      const { ratePerBase, ratePerPack } = resolvePurchaseRates(raw, item, product, meta, conv, movedQty);
+      const isBaseUnit = (raw.unitName || item.unitName || '').toLowerCase() === meta.baseUnitName.toLowerCase();
+      const batchUnitName = !isBaseUnit && (raw.unitName || item.unitName) ? (raw.unitName || item.unitName) : (conv > 1 ? meta.packUnitName : meta.baseUnitName);
+
       let batch = await StockBatch.findOne({ distributorId, batchNo, productId: item.productId, warehouseId: targetWh, areaId: item.toAreaId }).session(session);
       if (!batch) {
         batch = new StockBatch({
           distributorId, batchNo, productId: item.productId, warehouseId: targetWh, zoneId: item.toZoneId, areaId: item.toAreaId,
-          mfgDate: item.mfgDate || null, expDate: item.expDate || null, purchaseRatePerBase: product?.baseUnit?.traderPurchaseRate || 0,
+          purchaseDate: raw.purchaseDate ? new Date(raw.purchaseDate) : (movement.createdAt || new Date()),
+          mfgDate: item.mfgDate || null, expDate: item.expDate || null,
+          unitVersionId: raw.unitVersionId || meta.unitVersionId || 'UV-1', unitName: batchUnitName,
+          packingSpecification: raw.packingSpecification || meta.packingSpecification || '', conversionQty: conv,
+          purchaseRatePerBase: ratePerBase, purchaseRatePerPack: ratePerPack,
         });
+      } else if (ratePerBase > 0 || ratePerPack > 0) {
+        batch.purchaseRatePerBase = ratePerBase;
+        batch.purchaseRatePerPack = ratePerPack;
       }
       batch.currentBaseQty += movedQty;
       batch.totalWeightKg = Number((batch.currentBaseQty * meta.baseWeightKg).toFixed(3));
-      batch.status = deriveBatchStatus(batch, meta.conversionQty);
+      batch.status = deriveBatchStatus(batch, batch.conversionQty || conv);
       await batch.save(session ? { session } : undefined);
     } else if (movement.movementType === 'TRANSFER' || movement.movementType === 'SAME_TRANSFER') {
       const src = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
+      const srcMeta = getProductUnitMeta(product, item.unitName || src?.unitName, src?.unitVersionId);
+      const srcConv = Number(src?.conversionQty) > 1 ? Number(src.conversionQty) : srcMeta.conversionQty;
+      const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * srcConv;
       if (!src || src.availableBaseQty < movedQty) throw new AppError(`Insufficient stock in batch ${item.batchNo || item.batchId}.`, 400, 'INSUFFICIENT_STOCK');
       src.currentBaseQty -= movedQty;
-      src.totalWeightKg = Number((src.currentBaseQty * meta.baseWeightKg).toFixed(3));
-      src.status = deriveBatchStatus(src, meta.conversionQty);
+      src.totalWeightKg = Number((src.currentBaseQty * srcMeta.baseWeightKg).toFixed(3));
+      src.status = deriveBatchStatus(src, src.conversionQty || srcConv);
       await src.save(session ? { session } : undefined);
+      if (src.currentBaseQty === 0 && src.productId) depletedProducts.add(String(src.productId));
 
       const destWh = movement.movementType === 'SAME_TRANSFER' ? movement.fromWarehouseId : movement.toWarehouseId;
       let dest = await StockBatch.findOne({ distributorId, batchNo: src.batchNo, productId: src.productId, warehouseId: destWh, areaId: item.toAreaId }).session(session);
       if (!dest) {
         dest = new StockBatch({
           distributorId, batchNo: src.batchNo, productId: src.productId, warehouseId: destWh, zoneId: item.toZoneId, areaId: item.toAreaId,
-          mfgDate: src.mfgDate, expDate: src.expDate, purchaseRatePerBase: src.purchaseRatePerBase, condition: src.condition,
+          purchaseDate: src.purchaseDate || src.createdAt || new Date(), mfgDate: src.mfgDate, expDate: src.expDate,
+          unitVersionId: src.unitVersionId || 'UV-1', unitName: src.unitName || srcMeta.packUnitName || 'Carton',
+          packingSpecification: src.packingSpecification || srcMeta.packingSpecification || '',
+          conversionQty: src.conversionQty || srcConv || 1,
+          purchaseRatePerBase: src.purchaseRatePerBase || 0, purchaseRatePerPack: src.purchaseRatePerPack || 0, condition: src.condition,
         });
       }
       dest.currentBaseQty += movedQty;
-      dest.totalWeightKg = Number((dest.currentBaseQty * meta.baseWeightKg).toFixed(3));
-      dest.status = deriveBatchStatus(dest, meta.conversionQty);
+      dest.totalWeightKg = Number((dest.currentBaseQty * srcMeta.baseWeightKg).toFixed(3));
+      dest.status = deriveBatchStatus(dest, dest.conversionQty || srcConv);
       await dest.save(session ? { session } : undefined);
     } else if (movement.movementType === 'ADJUSTMENT') {
       const batch = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
       if (!batch) throw new AppError('Batch not found for adjustment.', 404, 'BATCH_NOT_FOUND');
+      const batchMeta = getProductUnitMeta(product, item.unitName || batch.unitName, batch.unitVersionId);
+      const batchConv = Number(batch.conversionQty) > 1 ? Number(batch.conversionQty) : batchMeta.conversionQty;
       const before = batch.currentBaseQty;
       batch.currentBaseQty = Math.max(0, Number(item.physicalCountBaseQty) || 0);
-      batch.totalWeightKg = Number((batch.currentBaseQty * meta.baseWeightKg).toFixed(3));
-      batch.status = deriveBatchStatus(batch, meta.conversionQty);
+      batch.totalWeightKg = Number((batch.currentBaseQty * batchMeta.baseWeightKg).toFixed(3));
+      batch.status = deriveBatchStatus(batch, batchConv);
       await batch.save(session ? { session } : undefined);
+      if (batch.currentBaseQty === 0 && batch.productId) depletedProducts.add(String(batch.productId));
       await recordAuditLog({
         distributorId, actorId, module: 'STOCK_ADJUSTMENT', action: 'ADJUST_BATCH', entityModel: 'StockBatch', entityId: batch._id,
         beforeState: { currentBaseQty: before }, afterState: { currentBaseQty: batch.currentBaseQty, missing: item.missingBaseQty, damaged: item.damagedBaseQty }, session,
       });
     } else if (movement.movementType === 'EXPIRY_DAMAGE_BACK') {
       const batch = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
+      const batchMeta = getProductUnitMeta(product, item.unitName || batch?.unitName, batch?.unitVersionId);
+      const batchConv = Number(batch?.conversionQty) > 1 ? Number(batch.conversionQty) : batchMeta.conversionQty;
+      const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * batchConv;
       if (!batch || batch.currentBaseQty < movedQty) throw new AppError('Insufficient quarantine stock for supplier return.', 400, 'INSUFFICIENT_STOCK');
       batch.currentBaseQty -= movedQty;
-      batch.status = deriveBatchStatus(batch, meta.conversionQty);
+      batch.totalWeightKg = Number((batch.currentBaseQty * batchMeta.baseWeightKg).toFixed(3));
+      batch.status = deriveBatchStatus(batch, batchConv);
       await batch.save(session ? { session } : undefined);
+      if (batch.currentBaseQty === 0 && batch.productId) depletedProducts.add(String(batch.productId));
     }
   }
+
+  for (const productId of depletedProducts) {
+    await syncProductUnitVersionLifecycle({ distributorId, productId, session });
+  }
+}
+
+function sanitizeMovementCost(movement, user) {
+  if (!movement || canViewPurchasePrice(user)) return movement;
+  const clone = { ...movement };
+  if (Array.isArray(clone.items)) {
+    clone.items = clone.items.map((it) => {
+      const next = { ...it };
+      if (clone.movementType === 'PURCHASE') delete next.totalValuePkr;
+      if (next.productId && typeof next.productId === 'object' && next.productId._bsontype !== 'ObjectId') {
+        next.productId = stripProductPurchaseRates(next.productId, user);
+      }
+      return next;
+    });
+  }
+  return clone;
 }
 
 export const listMovements = asyncHandler(async (req, res) => {
@@ -175,7 +269,7 @@ export const listMovements = asyncHandler(async (req, res) => {
       .populate('preparedById assignedToId', 'fullName profileId').lean(),
     StockMovement.countDocuments(filter),
   ]);
-  res.status(200).json({ success: true, data: movements, pagination: buildPaginationMeta(totalRecords) });
+  res.status(200).json({ success: true, data: movements.map((mv) => sanitizeMovementCost(mv, req.user)), pagination: buildPaginationMeta(totalRecords) });
 });
 
 export const getMovementById = asyncHandler(async (req, res) => {
@@ -183,9 +277,9 @@ export const getMovementById = asyncHandler(async (req, res) => {
   const movement = await StockMovement.findOne({ _id: req.params.id, distributorId: req.distributorId })
     .populate('fromWarehouseId toWarehouseId', 'warehouseCode warehouseName')
     .populate('preparedById assignedToId dispatchedById receivedById', 'fullName profileId')
-    .populate('items.productId', 'skuCode productName baseUnit packingUnits').lean();
+    .populate('items.productId', 'skuCode productName baseUnit packingUnits unitVersions').lean();
   if (!movement) throw new AppError('Stock movement not found.', 404, 'MOVEMENT_NOT_FOUND');
-  res.status(200).json({ success: true, data: movement });
+  res.status(200).json({ success: true, data: sanitizeMovementCost(movement, req.user) });
 });
 
 export const createMovement = asyncHandler(async (req, res) => {
@@ -194,11 +288,25 @@ export const createMovement = asyncHandler(async (req, res) => {
   const actorId = req.user._id;
   const movementCode = req.body.movementCode || `MV-${Date.now().toString().slice(-6)}`;
   const status = req.body.status || 'PENDING';
+  const normalizedItems = Array.isArray(req.body.items)
+    ? req.body.items.map((it) => {
+        if (req.body.movementType !== 'PURCHASE' || (it.totalValuePkr && Number(it.totalValuePkr) > 0)) return it;
+        const qty = Number(it.movedBaseQty) || 0;
+        const packQty = Number(it.movedPackQty) || 0;
+        const conv = Math.max(1, Number(it.conversionQty) || 1);
+        const val = Number(it.purchaseRatePerBase) > 0 && qty > 0
+          ? Number((Number(it.purchaseRatePerBase) * qty).toFixed(2))
+          : Number(it.purchaseRatePerPack) > 0
+            ? (packQty > 0 ? Number((Number(it.purchaseRatePerPack) * packQty).toFixed(2)) : (qty > 0 ? Number(((Number(it.purchaseRatePerPack) / conv) * qty).toFixed(2)) : 0))
+            : 0;
+        return val > 0 ? { ...it, totalValuePkr: val } : it;
+      })
+    : [];
 
   const movement = await runWithTransaction(async (session) => {
-    const [created] = await StockMovement.create([{ ...req.body, distributorId, movementCode, preparedById: actorId, status }], session ? { session } : {});
+    const [created] = await StockMovement.create([{ ...req.body, items: normalizedItems, distributorId, movementCode, preparedById: actorId, status }], session ? { session } : {});
     if (status === 'COMPLETED' || status === 'APPROVED') {
-      await applyMovementEffects(created, distributorId, actorId, session);
+      await applyMovementEffects(created, distributorId, actorId, session, req.body.items);
       created.completedAt = new Date();
       await created.save(session ? { session } : undefined);
     } else if (req.body.assignedToId) {
@@ -215,7 +323,7 @@ export const createMovement = asyncHandler(async (req, res) => {
   });
 
   await evaluateLowStockAndExpiryAlerts({ distributorId, actorId });
-  res.status(201).json({ success: true, data: movement });
+  res.status(201).json({ success: true, data: sanitizeMovementCost(movement.toObject(), req.user) });
 });
 
 export const approveMovement = asyncHandler(async (req, res) => {

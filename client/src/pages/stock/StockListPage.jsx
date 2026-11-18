@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftRight, Boxes, Printer, SlidersHorizontal } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
 import { FilterToolbar, FormModal, MetricCard, PrintPreviewModal, SmartDataTable } from '../../components/global';
@@ -19,6 +20,7 @@ import {
 export default function StockListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canViewPurchasePrice } = useAuth();
   const { addToast } = useShell();
 
   const table = useServerTable({
@@ -67,13 +69,19 @@ export default function StockListPage() {
       key: 'qty',
       header: 'Current (Pack : Base)',
       numeric: true,
-      accessor: (r) =>
-        formatDualUnit(
-          r.currentBaseQty,
-          r.productId?.packingUnits?.[0]?.conversionQty || 1,
-          r.productId?.packingUnits?.[0]?.unitName || 'CT',
-          r.productId?.baseUnit?.unitName || 'Pcs'
-        ),
+      render: (r) => {
+        const conv = r.conversionQty || r.productId?.packingUnits?.[0]?.conversionQty || 1;
+        const packName = r.unitName || r.productId?.packingUnits?.[0]?.unitName || 'CT';
+        const baseName = r.productId?.baseUnit?.unitName || 'Pcs';
+        return (
+          <span className="inline-flex items-center gap-1.5 flex-wrap">
+            <span>{formatDualUnit(r.currentBaseQty, conv, packName, baseName)}</span>
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+              {r.unitVersionId || 'UV-1'}
+            </span>
+          </span>
+        );
+      },
     },
     {
       key: 'available',
@@ -82,7 +90,9 @@ export default function StockListPage() {
       accessor: (r) => `${r.availableBaseQty ?? 0} / ${r.reservedBaseQty ?? 0}`,
     },
     { key: 'weight', header: 'Weight', numeric: true, align: 'right', accessor: (r) => formatWeight(r.totalWeightKg) },
-    { key: 'value', header: 'Value', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.totalStockValuePkr) },
+    ...(canViewPurchasePrice
+      ? [{ key: 'value', header: 'Value', numeric: true, align: 'right', accessor: (r) => formatCurrency(r.totalStockValuePkr) }]
+      : []),
     { key: 'expDate', header: 'EXP Date', accessor: (r) => formatDate(r.expDate) },
     { key: 'condition', header: 'Condition', render: (r) => <StatusBadge status={r.condition} /> },
     { key: 'status', header: 'Status', mobileBadge: true, render: (r) => <StatusBadge status={r.status} /> },
@@ -115,13 +125,15 @@ export default function StockListPage() {
         }
       />
 
-      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={`shrink-0 grid grid-cols-2 ${canViewPurchasePrice ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         <MetricCard title="Matching Batches" value={table.pagination.totalRecords} icon={Boxes} status="primary" />
-        <MetricCard
-          title="Page Stock Value"
-          value={formatCurrency(table.rows.reduce((s, r) => s + (r.totalStockValuePkr || 0), 0))}
-          status="info"
-        />
+        {canViewPurchasePrice && (
+          <MetricCard
+            title="Page Stock Value"
+            value={formatCurrency(table.rows.reduce((s, r) => s + (r.totalStockValuePkr || 0), 0))}
+            status="info"
+          />
+        )}
         <MetricCard
           title="Low / Out Batches"
           value={table.rows.filter((r) => ['LOW_WARNING', 'OUT'].includes(r.status)).length}

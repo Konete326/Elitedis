@@ -54,6 +54,29 @@ export default function AreasRoutesPage() {
 
   const openModal = () => {
     setTouched({});
+    const territories = territoriesQuery.data || [];
+    const areas = areasQuery.data || [];
+    if (tab === 'areas') {
+      setAreaForm({
+        territoryId: territories[0]?._id || '',
+        areaCode: suggestCode('AR', areas.length, areas.map((a) => a.areaCode)),
+        areaName: '',
+        city: 'Karachi',
+        subDistrict: 'Orangi',
+        areaType: 'MARKET',
+      });
+    } else {
+      setRouteForm({
+        areaId: areas[0]?._id || '',
+        routeCode: suggestCode(
+          'RT',
+          table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+          (table.rows || []).map((r) => r.routeCode)
+        ),
+        routeName: '',
+        routeType: 'Main Road',
+      });
+    }
     setModalOpen(true);
   };
 

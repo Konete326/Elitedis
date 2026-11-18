@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Edit, Layers, Plus, Trash2 } from 'lucide-react';
@@ -47,7 +47,21 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [touched, setTouched] = useState({});
+  const [companyAutoHint, setCompanyAutoHint] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const companies = companiesQuery.data || [];
+  const brands = brandsQuery.data || [];
+  const getId = (ref) => (ref && typeof ref === 'object' ? String(ref._id || '') : String(ref || ''));
+
+  const visibleBrands = useMemo(() => {
+    if (!form.companyId) return brands;
+    const matched = brands.filter((b) => getId(b.companyId) === String(form.companyId));
+    const extras = brands.filter(
+      (b) => getId(b.companyId) !== String(form.companyId) && (!b.companyId || form.linkedBrandIds.includes(b._id))
+    );
+    return [...matched, ...extras];
+  }, [brands, form.companyId, form.linkedBrandIds]);
 
   const codeError = touched.code ? validateField('code', form.code, { required: true, label: 'Category Code' }) : '';
   const nameError = touched.name ? validateField('required', form.name, { required: true, minLength: 2, label: 'Category Name' }) : '';
@@ -85,17 +99,53 @@ export default function CategoriesPage() {
   });
 
   const toggleBrand = (brandId) => {
-    setForm((prev) => ({
-      ...prev,
-      linkedBrandIds: prev.linkedBrandIds.includes(brandId)
-        ? prev.linkedBrandIds.filter((id) => id !== brandId)
-        : [...prev.linkedBrandIds, brandId],
-    }));
+    const exists = form.linkedBrandIds.includes(brandId);
+    const nextBrands = exists ? form.linkedBrandIds.filter((id) => id !== brandId) : [...form.linkedBrandIds, brandId];
+    let nextCompanyId = form.companyId;
+    let nextAutoHint = companyAutoHint;
+    if (!exists) {
+      const selectedCompIds = [...new Set(nextBrands.map((id) => getId(brands.find((b) => b._id === id)?.companyId)).filter(Boolean))];
+      const clickedCompId = getId(brands.find((b) => b._id === brandId)?.companyId);
+      if (!form.companyId && (clickedCompId || selectedCompIds.length === 1)) {
+        nextCompanyId = clickedCompId || selectedCompIds[0];
+        nextAutoHint = true;
+      } else if (selectedCompIds.length === 1 && nextAutoHint) {
+        nextCompanyId = selectedCompIds[0];
+      }
+    }
+    setCompanyAutoHint(nextAutoHint);
+    setForm((prev) => ({ ...prev, linkedBrandIds: nextBrands, companyId: nextCompanyId }));
+  };
+
+  const handleCompanyChange = (nextCompanyId) => {
+    setCompanyAutoHint(false);
+    const matchedBrands = nextCompanyId ? brands.filter((b) => getId(b.companyId) === String(nextCompanyId)) : [];
+    setForm((prev) => ({ ...prev, companyId: nextCompanyId, linkedBrandIds: nextCompanyId && matchedBrands.length === 1 ? [matchedBrands[0]._id] : prev.linkedBrandIds }));
+  };
+
+  const openCreate = () => {
+    let defaultCompanyId = table.filters.companyId || (companies.length === 1 ? companies[0]._id : '');
+    const companyBrands = defaultCompanyId ? brands.filter((b) => getId(b.companyId) === String(defaultCompanyId)) : brands;
+    const defaultBrands = companyBrands.length === 1 ? [companyBrands[0]._id] : brands.length === 1 ? [brands[0]._id] : [];
+    let autoFromBrand = false;
+    if (!defaultCompanyId && defaultBrands.length === 1) {
+      const brandCompId = getId(brands.find((b) => b._id === defaultBrands[0])?.companyId);
+      if (brandCompId) {
+        defaultCompanyId = brandCompId;
+        autoFromBrand = true;
+      }
+    }
+    setEditingId(null);
+    setTouched({});
+    setCompanyAutoHint(autoFromBrand);
+    setForm({ ...INITIAL_FORM, code: suggestCode('CAT', table.pagination.totalRecords, table.rows.map((r) => r.code)), companyId: defaultCompanyId, linkedBrandIds: defaultBrands });
+    setModalOpen(true);
   };
 
   const openEdit = (row) => {
     setEditingId(row._id);
     setTouched({});
+    setCompanyAutoHint(false);
     setForm({
       ...INITIAL_FORM,
       ...row,
@@ -104,9 +154,6 @@ export default function CategoriesPage() {
     });
     setModalOpen(true);
   };
-
-  const companies = companiesQuery.data || [];
-  const brands = brandsQuery.data || [];
 
   const columns = [
     { key: 'code', header: 'Code', numeric: true, render: (r) => <span className="font-mono font-semibold">{r.code}</span> },
@@ -137,12 +184,7 @@ export default function CategoriesPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setEditingId(null);
-                setTouched({});
-                setForm(INITIAL_FORM);
-                setModalOpen(true);
-              }}
+              onClick={openCreate}
               className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
             >
               <Plus className="w-4 h-4" />
@@ -176,13 +218,8 @@ export default function CategoriesPage() {
         onRefresh={table.refresh}
         isRefreshing={table.isFetching}
         filters={[
-          {
-            key: 'status',
-            label: 'Status',
-            value: table.filters.status,
-            onChange: (val) => table.setFilter('status', val),
-            options: ['ACTIVE', 'INACTIVE'],
-          },
+          { key: 'companyId', label: 'Company', value: table.filters.companyId, onChange: (val) => table.setFilter('companyId', val), options: companies.map((c) => ({ value: c._id, label: c.companyName })) },
+          { key: 'status', label: 'Status', value: table.filters.status, onChange: (val) => table.setFilter('status', val), options: ['ACTIVE', 'INACTIVE'] },
         ]}
       />
 
@@ -198,11 +235,7 @@ export default function CategoriesPage() {
         emptyTitle="No categories found"
         emptyDescription="Create categories like Detergent, Shampoo, or Dish Wash to group products."
         emptyActionLabel="Add Category"
-        onEmptyAction={() => {
-          setEditingId(null);
-          setForm(INITIAL_FORM);
-          setModalOpen(true);
-        }}
+        onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
             <button type="button" onClick={() => openEdit(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">
@@ -223,12 +256,7 @@ export default function CategoriesPage() {
         onSubmit={(e) => {
           e.preventDefault();
           setTouched({ code: true, name: true });
-          if (
-            validateField('code', form.code, { required: true, label: 'Category Code' }) ||
-            validateField('required', form.name, { required: true, minLength: 2, label: 'Category Name' })
-          ) {
-            return;
-          }
+          if (validateField('code', form.code, { required: true, label: 'Category Code' }) || validateField('required', form.name, { required: true, minLength: 2, label: 'Category Name' })) return;
           saveMutation.mutate(form);
         }}
         isSubmitting={saveMutation.isPending}
@@ -240,12 +268,7 @@ export default function CategoriesPage() {
                 <label className="text-xs font-semibold text-[var(--text-secondary)]">Category Code <span className="text-[var(--status-danger)]">*</span></label>
                 <button
                   type="button"
-                  onClick={() =>
-                    setForm((p) => ({
-                      ...p,
-                      code: suggestCode('CAT', table.pagination.totalRecords, table.rows.map((r) => r.code)),
-                    }))
-                  }
+                  onClick={() => setForm((p) => ({ ...p, code: suggestCode('CAT', table.pagination.totalRecords, table.rows.map((r) => r.code)) }))}
                   className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
                 >
                   Auto Code
@@ -274,14 +297,19 @@ export default function CategoriesPage() {
               {nameError && <p className="mt-1 text-[11px] text-[var(--status-danger)]">{nameError}</p>}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[var(--text-secondary)]">Company <span className="text-[var(--text-muted)] font-normal">(Optional)</span></label>
+                {companyAutoHint && form.companyId && (
+                  <span className="text-[11px] font-medium text-[var(--accent-primary)]">Auto-selected from Brand</span>
+                )}
+              </div>
               <select
                 value={form.companyId}
-                onChange={(e) => setForm((p) => ({ ...p, companyId: e.target.value }))}
+                onChange={(e) => handleCompanyChange(e.target.value)}
                 className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
               >
                 <option value="">All / Optional</option>
-                {(companiesQuery.data || []).map((c) => (
+                {companies.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.companyName}
                   </option>
@@ -304,7 +332,7 @@ export default function CategoriesPage() {
           <div>
             <p className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Linked Brands <span className="text-[var(--text-muted)] font-normal">(Optional)</span></p>
             <div className="flex flex-wrap gap-1.5">
-              {(brandsQuery.data || []).map((b) => {
+              {visibleBrands.map((b) => {
                 const selected = form.linkedBrandIds.includes(b._id);
                 return (
                   <button

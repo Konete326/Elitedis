@@ -25,7 +25,14 @@ export default function ZoneFormModal({
   onSave,
   isSubmitting,
 }) {
-  const [form, setForm] = useState(() => initialValue || buildEmptyZone(warehouses[0]?._id || ''));
+  const [form, setForm] = useState(() => {
+    const base = initialValue || buildEmptyZone(warehouses[0]?._id || '');
+    return {
+      ...base,
+      warehouseId: base.warehouseId || (!isEditing ? warehouses[0]?._id || '' : ''),
+      zoneCode: base.zoneCode || (!isEditing ? suggestCode('ZN', existingCount, existingCodes) : ''),
+    };
+  });
   const [touched, setTouched] = useState({});
 
   const codeError = touched.zoneCode ? validateField('code', form.zoneCode, { required: true, label: 'Zone Code' }) : '';

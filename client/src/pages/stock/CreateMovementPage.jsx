@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, Plus } from 'lucide-react';
 import apiClient from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { useShell } from '../../context/ShellContext';
 import { ConfirmModal, TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
@@ -21,6 +22,7 @@ const MOVEMENT_TYPES = [
 export default function CreateMovementPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canViewPurchasePrice } = useAuth();
   const { addToast } = useShell();
 
   const [movementType, setMovementType] = useState('PURCHASE');
@@ -45,22 +47,27 @@ export default function CreateMovementPage() {
     queryKey: ['companies-options'],
     queryFn: async () => extractListPayload(await apiClient.get('/inventory/companies', { params: { limit: 100 } })).data,
   });
+
+  const warehouses = warehousesQuery.data || [];
+  const effectiveFromWarehouseId = fromWarehouseId || warehouses[0]?._id || '';
+  const effectiveToWarehouseId = toWarehouseId || warehouses[0]?._id || '';
+
   const batchesQuery = useQuery({
-    queryKey: ['stock-batches-options', fromWarehouseId],
+    queryKey: ['stock-batches-options', effectiveFromWarehouseId],
     queryFn: async () =>
       extractListPayload(
         await apiClient.get('/stocks/batches', {
-          params: { limit: 100, warehouseId: fromWarehouseId || undefined },
+          params: { limit: 100, warehouseId: effectiveFromWarehouseId || undefined },
         })
       ).data,
     enabled: movementType !== 'PURCHASE',
   });
 
   const destZones = useMemo(() => {
-    const targetWhId = movementType === 'SAME_TRANSFER' ? fromWarehouseId : toWarehouseId;
-    const wh = (warehousesQuery.data || []).find((w) => String(w._id) === String(targetWhId));
+    const targetWhId = movementType === 'SAME_TRANSFER' ? effectiveFromWarehouseId : effectiveToWarehouseId;
+    const wh = warehouses.find((w) => String(w._id) === String(targetWhId));
     return wh?.zones || [];
-  }, [warehousesQuery.data, movementType, fromWarehouseId, toWarehouseId]);
+  }, [warehouses, movementType, effectiveFromWarehouseId, effectiveToWarehouseId]);
 
   const mutation = useMutation({
     mutationFn: (payload) => apiClient.post('/stocks/movements', payload),
@@ -75,6 +82,18 @@ export default function CreateMovementPage() {
     },
   });
 
+  const resolveProductMeta = (prod) => {
+    const activeVer = prod?.unitVersions?.find((v) => v.versionStatus === 'ACTIVE_DEFAULT') || prod?.unitVersions?.[0];
+    const pack0 = prod?.packingUnits?.[0];
+    return {
+      unitVersionId: activeVer?.unitVersionId || 'UV-1',
+      unitName: activeVer?.unitName || pack0?.unitName || prod?.baseUnit?.unitName || 'Piece',
+      conversionQty: activeVer?.conversionQty || pack0?.conversionQty || 1,
+      purchaseRatePerPack: pack0?.traderPurchaseRate || 0,
+      companyId: String(prod?.companyId?._id || prod?.companyId || ''),
+    };
+  };
+
   const addLineItem = () => {
     const firstProd = productsQuery.data?.[0];
     const firstBatch = batchesQuery.data?.[0];
@@ -86,6 +105,8 @@ export default function CreateMovementPage() {
         addToast({ type: 'warning', message: 'Create a product first before recording a purchase.' });
         return;
       }
+      const meta = resolveProductMeta(firstProd);
+      if (!supplierCompanyId && meta.companyId) setSupplierCompanyId(meta.companyId);
       setItems((prev) => [
         ...prev,
         {
@@ -93,8 +114,11 @@ export default function CreateMovementPage() {
           batchNo: `B-${Date.now().toString().slice(-4)}`,
           toZoneId: firstZone?._id || '',
           toAreaId: firstArea?._id || '',
-          unitName: firstProd.baseUnit?.unitName || 'Piece',
-          movedBaseQty: 24,
+          unitVersionId: meta.unitVersionId,
+          unitName: meta.unitName,
+          conversionQty: meta.conversionQty,
+          ...(canViewPurchasePrice ? { purchaseRatePerPack: meta.purchaseRatePerPack } : {}),
+          movedBaseQty: meta.conversionQty || 24,
           lineDecision: 'ACCEPT',
         },
       ]);
@@ -116,7 +140,8 @@ export default function CreateMovementPage() {
         fromAreaId: firstBatch.areaId,
         toZoneId: firstZone?._id || firstBatch.zoneId,
         toAreaId: firstArea?._id || firstBatch.areaId,
-        unitName: firstBatch.productId?.baseUnit?.unitName || 'Piece',
+        unitVersionId: firstBatch.unitVersionId || 'UV-1',
+        unitName: firstBatch.unitName || firstBatch.productId?.baseUnit?.unitName || 'Piece',
         previousErpBaseQty: firstBatch.currentBaseQty || 0,
         physicalCountBaseQty: firstBatch.currentBaseQty || 0,
         movedBaseQty: 1,
@@ -129,24 +154,48 @@ export default function CreateMovementPage() {
     setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, [key]: val } : row)));
   };
 
+  const handlePurchaseProductChange = (idx, prodId) => {
+    const prod = (productsQuery.data || []).find((p) => String(p._id) === String(prodId));
+    const meta = resolveProductMeta(prod);
+    if (meta.companyId && (!supplierCompanyId || items.length <= 1)) {
+      setSupplierCompanyId(meta.companyId);
+    }
+    setItems((prev) =>
+      prev.map((row, i) =>
+        i === idx
+          ? {
+              ...row,
+              productId: prodId,
+              unitVersionId: meta.unitVersionId,
+              unitName: meta.unitName,
+              conversionQty: meta.conversionQty,
+              ...(canViewPurchasePrice ? { purchaseRatePerPack: meta.purchaseRatePerPack } : {}),
+            }
+          : row
+      )
+    );
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (items.length === 0) {
       addToast({ type: 'warning', message: 'Add at least one item line.' });
       return;
     }
+    const cleanItems = canViewPurchasePrice
+      ? items
+      : items.map(({ purchaseRatePerPack: _drop, ...rest }) => rest);
     mutation.mutate({
       movementType,
       taskName: taskName || `${movementType} Movement`,
-      fromWarehouseId: fromWarehouseId || null,
-      toWarehouseId: toWarehouseId || null,
+      fromWarehouseId: movementType !== 'PURCHASE' ? effectiveFromWarehouseId || null : null,
+      toWarehouseId: movementType === 'PURCHASE' || movementType === 'TRANSFER' ? effectiveToWarehouseId || null : null,
       supplierCompanyId: supplierCompanyId || null,
       status,
-      items,
+      items: cleanItems,
     });
   };
 
-  const warehouses = warehousesQuery.data || [];
   const products = productsQuery.data || [];
   const missingPrereqs =
     !warehousesQuery.isLoading && !productsQuery.isLoading && (warehouses.length === 0 || products.length === 0);
@@ -194,7 +243,7 @@ export default function CreateMovementPage() {
           {movementType !== 'PURCHASE' && (
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">From Warehouse <span className="text-[var(--status-danger)]">*</span></label>
-              <select required value={fromWarehouseId} onChange={(e) => setFromWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <select required value={effectiveFromWarehouseId} onChange={(e) => setFromWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select source...</option>
                 {warehouses.map((w) => (
                   <option key={w._id} value={w._id}>
@@ -208,7 +257,7 @@ export default function CreateMovementPage() {
           {(movementType === 'PURCHASE' || movementType === 'TRANSFER') && (
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Destination Warehouse <span className="text-[var(--status-danger)]">*</span></label>
-              <select required value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+              <select required value={effectiveToWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
                 <option value="">Select destination...</option>
                 {warehouses.map((w) => (
                   <option key={w._id} value={w._id}>
@@ -266,6 +315,8 @@ export default function CreateMovementPage() {
                   products={products}
                   batches={batchesQuery.data || []}
                   destZones={destZones}
+                  canViewPurchasePrice={canViewPurchasePrice}
+                  onPurchaseProductChange={handlePurchaseProductChange}
                   updateLine={updateLine}
                   onOpenKeypad={(i, field) => setKeypadTarget({ idx: i, field, val: items[i][field] })}
                   onRemove={(i) => setRemoveIndexTarget(i)}

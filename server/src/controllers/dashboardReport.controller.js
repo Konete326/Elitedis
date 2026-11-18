@@ -13,6 +13,7 @@ import {
 } from '../models/index.js';
 import { getTenantModels } from '../config/tenantDb.js';
 import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
+import { canViewPurchasePrice, stripBatchPurchaseRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery } from '../middlewares/tenantMiddleware.js';
 import { evaluateLowStockAndExpiryAlerts } from '../services/automationAlert.service.js';
 
@@ -82,6 +83,8 @@ export const getModuleDashboard = asyncHandler(async (req, res) => {
     StockMovement.find({ distributorId, isHidden: false }).sort({ createdAt: -1 }).limit(5).lean(),
   ]);
 
+  const allowCost = canViewPurchasePrice(req.user);
+
   res.status(200).json({
     success: true,
     data: {
@@ -90,7 +93,7 @@ export const getModuleDashboard = asyncHandler(async (req, res) => {
         productsTotal,
         productsActive,
         productsInactive: productsTotal - productsActive,
-        stockValuePkr: stock.totalValue,
+        stockValuePkr: allowCost ? stock.totalValue : 0,
         stockWeightKg: stock.totalWeightKg,
         lowStockCount: stock.lowCount,
         outOfStockCount: stock.outCount,
@@ -143,7 +146,14 @@ export const getReport = asyncHandler(async (req, res) => {
       .populate('productId', 'skuCode productName')
       .populate('warehouseId', 'warehouseName')
       .lean();
-    return res.status(200).json({ success: true, reportSlug: slug, data: { products, batches } });
+    return res.status(200).json({
+      success: true,
+      reportSlug: slug,
+      data: {
+        products: products.map((p) => stripProductPurchaseRates(p, req.user)),
+        batches: batches.map((b) => stripBatchPurchaseRates(b, req.user)),
+      },
+    });
   }
 
   if (slug === 'batch-stock' || slug === 'expiry') {
@@ -153,7 +163,12 @@ export const getReport = asyncHandler(async (req, res) => {
       StockBatch.find(filter).sort({ expDate: 1 }).skip(skip).limit(limit).populate('productId warehouseId', 'skuCode productName warehouseName').lean(),
       StockBatch.countDocuments(filter),
     ]);
-    return res.status(200).json({ success: true, reportSlug: slug, data: rows, pagination: buildPaginationMeta(total) });
+    return res.status(200).json({
+      success: true,
+      reportSlug: slug,
+      data: rows.map((b) => stripBatchPurchaseRates(b, req.user)),
+      pagination: buildPaginationMeta(total),
+    });
   }
 
   if (slug === 'stock-movement' || slug === 'purchase') {
@@ -162,7 +177,15 @@ export const getReport = asyncHandler(async (req, res) => {
       StockMovement.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       StockMovement.countDocuments(filter),
     ]);
-    return res.status(200).json({ success: true, reportSlug: slug, data: rows, pagination: buildPaginationMeta(total) });
+    const allowCost = canViewPurchasePrice(req.user);
+    const safeRows = allowCost
+      ? rows
+      : rows.map((mv) =>
+          mv.movementType === 'PURCHASE' && Array.isArray(mv.items)
+            ? { ...mv, items: mv.items.map(({ totalValuePkr: _drop, ...rest }) => rest) }
+            : mv
+        );
+    return res.status(200).json({ success: true, reportSlug: slug, data: safeRows, pagination: buildPaginationMeta(total) });
   }
 
   if (slug === 'recovery' || slug === 'expense') {

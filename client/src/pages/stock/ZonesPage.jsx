@@ -11,6 +11,7 @@ import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import ZoneFormModal, { buildEmptyZone } from './ZoneFormModal';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode } from '../../utils/validation';
 
 export default function ZonesPage() {
   const navigate = useNavigate();
@@ -65,8 +66,16 @@ export default function ZonesPage() {
   });
 
   const warehouses = warehousesQuery.data || [];
-  const openCreate = () =>
-    setModalState((p) => ({ open: true, editing: null, initial: buildEmptyZone(warehouses[0]?._id || ''), key: p.key + 1 }));
+  const openCreate = () => {
+    const defaultWhId = table.filters.warehouseId || warehouses[0]?._id || '';
+    const defaultCode = suggestCode('ZN', table.pagination.totalRecords, table.rows.map((r) => r.zoneCode));
+    setModalState((p) => ({
+      open: true,
+      editing: null,
+      initial: { ...buildEmptyZone(defaultWhId), zoneCode: defaultCode },
+      key: p.key + 1,
+    }));
+  };
   const openEdit = (row) =>
     setModalState((p) => ({ open: true, editing: row, initial: { ...buildEmptyZone(), ...row }, key: p.key + 1 }));
 

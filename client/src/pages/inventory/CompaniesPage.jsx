@@ -8,6 +8,7 @@ import { ConfirmModal, FilterToolbar, MetricCard, SmartDataTable } from '../../c
 import PageHeader from '../../components/shared/PageHeader';
 import StatusBadge from '../../components/shared/StatusBadge';
 import CompanyFormModal, { buildEmptyCompany } from './CompanyFormModal';
+import { suggestCode } from '../../utils/validation';
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
@@ -53,18 +54,29 @@ export default function CompaniesPage() {
   });
 
   const openCreate = () => {
-    setModalState((p) => ({ open: true, editingId: null, initial: buildEmptyCompany(), key: p.key + 1 }));
+    const code = suggestCode(
+      'COMP',
+      table.pagination.totalRecords,
+      table.rows.map((r) => r.companyCode)
+    );
+    setModalState((p) => ({
+      open: true,
+      editingId: null,
+      initial: { ...buildEmptyCompany(), companyCode: code },
+      key: p.key + 1,
+    }));
   };
 
   const openEdit = (row, duplicate = false) => {
     const base = buildEmptyCompany();
+    const { _id, createdAt, updatedAt, ...rowFields } = row;
     setModalState((p) => ({
       open: true,
-      editingId: duplicate ? null : row._id,
+      editingId: duplicate ? null : _id,
       key: p.key + 1,
       initial: {
         ...base,
-        ...row,
+        ...(duplicate ? rowFields : row),
         companyCode: duplicate ? `${row.companyCode}-COPY` : row.companyCode,
         address: { ...base.address, ...(row.address || {}) },
         contacts: row.contacts?.length ? row.contacts : base.contacts,

@@ -41,6 +41,9 @@ export const INITIAL_EMPLOYEE_FORM = {
     advanceInvoice: false,
     salesman: false,
   },
+  permissions: {
+    purchasePriceVisibility: false,
+  },
 };
 
 export default function EmployeeFormModal({
@@ -55,7 +58,17 @@ export default function EmployeeFormModal({
   onSave,
   isSubmitting,
 }) {
-  const [form, setForm] = useState(() => initialValue || INITIAL_EMPLOYEE_FORM);
+  const [form, setForm] = useState(() => {
+    const base = initialValue || INITIAL_EMPLOYEE_FORM;
+    return {
+      ...INITIAL_EMPLOYEE_FORM,
+      ...base,
+      workParts: { ...INITIAL_EMPLOYEE_FORM.workParts, ...(base.workParts || {}) },
+      permissions: { ...INITIAL_EMPLOYEE_FORM.permissions, ...(base.permissions || {}) },
+      linkedWarehouseId:
+        base.linkedWarehouseId || (!editingId && warehouses.length === 1 ? warehouses[0]._id : ''),
+    };
+  });
   const [touched, setTouched] = useState({});
 
   const errors = {
@@ -262,6 +275,31 @@ export default function EmployeeFormModal({
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="rounded-xl border p-3.5 space-y-2">
+          <span className="text-xs font-bold uppercase text-[var(--accent-primary)]">
+            Cost &amp; Valuation Visibility Permissions
+          </span>
+          <label className="flex items-start gap-2.5 rounded-lg border p-2.5 bg-[var(--bg-canvas)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(form.permissions?.purchasePriceVisibility)}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  permissions: { ...(p.permissions || {}), purchasePriceVisibility: e.target.checked },
+                }))
+              }
+              className="mt-0.5 accent-[var(--accent-primary)]"
+            />
+            <div className="text-xs">
+              <p className="font-semibold text-[var(--text-primary)]">Purchase Price &amp; Stock Valuation Visibility</p>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Allow viewing product purchase rates, batch cost rates, and stock valuation totals (Admins always have access).
+              </p>
+            </div>
+          </label>
         </div>
       </div>
     </FormModal>

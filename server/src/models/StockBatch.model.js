@@ -19,8 +19,13 @@ const stockBatchSchema = new Schema(
     warehouseId: { type: Schema.Types.ObjectId, ref: 'Warehouse', required: true },
     zoneId: { type: Schema.Types.ObjectId, required: true },
     areaId: { type: Schema.Types.ObjectId, required: true },
+    purchaseDate: { type: Date, default: Date.now },
     mfgDate: { type: Date, default: null },
     expDate: { type: Date, default: null },
+    unitVersionId: { type: String, trim: true, default: 'UV-1' },
+    unitName: { type: String, trim: true, default: 'Carton' },
+    packingSpecification: { type: String, trim: true, default: '' },
+    conversionQty: { type: Number, default: 1, min: 1 },
     purchaseRatePerBase: { type: Number, default: 0, min: 0 },
     purchaseRatePerPack: { type: Number, default: 0, min: 0 },
     currentBaseQty: { type: Number, required: true, default: 0, min: 0 },
@@ -46,15 +51,29 @@ const stockBatchSchema = new Schema(
 stockBatchSchema.pre('save', function () {
   const current = Math.max(0, Number(this.currentBaseQty) || 0);
   const reserved = Math.max(0, Number(this.reservedBaseQty) || 0);
+  const conv = Math.max(1, Number(this.conversionQty) || 1);
   this.currentBaseQty = current;
   this.reservedBaseQty = reserved;
+  this.conversionQty = conv;
   this.availableBaseQty = Math.max(0, current - reserved);
 
   if (
+    this.purchaseRatePerPack > 0 &&
+    (!this.purchaseRatePerBase || this.purchaseRatePerBase <= 0) &&
+    conv > 0
+  ) {
+    this.purchaseRatePerBase = Number((this.purchaseRatePerPack / conv).toFixed(4));
+  }
+
+  if (
     this.purchaseRatePerBase > 0 &&
-    (this.isModified('currentBaseQty') || this.isModified('purchaseRatePerBase'))
+    (this.isModified('currentBaseQty') ||
+      this.isModified('purchaseRatePerBase') ||
+      this.isModified('purchaseRatePerPack'))
   ) {
     this.totalStockValuePkr = Number((current * this.purchaseRatePerBase).toFixed(2));
+  } else if (current <= 0) {
+    this.totalStockValuePkr = 0;
   }
 
   if (current <= 0 && this.status !== 'BLOCKED' && this.status !== 'QUARANTINED') {
@@ -67,6 +86,7 @@ stockBatchSchema.index(
   { unique: true }
 );
 stockBatchSchema.index({ distributorId: 1, productId: 1, status: 1, expDate: 1 });
+stockBatchSchema.index({ distributorId: 1, productId: 1, unitVersionId: 1 });
 stockBatchSchema.index({ distributorId: 1, warehouseId: 1, zoneId: 1, areaId: 1 });
 stockBatchSchema.index({ distributorId: 1, condition: 1, status: 1 });
 

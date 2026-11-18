@@ -209,6 +209,12 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(token && resolvedUser);
   const isLoading = Boolean(token && !resolvedUser && meQuery.isPending);
   const agencyProfile = agencyQuery.data || null;
+  const canViewPurchasePrice = Boolean(
+    resolvedUser &&
+      (resolvedUser.primaryRole === 'SUPER_ADMIN' ||
+        resolvedUser.primaryRole === 'ADMIN' ||
+        resolvedUser.permissions?.purchasePriceVisibility === true)
+  );
 
   const value = useMemo(
     () => ({
@@ -217,6 +223,7 @@ export function AuthProvider({ children }) {
       agencyProfile,
       isAuthenticated,
       isLoading,
+      canViewPurchasePrice,
       login,
       register,
       logout,
@@ -233,6 +240,7 @@ export function AuthProvider({ children }) {
       agencyProfile,
       isAuthenticated,
       isLoading,
+      canViewPurchasePrice,
       login,
       register,
       logout,

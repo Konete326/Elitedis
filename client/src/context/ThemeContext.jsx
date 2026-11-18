@@ -1,42 +1,82 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 const THEME_STORAGE_KEY = 'elitedist_theme';
 const ThemeContext = createContext(null);
 
-function resolveInitialTheme() {
+function readSavedTheme() {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+  } catch {
+    // Ignore storage access errors
+  }
+  return null;
+}
+
+function persistThemePreference(theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Ignore storage write errors
+  }
+}
+
+function resolveInitialTheme() {
+  const saved = readSavedTheme();
+  if (saved) {
+    return saved;
+  }
+  try {
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
   } catch {
-    // Ignore storage access errors
+    // Ignore matchMedia errors
   }
   return 'light';
 }
 
 function applyThemeToDocument(theme) {
+  if (typeof document === 'undefined') return;
   const isDark = theme === 'dark';
   const root = document.documentElement;
   root.classList.toggle('dark', isDark);
+  root.classList.toggle('light', !isDark);
   root.style.colorScheme = isDark ? 'dark' : 'light';
 }
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(resolveInitialTheme);
+  const shouldPersistRef = useRef(Boolean(readSavedTheme()));
 
   useEffect(() => {
     applyThemeToDocument(theme);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // Ignore storage write errors
+    if (shouldPersistRef.current) {
+      persistThemePreference(theme);
     }
   }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleSystemThemeChange = (event) => {
+      if (!readSavedTheme()) {
+        shouldPersistRef.current = false;
+        setThemeState(event.matches ? 'dark' : 'light');
+      }
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    }
+    mediaQuery.addListener(handleSystemThemeChange);
+    return () => mediaQuery.removeListener(handleSystemThemeChange);
+  }, []);
 
   const applyWithTransition = useCallback((computeNext) => {
     const prefersReduced =
@@ -62,12 +102,15 @@ export function ThemeProvider({ children }) {
   const setTheme = useCallback(
     (nextTheme) => {
       const normalized = nextTheme === 'dark' ? 'dark' : 'light';
+      shouldPersistRef.current = true;
+      persistThemePreference(normalized);
       applyWithTransition(() => normalized);
     },
     [applyWithTransition]
   );
 
   const toggleTheme = useCallback(() => {
+    shouldPersistRef.current = true;
     applyWithTransition((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, [applyWithTransition]);
 

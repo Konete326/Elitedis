@@ -27,7 +27,16 @@ export default function AreaFormModal({
   onSave,
   isSubmitting,
 }) {
-  const [form, setForm] = useState(() => initialValue || buildEmptyArea(warehouses[0]));
+  const [form, setForm] = useState(() => {
+    const base = initialValue || buildEmptyArea(warehouses[0]);
+    const wh = warehouses.find((w) => String(w._id) === String(base.warehouseId)) || warehouses[0];
+    return {
+      ...base,
+      warehouseId: base.warehouseId || (!isEditing ? wh?._id || '' : ''),
+      zoneId: base.zoneId || (!isEditing ? wh?.zones?.[0]?._id || '' : ''),
+      areaCode: base.areaCode || (!isEditing ? suggestCode('AR', existingCount, existingCodes) : ''),
+    };
+  });
   const [touched, setTouched] = useState({});
 
   const codeError = touched.areaCode ? validateField('code', form.areaCode, { required: true, label: 'Area Code' }) : '';
@@ -72,7 +81,16 @@ export default function AreaFormModal({
             <>
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Warehouse <span className="text-[var(--status-danger)]">*</span></label>
-                <select required value={form.warehouseId} onChange={(e) => setForm((p) => ({ ...p, warehouseId: e.target.value, zoneId: '' }))} className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm">
+                <select
+                  required
+                  value={form.warehouseId}
+                  onChange={(e) => {
+                    const nextWhId = e.target.value;
+                    const newWh = warehouses.find((w) => String(w._id) === String(nextWhId));
+                    setForm((p) => ({ ...p, warehouseId: nextWhId, zoneId: newWh?.zones?.[0]?._id || '' }));
+                  }}
+                  className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
+                >
                   <option value="">Select warehouse...</option>
                   {warehouses.map((w) => (
                     <option key={w._id} value={w._id}>

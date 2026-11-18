@@ -8,22 +8,41 @@ export default function MovementLineRow({
   products,
   batches,
   destZones,
+  canViewPurchasePrice = false,
+  onPurchaseProductChange,
   updateLine,
   onOpenKeypad,
   onRemove,
 }) {
   const selectedZone = destZones.find((z) => String(z._id) === String(row.toZoneId)) || destZones[0];
   const areasList = selectedZone?.areas || [];
+  const selectedProduct = products.find((p) => String(p._id) === String(row.productId));
+  const activeVer =
+    selectedProduct?.unitVersions?.find((v) => v.versionStatus === 'ACTIVE_DEFAULT') ||
+    selectedProduct?.unitVersions?.[0];
+  const versionBadge = row.unitVersionId || activeVer?.unitVersionId || 'UV-1';
+  const showPurchaseCost = movementType === 'PURCHASE' && canViewPurchasePrice;
 
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] p-3.5 bg-[var(--bg-canvas)] space-y-3 md:space-y-0 md:grid md:grid-cols-6 md:gap-2.5 md:items-end animate-fade-in">
+    <div
+      className={`rounded-xl border border-[var(--border-subtle)] p-3.5 bg-[var(--bg-canvas)] space-y-3 md:space-y-0 md:grid ${
+        showPurchaseCost ? 'md:grid-cols-7' : 'md:grid-cols-6'
+      } md:gap-2.5 md:items-end animate-fade-in`}
+    >
       {movementType === 'PURCHASE' ? (
         <>
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">Product</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-[11px] font-semibold text-[var(--text-secondary)]">Product</label>
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+                {versionBadge}
+              </span>
+            </div>
             <select
               value={row.productId}
-              onChange={(e) => updateLine(idx, 'productId', e.target.value)}
+              onChange={(e) =>
+                onPurchaseProductChange ? onPurchaseProductChange(idx, e.target.value) : updateLine(idx, 'productId', e.target.value)
+              }
               className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm"
             >
               {products.map((p) => (
@@ -50,6 +69,24 @@ export default function MovementLineRow({
               className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm font-mono"
             />
           </div>
+          {showPurchaseCost && (
+            <div>
+              <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1">
+                Pack Cost (Opt)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Batch cost"
+                value={row.purchaseRatePerPack ?? ''}
+                onChange={(e) =>
+                  updateLine(idx, 'purchaseRatePerPack', e.target.value === '' ? '' : Number(e.target.value))
+                }
+                className="w-full min-h-[42px] md:h-9 px-2.5 rounded-lg border bg-[var(--bg-surface)] text-xs sm:text-sm tabular-nums"
+              />
+            </div>
+          )}
         </>
       ) : (
         <div className="md:col-span-3">

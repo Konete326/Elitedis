@@ -26,6 +26,21 @@ const workPartsSchema = new Schema(
   { _id: false }
 );
 
+const permissionsSchema = new Schema(
+  {
+    purchasePriceVisibility: { type: Boolean, default: false },
+    canView: { type: Boolean, default: true },
+    canCreate: { type: Boolean, default: true },
+    canEdit: { type: Boolean, default: true },
+    canDelete: { type: Boolean, default: false },
+    canSubmit: { type: Boolean, default: true },
+    canApprove: { type: Boolean, default: false },
+    canStockMovement: { type: Boolean, default: true },
+    canPayment: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const userSchema = new Schema(
   {
     distributorId: { type: String, required: true, trim: true },
@@ -44,6 +59,7 @@ const userSchema = new Schema(
       default: 'BOOKER',
     },
     workParts: { type: workPartsSchema, default: () => ({}) },
+    permissions: { type: permissionsSchema, default: () => ({}) },
     linkedWarehouseId: { type: Schema.Types.ObjectId, ref: 'Warehouse', default: null },
     assignedCompanyIds: [{ type: Schema.Types.ObjectId, ref: 'Company' }],
     assignedBrandIds: [{ type: Schema.Types.ObjectId, ref: 'Brand' }],

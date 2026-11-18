@@ -11,6 +11,7 @@ import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
 import AreaFormModal, { buildEmptyArea } from './AreaFormModal';
 import { extractListPayload } from '../../utils/formatters';
+import { suggestCode } from '../../utils/validation';
 
 export default function AreasPage() {
   const navigate = useNavigate();
@@ -71,10 +72,17 @@ export default function AreasPage() {
   });
 
   const openCreate = () => {
+    const whList = warehousesQuery.data || [];
+    const selectedWh = whList.find((w) => String(w._id) === String(table.filters.warehouseId)) || whList[0] || null;
+    const base = buildEmptyArea(selectedWh);
     setModalState((p) => ({
       open: true,
       editing: null,
-      initial: buildEmptyArea(warehousesQuery.data?.[0]),
+      initial: {
+        ...base,
+        zoneId: table.filters.zoneId || base.zoneId,
+        areaCode: suggestCode('AR', table.pagination.totalRecords, table.rows.map((r) => r.areaCode)),
+      },
       key: p.key + 1,
     }));
   };

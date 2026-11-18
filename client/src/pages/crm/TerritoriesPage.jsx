@@ -54,7 +54,14 @@ export default function TerritoriesPage() {
 
   const openCreateModal = () => {
     setEditingId(null);
-    setForm(INITIAL_FORM);
+    setForm({
+      ...INITIAL_FORM,
+      territoryCode: suggestCode(
+        'TER',
+        table.pagination?.totalRecords ?? table.rows?.length ?? 0,
+        (table.rows || []).map((r) => r.territoryCode)
+      ),
+    });
     setTouched({});
     setModalOpen(true);
   };
