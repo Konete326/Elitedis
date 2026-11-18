@@ -102,7 +102,7 @@ export function SmartDataTable({
   return (
     <div className={`lg:flex-1 lg:min-h-0 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] lg:overflow-hidden transition-colors duration-200 ${className}`}>
       {viewMode !== 'card' && (
-        <div className="hidden lg:block flex-1 min-h-0 overflow-auto">
+        <div className="hidden lg:block flex-1 min-h-0 overflow-auto overscroll-contain">
           <table className="w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)] text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
               <tr>
@@ -162,7 +162,7 @@ export function SmartDataTable({
                       <tr
                         key={id}
                         onClick={onRowClick ? () => onRowClick(row) : undefined}
-                        className={`transition-colors duration-150 ${selected ? 'bg-[var(--accent-soft)]/50' : 'hover:bg-[var(--bg-elevated)]/60'} ${onRowClick ? 'cursor-pointer' : ''}`}
+                        className={`${selected ? 'bg-[var(--accent-soft)]/50' : 'hover:bg-[var(--bg-elevated)]/60'} ${onRowClick ? 'cursor-pointer' : ''}`}
                       >
                         {selectable && (
                           <td className="px-3 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>

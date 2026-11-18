@@ -85,3 +85,53 @@ ELITE DIST enforces a sharp, enterprise distribution visual identity featuring *
 6. **Clean Scroll Restoration:** Restore `document.body.style.overflow` on modal unmount or route change via `ShellContext`.
 7. **Non-Blocking Export Chunking:** Keep CSV/Excel/Print DOM serialization under `< 200ms` INP.
 8. **Zero Dead Buttons:** Every button triggers its live workflow, `<ComingSoonModal />`, or `<ConfirmModal />`.
+
+---
+
+## 5. Outside-In Layout Architecture & Container Hierarchy
+
+1. **Fixed Outside-In Region Budgets:** Design layouts from the outer viewport shell inward using explicit CSS region tokens:
+   - `SideNav`: `240px–280px` (`--region-sidenav-width: 260px`) for primary workspace navigation.
+   - `IconRail`: `64px–72px` (`--region-rail-width: 68px`) when collapsed on desktop.
+   - `DetailPanel` / Inspector Drawer: `340px–420px` (`--region-panel-width: 380px`).
+   - **Content Width Caps vs. Full-Bleed Tables:** Focused forms and auth/settings panels cap width at `--content-width-form` (`640px`) or mixed analytical grids at `--content-width-mixed` (`960px`); high-density `<SmartDataTable />` operational listings expand full-bleed inside the inner viewport container.
+2. **Weakest Container Hierarchy (`gap` → `Divider` → `Section` → `Card`):** Reach for whitespace (`gap`) first, subtle `1px` dividers second, flat semantic sections third, and elevated `Card` surfaces last. Prevent **Card soup** (cards nested inside cards) and **Flexbox soup** (deep ad-hoc flex wrappers where CSS Grid belongs).
+3. **Single Left Content Line & Spacing Rhythm:** Align headings, filter bars, and inner sections along one crisp left content edge. Pair **tight** spacing (`--spacing-1` / `--spacing-2`, `4px–8px`) between closely coupled labels, inputs, and action pairs with **generous** spacing (`--spacing-4` to `--spacing-6`, `16px–24px`) between distinct layout regions.
+4. **Reflowing Grids:** Use `.grid-reflow-cards` (`grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr))`) so KPI strips and card grids wrap smoothly down to `320px` without hardcoded breakpoint guesswork.
+5. **Explicit Responsive Contract:**
+   - **Desktop (`> 1024px`):** Viewport-locked `100dvh` `<AppShell />` with persistent collapsible `SideNav`/`IconRail`, internal scroll containment (`overscroll-contain`), and tabular data views (`28px–36px` fine-pointer control heights).
+   - **Tablet (`768px–1024px`):** Collapsible navigation drawer/rail and adaptive split panes that preserve single-column reading comfort without horizontal overflow.
+   - **Mobile (`< 768px`):** `<SmartDataTable />` switches to stacked cards; coarse pointers (`@media (pointer: coarse)`) scale controls (`--size-element-sm: 36px`, `md: 40px`, `lg: 44px`, `--size-touch-target: 44px`) paired with `<TouchKeypadModal />`.
+
+---
+
+## 6. Core Design Tokens Summary (`globals.css`)
+
+- **Spacing Scale (`4px` / `0.25rem` base):** `--spacing-0` (`0rem`) through `--spacing-12` (`3rem`) in `0.25rem` increments.
+- **Shape & Concentric Radius:** `--radius-none` (`0px`), `--radius-inner` (`8px`), `--radius-element` (`12px`), `--radius-container` (`16px`), `--radius-page` (`32px`), and `--radius-full` (`9999px`). Nested surfaces follow the concentric formula `max(0px, calc(outerRadius - padding))` (`.concentric-inner`).
+- **Typography Scale (`14px` × `1.2` Geometric Scale):** Base `--font-size-base: 0.875rem` (`14px`) with `--font-size-sm` (`0.75rem`), `--font-size-lg` (`1.0625rem`), `--font-size-xl` (`1.25rem`), `--font-size-2xl` (`1.5rem`), weights `400/500/600/700`, `4px`-aligned unitless `line-height: 1.5`, `rem` sizing, and `clamp()` for fluid display headings.
+- **Border, Focus & High Contrast:** `--border-width: 1px`; crisp keyboard focus ring tokens (`--focus-outline-width: 2px`, `--focus-outline-style: solid`, `--focus-outline-color: var(--accent-primary)`, `--focus-outline-offset: 3px`) plus `@media (forced-colors: active)` (`CanvasText` borders, `Highlight` focus outlines).
+- **Zero-Purple Data-Viz Palette:** Categorical series tokens `--color-data-categorical-blue` (`#0171E3`), `-cyan` (`#0171A4`), `-teal` (`#08A3A3`), `-green` (`#0B991F`), `-orange` (`#EB6E00`), `-red` (`#F5394F`), and adaptive `--color-data-neutral` (`light-dark(#8494A3, #8C939B)`).
+
+---
+
+## 7. Motion Architecture
+
+- **Duration Bands & Curves:**
+  - **Fast (`130ms–230ms`, `--duration-fast: 175ms`):** Hover states, focus fades, dropdowns, micro-reveals, and modal/dialog entrances (`--ease-entrance: cubic-bezier(0.24, 1, 0.4, 1)`).
+  - **Medium (`310ms–550ms`, `--duration-medium: 410ms`):** Off-canvas drawers and large spatial layout shifts (`--ease-move: cubic-bezier(0.24, 1, 0.4, 1)`).
+  - **Slow (`--duration-slow: 975ms`) & Exit (`--duration-exit: 175ms`):** Ambient progress/shimmer cycles and snappy exit transitions (`--ease-exit: cubic-bezier(0.3, 0, 0.6, 0.6)`).
+  - Supports `interpolate-size: allow-keywords` for intrinsic height animations, respects `@media (prefers-reduced-motion: reduce)`, and never animates `scrollbar-color`.
+- **Where Motion Helps vs. Where Motion Hurts:**
+  - **Helps:** Spatial orientation in drawers (`FormModal`, mobile `Sidebar`), confirmation/popover scale-ins, skeleton shimmers, and theme view transitions.
+  - **Hurts:** High-density ERP data tables (`table, thead, tbody, tr, th, td`) and long list rows—hover highlights MUST remain instantaneous (zero transition delay) so fast cursor scanning never lags. Coarse-pointer touch transitions cross-fade at `<= 200ms`.
+
+---
+
+## 8. Modern Web Guidance Form, Dialog & Smart Auto-Selection Patterns
+
+- **Auto-Sizing Textareas:** `<textarea>` uses `resize: vertical; field-sizing: content; min-block-size: 3lh; max-block-size: 15lh;` so remarks and address notes expand naturally without clipping.
+- **IME-Safe Search & Enter Submit:** Every Enter-to-submit handler (including `<FilterToolbar />`) guards IME composition (`if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) return;`) before triggering immediate search/submit.
+- **Premature-Error-Free Validation:** CSS validation uses `:user-invalid` (excluding `[type="range"]`) and `:has(:user-invalid)` parent label highlighting—never bare `:invalid`—so untouched forms stay calm until interaction.
+- **Drag-Safe Light Dismiss & Scroll Containment:** Backdrop overlays (`FormModal`, `ConfirmModal`) track `pointerdown` origin (`pointerDownOnBackdropRef`) so dragging text selection outside a modal never triggers an accidental backdrop close; modal and table scroll bodies set `overscroll-contain`.
+- **Browser `autocomplete` & Smart Defaults:** Auth and contact inputs expose standard `autocomplete` tokens (`username`, `current-password`, `email`, `tel`). Creation modals auto-suggest structured codes (`SKU`, `COMP`, `BR`, `CAT`, `SUB`, `WH`, `ZN`, `AR`, `TER`, `BAT`) and bidirectionally auto-select parent/single-option relations (`Company ↔ Brand ↔ Category ↔ Sub-Category`, `Warehouse → Zone → Area`).

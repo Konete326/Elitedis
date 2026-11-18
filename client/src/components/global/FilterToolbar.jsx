@@ -91,6 +91,15 @@ export function FilterToolbar({
     onSearchChange?.('');
   };
 
+  const handleSearchKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    onResetPage?.();
+    onSearchChange?.(localSearch);
+  };
+
   const handleResetAll = onResetFilters || onReset;
   const hasFilters = (Array.isArray(filters) && filters.length > 0) || Boolean(children);
 
@@ -110,6 +119,7 @@ export function FilterToolbar({
                 type="text"
                 value={localSearch}
                 onChange={handleInputChange}
+                onKeyDown={handleSearchKeyDown}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
                 className="w-full min-h-[42px] sm:h-9 sm:min-h-0 pl-9 pr-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] transition-colors duration-200"

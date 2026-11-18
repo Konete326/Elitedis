@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
@@ -38,6 +38,7 @@ export function FormModal({
   const resolvedMode = mode || variant;
   const isDrawer = resolvedMode === 'drawer';
   const { lockScroll, unlockScroll } = useShell();
+  const pointerDownOnBackdropRef = useRef(false);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -84,7 +85,7 @@ export function FormModal({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4">{children}</div>
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4">{children}</div>
 
       {(footer || onSubmit) && (
         <div className="shrink-0 flex flex-wrap items-center justify-end gap-2 px-4 sm:px-6 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60">
@@ -117,7 +118,16 @@ export function FormModal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      onClick={() => closeOnBackdrop && !isSubmitting && onClose?.()}
+      onPointerDown={(e) => {
+        pointerDownOnBackdropRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        const shouldClose = e.target === e.currentTarget && pointerDownOnBackdropRef.current;
+        pointerDownOnBackdropRef.current = false;
+        if (shouldClose && closeOnBackdrop && !isSubmitting) {
+          onClose?.();
+        }
+      }}
       className={`fixed inset-0 z-[100] flex bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in ${
         isDrawer ? 'justify-end' : 'items-center justify-center p-2.5 sm:p-5'
       }`}

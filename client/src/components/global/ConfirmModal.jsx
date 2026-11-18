@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ShieldAlert, Info, Check } from 'lucide-react';
 import { useShell } from '../../context/ShellContext';
@@ -54,6 +54,7 @@ export function ConfirmModal({
   const busy = isLoading || loading;
   const handleClose = onClose || onCancel;
   const { lockScroll, unlockScroll } = useShell();
+  const pointerDownOnBackdropRef = useRef(false);
 
   const style = TONE_MAP[tone || variant] || TONE_MAP.danger;
   const StatusIcon = style.Icon;
@@ -85,7 +86,16 @@ export function ConfirmModal({
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-[var(--bg-overlay)] backdrop-blur-md animate-fade-in"
-      onClick={() => !busy && handleClose?.()}
+      onPointerDown={(e) => {
+        pointerDownOnBackdropRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        const shouldClose = e.target === e.currentTarget && pointerDownOnBackdropRef.current;
+        pointerDownOnBackdropRef.current = false;
+        if (shouldClose && !busy) {
+          handleClose?.();
+        }
+      }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
