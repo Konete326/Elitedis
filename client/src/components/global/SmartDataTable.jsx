@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Inbox, Loader2, Plus } from 'lucide-react';
 import PaginationBar from './PaginationBar';
+import SmartMediaCard from './SmartMediaCard';
 
 const getRowKey = (row, idx, keyField) => row?.[keyField] ?? row?.id ?? row?._id ?? idx;
 
@@ -223,56 +224,21 @@ export function SmartDataTable({
                 const selected = checkSelected(selectedKeys, id);
 
                 return (
-                  <div
+                  <SmartMediaCard
                     key={id}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={`animate-fade-in rounded-xl border p-4 transition-colors duration-150 ${
-                      selected
-                        ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/30'
-                        : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)]/40'
-                    } ${onRowClick ? 'cursor-pointer' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-[var(--border-subtle)]">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {selectable && (
-                          <input
-                            type="checkbox"
-                            aria-label={`Select row ${id}`}
-                            checked={selected}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelectOne(id)}
-                            className="w-4 h-4 shrink-0 rounded accent-[var(--accent-primary)]"
-                          />
-                        )}
-                        <div className="min-w-0 font-semibold text-sm text-[var(--text-primary)] truncate">
-                          {primaryCol ? getCellValue(row, primaryCol, rIdx) : id}
-                        </div>
-                      </div>
-                      {badgeCol && <div className="shrink-0">{getCellValue(row, badgeCol, rIdx)}</div>}
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 text-xs">
-                      {detailCols.slice(0, 6).map((col) => (
-                        <div key={col.key} className="min-w-0">
-                          <span className="block text-[11px] font-medium text-[var(--text-muted)] truncate">
-                            {col.header || col.label}
-                          </span>
-                          <span className={`mt-0.5 block font-semibold text-[var(--text-primary)] truncate ${col.numeric ? 'tabular-nums font-mono' : ''}`}>
-                            {getCellValue(row, col, rIdx)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {renderActions && (
-                      <div
-                        className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-end gap-2 [&>button]:min-h-[44px] [&>a]:min-h-[44px]"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {renderActions(row, rIdx)}
-                      </div>
-                    )}
-                  </div>
+                    row={row}
+                    rIdx={rIdx}
+                    id={id}
+                    selected={selected}
+                    selectable={selectable}
+                    toggleSelectOne={toggleSelectOne}
+                    onRowClick={onRowClick}
+                    primaryCol={primaryCol}
+                    badgeCol={badgeCol}
+                    detailCols={detailCols}
+                    getCellValue={getCellValue}
+                    renderActions={renderActions}
+                  />
                 );
               })}
         </div>

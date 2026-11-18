@@ -144,34 +144,47 @@ export default function BookerPortalPage() {
               </span>
             </div>
 
-            <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
+            <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto p-3 grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 content-start">
               {(catalogQuery.data || []).map((prod) => {
                 const inCart = cart.find((x) => x.productId === prod._id);
                 const rate = prod.packingUnits?.[0]?.wholesaleSaleRate || prod.baseUnit?.wholesaleSaleRate || 0;
+                const imgUrl = prod.baseUnit?.image?.url || prod.packingUnits?.[0]?.image?.url || '';
                 return (
                   <button
                     key={prod._id}
                     type="button"
                     onClick={() => setKeypadProd(prod)}
-                    className={`rounded-xl border p-3 text-left flex flex-col justify-between min-h-[92px] transition ${
-                      inCart ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/50' : 'bg-[var(--bg-canvas)] hover:bg-[var(--bg-elevated)]'
+                    className={`group overflow-hidden rounded-2xl border text-left flex flex-col justify-between transition ${
+                      inCart ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/50 shadow-md' : 'bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] hover:shadow-md'
                     }`}
                   >
-                    <div>
-                      <p className="text-xs font-bold truncate">{prod.productName}</p>
-                      <p className="text-[11px] font-mono text-[var(--text-muted)]">{prod.skuCode} · Stock: {prod.availableBaseQty ?? 0}</p>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="font-mono font-semibold tabular-nums text-[var(--accent-primary)]">
-                        {formatCurrency(rate)}
-                      </span>
-                      {inCart ? (
-                        <span className="px-2 py-0.5 rounded-full bg-[var(--accent-primary)] text-white font-mono text-[11px]">
-                          x{inCart.quantity}
-                        </span>
+                    <div className="relative h-28 sm:h-32 w-full bg-[var(--bg-elevated)] overflow-hidden border-b border-[var(--border-subtle)]">
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={prod.productName} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                       ) : (
-                        <Calculator className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                        <div className="h-full w-full flex items-center justify-center text-[var(--accent-primary)]/40">
+                          <Calculator className="w-7 h-7" />
+                        </div>
                       )}
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--bg-surface)]/90 text-[var(--text-primary)] border border-[var(--border-subtle)] backdrop-blur-sm">
+                        Stock {prod.availableBaseQty ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-3 w-full">
+                      <p className="text-xs font-bold truncate">{prod.productName}</p>
+                      <p className="text-[11px] font-mono text-[var(--text-muted)] truncate">{prod.skuCode}</p>
+                      <div className="mt-2 flex items-center justify-between text-xs">
+                        <span className="font-mono font-semibold tabular-nums text-[var(--accent-primary)]">
+                          {formatCurrency(rate)}
+                        </span>
+                        {inCart ? (
+                          <span className="px-2 py-0.5 rounded-full bg-[var(--accent-primary)] text-white font-mono text-[11px]">
+                            x{inCart.quantity}
+                          </span>
+                        ) : (
+                          <Calculator className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                        )}
+                      </div>
                     </div>
                   </button>
                 );

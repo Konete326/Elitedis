@@ -155,26 +155,39 @@ export default function PosPortalPage() {
               </select>
             </div>
 
-            <div className="max-h-[46vh] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 content-start">
+            <div className="max-h-[48vh] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto p-3 grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 content-start">
               {(catalogQuery.data || []).map((prod) => {
                 const rate =
                   invoiceMode === 'POS_WHOLESALE'
                     ? prod.baseUnit?.wholesaleSaleRate || 0
                     : prod.baseUnit?.posRetailEndRate || 0;
+                const imgUrl = prod.baseUnit?.image?.url || prod.packingUnits?.[0]?.image?.url || '';
                 return (
                   <button
                     key={prod._id}
                     type="button"
                     onClick={() => addItem(prod)}
-                    className="rounded-xl border bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] p-3 text-left flex flex-col justify-between min-h-[88px] transition"
+                    className="group overflow-hidden rounded-2xl border bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] hover:shadow-md text-left flex flex-col justify-between transition"
                   >
-                    <div>
-                      <p className="text-xs font-bold truncate">{prod.productName}</p>
-                      <p className="text-[11px] font-mono text-[var(--text-muted)]">{prod.skuCode} · Stock {prod.availableBaseQty ?? 0}</p>
+                    <div className="relative h-28 sm:h-32 w-full bg-[var(--bg-elevated)] overflow-hidden border-b border-[var(--border-subtle)]">
+                      {imgUrl ? (
+                        <img src={imgUrl} alt={prod.productName} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-[var(--accent-primary)]/40">
+                          <Store className="w-8 h-8" />
+                        </div>
+                      )}
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--bg-surface)]/90 text-[var(--text-primary)] border border-[var(--border-subtle)] backdrop-blur-sm">
+                        Stock {prod.availableBaseQty ?? 0}
+                      </span>
                     </div>
-                    <p className="mt-2 font-mono font-bold text-xs tabular-nums text-[var(--accent-primary)]">
-                      {formatCurrency(rate)} / {prod.baseUnit?.unitName || 'Pc'}
-                    </p>
+                    <div className="p-3 w-full">
+                      <p className="text-xs font-bold truncate">{prod.productName}</p>
+                      <p className="text-[11px] font-mono text-[var(--text-muted)] truncate">{prod.skuCode}</p>
+                      <p className="mt-1.5 font-mono font-bold text-xs tabular-nums text-[var(--accent-primary)]">
+                        {formatCurrency(rate)} / {prod.baseUnit?.unitName || 'Pc'}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
