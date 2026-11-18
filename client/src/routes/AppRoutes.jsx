@@ -23,6 +23,7 @@ import ZonesPage from '../pages/stock/ZonesPage';
 import AreasPage from '../pages/stock/AreasPage';
 import MovementsPage from '../pages/stock/MovementsPage';
 import CreateMovementPage from '../pages/stock/CreateMovementPage';
+import PurchaseReceivingPage from '../pages/stock/PurchaseReceivingPage';
 
 import CrmDashboardPage from '../pages/crm/CrmDashboardPage';
 import CustomersPage from '../pages/crm/CustomersPage';
@@ -142,6 +143,7 @@ export default function AppRoutes() {
           <Route path="/stock/areas" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER']} requiredWorkPart="warehouseManager"><AreasPage /></ProtectedRoute>} />
           <Route path="/stock/movements" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER']} requiredWorkPart="warehouseManager"><MovementsPage /></ProtectedRoute>} />
           <Route path="/stock/movements/create" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER']} requiredWorkPart="warehouseManager"><CreateMovementPage /></ProtectedRoute>} />
+          <Route path="/stock/purchase-receiving" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'WAREHOUSE_MANAGER', 'STOREKEEPER']} requiredWorkPart="warehouseManager"><PurchaseReceivingPage /></ProtectedRoute>} />
 
           <Route path="/crm/dashboard" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'BOOKER']}><CrmDashboardPage /></ProtectedRoute>} />
           <Route path="/crm/customers" element={<ProtectedRoute allowedRoles={[...ADMIN_ROLES, 'BOOKER', 'SALESMAN', 'ACCOUNTANT']}><CustomersPage /></ProtectedRoute>} />

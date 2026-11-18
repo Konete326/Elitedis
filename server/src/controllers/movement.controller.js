@@ -4,6 +4,7 @@ import { AppError, asyncHandler } from '../middlewares/errorMiddleware.js';
 import { canViewPurchasePrice, stripBatchPurchaseRates, stripProductPurchaseRates } from '../middlewares/rbacMiddleware.js';
 import { buildPaginationQuery, buildScopedFilter } from '../middlewares/tenantMiddleware.js';
 import { applyBatchConditionAndStatus, deriveBatchStatus, formatDualUnitQty, getDistributorStockPolicy, getProductUnitMeta, runWithTransaction, saveDistributorStockPolicy, syncProductUnitVersionLifecycle } from '../services/stockLedger.service.js';
+import { buildDiscrepancyAlerts, executePurchaseReturn, executeSegregatedPurchasePutAway, normalizePurchaseItem } from '../services/purchaseReceiving.service.js';
 import { recordAuditLog } from '../services/accountingPost.service.js';
 import { evaluateLowStockAndExpiryAlerts } from '../services/automationAlert.service.js';
 
@@ -151,37 +152,25 @@ async function applyMovementEffects(movement, distributorId, actorId, session, r
     const product = await Product.findOne({ _id: item.productId, distributorId }).session(session).lean();
 
     if (movement.movementType === 'PURCHASE') {
-      const targetWh = movement.toWarehouseId || movement.fromWarehouseId;
-      if (!targetWh || !item.toZoneId || !item.toAreaId) {
-        throw new AppError('Warehouse, Zone, and Area are required to complete purchase put-away.', 400, 'LOCATION_REQUIRED');
-      }
-      const meta = getProductUnitMeta(product, raw.unitName || item.unitName, raw.unitVersionId || item.unitVersionId);
-      const conv = Math.max(1, Number(raw.conversionQty) || meta.conversionQty || 1);
-      const movedQty = Number(item.movedBaseQty) || (Number(item.movedPackQty) || 0) * conv;
-      const batchNo = (item.batchNo || `B-${Date.now().toString().slice(-5)}`).toUpperCase();
-      const { ratePerBase, ratePerPack } = resolvePurchaseRates(raw, item, product, meta, conv, movedQty);
-      const isBaseUnit = (raw.unitName || item.unitName || '').toLowerCase() === meta.baseUnitName.toLowerCase();
-      const batchUnitName = !isBaseUnit && (raw.unitName || item.unitName) ? (raw.unitName || item.unitName) : (conv > 1 ? meta.packUnitName : meta.baseUnitName);
-
-      let batch = await StockBatch.findOne({ distributorId, batchNo, productId: item.productId, warehouseId: targetWh, areaId: item.toAreaId }).session(session);
-      if (!batch) {
-        batch = new StockBatch({
-          distributorId, batchNo, productId: item.productId, warehouseId: targetWh, zoneId: item.toZoneId, areaId: item.toAreaId,
-          purchaseDate: raw.purchaseDate ? new Date(raw.purchaseDate) : (movement.createdAt || new Date()),
-          mfgDate: item.mfgDate || null, expDate: item.expDate || null,
-          unitVersionId: raw.unitVersionId || meta.unitVersionId || 'UV-1', unitName: batchUnitName,
-          packingSpecification: raw.packingSpecification || meta.packingSpecification || '', conversionQty: conv,
-          purchaseRatePerBase: ratePerBase, purchaseRatePerPack: ratePerPack,
-          condition: raw.condition || item.condition || 'FRESH',
-          customConditionLabel: raw.customConditionLabel || item.customConditionLabel || '',
-        });
-      } else {
-        if (ratePerBase > 0 || ratePerPack > 0) Object.assign(batch, { purchaseRatePerBase: ratePerBase, purchaseRatePerPack: ratePerPack });
-        if (raw.condition || item.condition) batch.condition = raw.condition || item.condition;
-        if (raw.customConditionLabel || item.customConditionLabel) batch.customConditionLabel = raw.customConditionLabel || item.customConditionLabel;
-      }
-      batch.currentBaseQty += movedQty;
-      await saveBatchWeightAndStatus(batch, meta.baseWeightKg, batch.conversionQty || conv, session);
+      await executeSegregatedPurchasePutAway({
+        movement,
+        item,
+        raw,
+        product,
+        distributorId,
+        session,
+        resolveRatesFn: resolvePurchaseRates,
+      });
+    } else if (movement.movementType === 'PURCHASE_RETURN') {
+      await executePurchaseReturn({
+        movement,
+        item,
+        product,
+        distributorId,
+        actorId,
+        session,
+        depletedProducts,
+      });
     } else if (movement.movementType === 'TRANSFER' || movement.movementType === 'SAME_TRANSFER') {
       const src = await StockBatch.findOne({ _id: item.batchId, distributorId }).session(session);
       const srcMeta = getProductUnitMeta(product, item.unitName || src?.unitName, src?.unitVersionId);
@@ -289,28 +278,35 @@ function normalizeMovementItem(movementType, it) {
     const phys = Math.max(0, Number(it.physicalCountBaseQty) || 0);
     return { ...it, systemBaseQty: sys, previousErpBaseQty: sys, physicalCountBaseQty: phys, differenceBaseQty: phys - sys, updatedBalanceBaseQty: phys };
   }
-  if (movementType !== 'PURCHASE' || (it.totalValuePkr && Number(it.totalValuePkr) > 0)) return it;
-  const qty = Number(it.movedBaseQty) || 0;
-  const packQty = Number(it.movedPackQty) || 0;
-  const conv = Math.max(1, Number(it.conversionQty) || 1);
-  const val = Number(it.purchaseRatePerBase) > 0 && qty > 0
-    ? Number((Number(it.purchaseRatePerBase) * qty).toFixed(2))
-    : Number(it.purchaseRatePerPack) > 0
-      ? (packQty > 0 ? Number((Number(it.purchaseRatePerPack) * packQty).toFixed(2)) : (qty > 0 ? Number(((Number(it.purchaseRatePerPack) / conv) * qty).toFixed(2)) : 0))
+  if (movementType !== 'PURCHASE') return it;
+  const normalized = normalizePurchaseItem(it);
+  if (normalized.totalValuePkr && Number(normalized.totalValuePkr) > 0) return normalized;
+  const qty = Number(normalized.receivedBaseQty || normalized.movedBaseQty) || 0;
+  const packQty = Number(normalized.movedPackQty) || 0;
+  const conv = Math.max(1, Number(normalized.conversionQty) || 1);
+  const val = Number(normalized.purchaseRatePerBase) > 0 && qty > 0
+    ? Number((Number(normalized.purchaseRatePerBase) * qty).toFixed(2))
+    : Number(normalized.purchaseRatePerPack) > 0
+      ? (packQty > 0 ? Number((Number(normalized.purchaseRatePerPack) * packQty).toFixed(2)) : (qty > 0 ? Number(((Number(normalized.purchaseRatePerPack) / conv) * qty).toFixed(2)) : 0))
       : 0;
-  return val > 0 ? { ...it, totalValuePkr: val } : it;
+  return val > 0 ? { ...normalized, totalValuePkr: val } : normalized;
 }
 
 export const createMovement = asyncHandler(async (req, res) => {
   const { StockMovement, PendingTask } = m();
   const distributorId = req.distributorId;
   const actorId = req.user._id;
+  if (req.body.idempotencyKey) {
+    const existing = await StockMovement.findOne({ distributorId, idempotencyKey: req.body.idempotencyKey }).lean();
+    if (existing) return res.status(200).json({ success: true, idempotentReplay: true, data: sanitizeMovementCost(existing, req.user) });
+  }
   const movementCode = req.body.movementCode || `MV-${Date.now().toString().slice(-6)}`;
   const status = req.body.status || 'PENDING';
   const normalizedItems = Array.isArray(req.body.items) ? req.body.items.map((it) => normalizeMovementItem(req.body.movementType, it)) : [];
+  const discrepancyAlerts = req.body.movementType === 'PURCHASE' ? buildDiscrepancyAlerts(normalizedItems) : [];
 
   const movement = await runWithTransaction(async (session) => {
-    const [created] = await StockMovement.create([{ ...req.body, items: normalizedItems, distributorId, movementCode, preparedById: actorId, status }], session ? { session } : {});
+    const [created] = await StockMovement.create([{ ...req.body, items: normalizedItems, discrepancyAlerts, distributorId, movementCode, preparedById: actorId, status }], session ? { session } : {});
     if (status === 'COMPLETED' || status === 'APPROVED') {
       await applyMovementEffects(created, distributorId, actorId, session, req.body.items);
       created.completedAt = new Date();

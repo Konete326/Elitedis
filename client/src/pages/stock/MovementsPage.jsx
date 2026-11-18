@@ -86,14 +86,23 @@ export default function MovementsPage() {
         title="Stock Movements Ledger"
         subtitle="Inter-warehouse transfers, same transfers, physical adjustments, purchases, and returns"
         actions={
-          <button
-            type="button"
-            onClick={() => navigate('/stock/movements/create')}
-            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Movement</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/stock/purchase-receiving')}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg border bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] text-xs font-semibold"
+            >
+              <span>5-Step Receiving</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/stock/movements/create')}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Movement</span>
+            </button>
+          </div>
         }
       />
 
@@ -113,7 +122,7 @@ export default function MovementsPage() {
             label: 'Movement Type',
             value: table.filters.movementType,
             onChange: (val) => table.setFilter('movementType', val),
-            options: ['TRANSFER', 'SAME_TRANSFER', 'ADJUSTMENT', 'PURCHASE', 'EXPIRY_DAMAGE_BACK'],
+            options: ['TRANSFER', 'SAME_TRANSFER', 'ADJUSTMENT', 'PURCHASE', 'PURCHASE_RETURN', 'EXPIRY_DAMAGE_BACK'],
           },
           {
             key: 'status',

@@ -678,7 +678,7 @@
   - `Test Case`: Attempt to delete Area/Zone/Warehouse with `currentBaseQty > 0` -> expect 400 with remaining unit count; transfer stock to 0 -> verify deletion succeeds; verify Physical Count records `Difference = Physical - System`.
   - `Status`: Complete
 
-### [ ] Phase 104: 5-Step Purchase Receiving, Expected vs Received MFG/EXP Discrepancies & Segregated Put-Away + Purchase Return
+### [x] Phase 104: 5-Step Purchase Receiving, Expected vs Received MFG/EXP Discrepancies & Segregated Put-Away + Purchase Return
 - **Scope:** Upgrade `Purchase` movement workflow into all 5 stages (`Purchase Received -> Check & Received -> Move & Put Away -> Create Movement -> Purchase Movement Result` [24 fields]), add Expected vs Received quantity & MFG/EXP mismatch alerts, segregate `Normal` / `Damaged` / `Expired` destination storage areas at put-away, and link `Purchase Return` directly to source batch/company payable.
 - **Traceability (§30.5):**
   - `PRD Section`: §9.1–9.8
@@ -686,7 +686,7 @@
   - `Classification`: Existing / Confirmed
   - `Acceptance Criteria`: AC-07
   - `Test Case`: Receive 100 expected vs 95 Normal + 3 Damaged + 2 Expired with MFG mismatch alert; confirm 3 separate `StockBatch` condition placements and 24-field `Purchase Movement Result`.
-  - `Status`: Pending
+  - `Status`: Complete
 
 ### [ ] Phase 105: Company-Wise Operational Payable Ledger & Isolated General Business Expenses (`Loading` / `Transport` / `Other`)
 - **Scope:** Implement `Company-Wise Payable Account` (`Purchases`, `Purchase Returns`, `Payments Made`, `Outstanding Payable`, method/account/Ref no/Due date/Source transaction) under operational accounts, plus `GeneralExpense.model.js` for `Loading`, `Transport`, and `Other` general expenses guaranteed NEVER to alter `StockBatch.purchaseRate`.
