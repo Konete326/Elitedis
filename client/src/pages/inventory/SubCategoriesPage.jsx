@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Edit, Layers, Plus, Trash2 } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import useServerTable from '../../hooks/useServerTable';
-import { ConfirmModal, FilterToolbar, FormModal, ImageDropzone, SmartDataTable } from '../../components/global';
+import { ConfirmModal, FilterToolbar, FormModal, ImageDropzone, SearchableSelect, SmartDataTable } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
 import SetupGuideBanner from '../../components/shared/SetupGuideBanner';
 import StatusBadge from '../../components/shared/StatusBadge';
@@ -24,18 +24,31 @@ const INITIAL_FORM = {
 
 export default function SubCategoriesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const paramParentId = searchParams.get('parentCategoryId') || '';
   const queryClient = useQueryClient();
   const { addToast } = useShell();
 
   const table = useServerTable({
     queryKey: 'sub-categories',
     endpoint: '/inventory/sub-categories',
-    initialFilters: { parentCategoryId: '', status: '' },
+    initialFilters: { parentCategoryId: paramParentId, status: '' },
   });
+
+  useEffect(() => {
+    if (paramParentId && paramParentId !== table.filters.parentCategoryId) {
+      table.setFilter('parentCategoryId', paramParentId);
+    }
+  }, [paramParentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categoriesQuery = useQuery({
     queryKey: ['categories-options'],
     queryFn: async () => extractListPayload(await apiClient.get('/inventory/categories', { params: { limit: 100 } })).data,
+  });
+
+  const allSubsQuery = useQuery({
+    queryKey: ['sub-categories-options'],
+    queryFn: async () => extractListPayload(await apiClient.get('/inventory/sub-categories', { params: { limit: 200 } })).data,
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -80,16 +93,18 @@ export default function SubCategoriesPage() {
   });
 
   const categories = categoriesQuery.data || [];
+  const allSubs = allSubsQuery.data || table.rows;
+  const nextSubCode = () => suggestCode('SUB', allSubs.length, allSubs.map((r) => r.code));
 
   const openCreate = () => {
-    const defaultParentId = table.filters.parentCategoryId || categories[0]?._id || '';
+    const defaultParentId = table.filters.parentCategoryId || (categories.length === 1 ? categories[0]._id : '') || categories[0]?._id || '';
     const parentCat = categories.find((c) => String(c._id) === String(defaultParentId));
-    const inheritedCompanyId = String(parentCat?.companyId?._id || parentCat?.companyId || '');
+    const inheritedCompanyId = parentCat?.companyId?._id || parentCat?.companyId || null;
     setEditingId(null);
     setTouched({});
     setForm({
       ...INITIAL_FORM,
-      code: suggestCode('SUB', table.pagination.totalRecords, table.rows.map((r) => r.code)),
+      code: nextSubCode(),
       parentCategoryId: defaultParentId,
       companyId: inheritedCompanyId,
     });
@@ -224,7 +239,7 @@ export default function SubCategoriesPage() {
                   onClick={() =>
                     setForm((p) => ({
                       ...p,
-                      code: suggestCode('SUB', table.pagination.totalRecords, table.rows.map((r) => r.code)),
+                      code: nextSubCode(),
                     }))
                   }
                   className="text-[11px] font-semibold text-[var(--accent-primary)] hover:underline"
@@ -256,28 +271,26 @@ export default function SubCategoriesPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Parent Category <span className="text-[var(--status-danger)]">*</span></label>
-              <select
+              <SearchableSelect
                 required
+                options={categories.map((c) => ({
+                  value: c._id,
+                  label: c.name,
+                  sublabel: c.companyId?.companyName ? `Company: ${c.companyId.companyName}` : 'MIX / Multi-Company',
+                }))}
                 value={form.parentCategoryId}
-                onChange={(e) => {
-                  const nextParentId = e.target.value;
+                emptyLabel="Select parent category..."
+                placeholder="Search parent category..."
+                onChange={(nextParentId) => {
                   const parentCat = categories.find((c) => String(c._id) === String(nextParentId));
-                  const inheritedCompanyId = String(parentCat?.companyId?._id || parentCat?.companyId || '');
+                  const inheritedCompanyId = parentCat?.companyId?._id || parentCat?.companyId || null;
                   setForm((p) => ({
                     ...p,
                     parentCategoryId: nextParentId,
                     companyId: inheritedCompanyId,
                   }));
                 }}
-                className="w-full h-9 px-3 rounded-lg border bg-[var(--bg-elevated)] text-sm"
-              >
-                <option value="">Select parent category...</option>
-                {(categoriesQuery.data || []).map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Status <span className="text-[var(--status-danger)]">*</span></label>

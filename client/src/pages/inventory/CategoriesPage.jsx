@@ -238,6 +238,14 @@ export default function CategoriesPage() {
         onEmptyAction={openCreate}
         renderActions={(row) => (
           <>
+            <button
+              type="button"
+              onClick={() => navigate(`/inventory/sub-categories?parentCategoryId=${row._id}`)}
+              className="px-2.5 py-1.5 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-soft)]/50 text-[var(--accent-primary)] text-xs font-semibold hover:bg-[var(--accent-soft)] inline-flex items-center gap-1"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Sub-Categories</span>
+            </button>
             <button type="button" onClick={() => openEdit(row)} className="px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:bg-[var(--bg-elevated)] inline-flex items-center gap-1">
               <Edit className="w-3.5 h-3.5" />
               <span>Edit</span>

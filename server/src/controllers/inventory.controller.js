@@ -243,6 +243,22 @@ export const categoryHandlers = buildResourceHandlers({
   beforeDelete: categoryGuard,
 });
 
+async function ensureUniqueSubCategoryCode(CatM, distributorId, rawCode) {
+  const trimmed = String(rawCode || '').trim().toUpperCase();
+  const isAuto = !trimmed || /^SUB-\d+$/i.test(trimmed);
+  if (trimmed && !isAuto) {
+    if (await CatM.exists({ distributorId, level: 'SUB_CATEGORY', code: trimmed })) throw new AppError('Sub-Category code already exists.', 409, 'DUPLICATE_SUBCATEGORY_CODE');
+    return trimmed;
+  }
+  if (trimmed && !(await CatM.exists({ distributorId, level: 'SUB_CATEGORY', code: trimmed }))) return trimmed;
+  const base = await CatM.countDocuments({ distributorId, level: 'SUB_CATEGORY' });
+  for (let i = 0; i < 20; i++) {
+    const candidate = `SUB-${String(base + 1 + i).padStart(3, '0')}`;
+    if (!(await CatM.exists({ distributorId, level: 'SUB_CATEGORY', code: candidate }))) return candidate;
+  }
+  return `SUB-${Date.now().toString().slice(-5)}`;
+}
+
 export const subCategoryHandlers = buildResourceHandlers({
   Model: Category,
   name: 'Sub-Category',
@@ -255,13 +271,17 @@ export const subCategoryHandlers = buildResourceHandlers({
     sanitizeInventoryPayload(payload);
     payload.companyId = nullIfEmpty(payload.companyId);
     payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
+    if (!payload.parentCategoryId) throw new AppError('Parent Category is required.', 400, 'PARENT_CATEGORY_REQUIRED');
     await resolveSubCategoryParentDefaults(payload, null, req);
-    if (!payload.code) payload.code = `SUB-${Date.now().toString().slice(-5)}`;
+    payload.code = await ensureUniqueSubCategoryCode(getTenantModel('Category', Category), req.distributorId, payload.code);
   },
   beforeUpdate: async (payload, existing, req) => {
     sanitizeInventoryPayload(payload);
     if ('companyId' in payload) payload.companyId = nullIfEmpty(payload.companyId);
-    if ('parentCategoryId' in payload) payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
+    if ('parentCategoryId' in payload) {
+      payload.parentCategoryId = nullIfEmpty(payload.parentCategoryId);
+      if (!payload.parentCategoryId) throw new AppError('Parent Category is required.', 400, 'PARENT_CATEGORY_REQUIRED');
+    }
     await resolveSubCategoryParentDefaults(payload, existing, req);
   },
   beforeDelete: categoryGuard,
@@ -272,17 +292,14 @@ async function assertOptionalProductRefs(payload, req) {
   for (const field of ['companyId', 'brandId', 'categoryId', 'subCategoryId']) {
     if (field in payload) payload[field] = nullIfEmpty(payload[field]);
   }
-  if (payload.companyId && !(await CompanyM.exists({ _id: payload.companyId, distributorId: req.distributorId }))) {
-    throw new AppError('Selected Company was not found.', 400, 'PREREQUISITE_COMPANY_NOT_FOUND');
-  }
-  if (payload.brandId && !(await BrandM.exists({ _id: payload.brandId, distributorId: req.distributorId }))) {
-    throw new AppError('Selected Brand was not found.', 400, 'PREREQUISITE_BRAND_NOT_FOUND');
-  }
-  if (payload.categoryId && !(await CatM.exists({ _id: payload.categoryId, distributorId: req.distributorId, level: 'CATEGORY' }))) {
-    throw new AppError('Selected Category was not found.', 400, 'PREREQUISITE_CATEGORY_NOT_FOUND');
-  }
-  if (payload.subCategoryId && !(await CatM.exists({ _id: payload.subCategoryId, distributorId: req.distributorId, level: 'SUB_CATEGORY' }))) {
-    throw new AppError('Selected Sub-Category was not found.', 400, 'PREREQUISITE_SUBCATEGORY_NOT_FOUND');
+  const checks = [
+    [payload.companyId, CompanyM, { _id: payload.companyId, distributorId: req.distributorId }, 'Selected Company was not found.', 'PREREQUISITE_COMPANY_NOT_FOUND'],
+    [payload.brandId, BrandM, { _id: payload.brandId, distributorId: req.distributorId }, 'Selected Brand was not found.', 'PREREQUISITE_BRAND_NOT_FOUND'],
+    [payload.categoryId, CatM, { _id: payload.categoryId, distributorId: req.distributorId, level: 'CATEGORY' }, 'Selected Category was not found.', 'PREREQUISITE_CATEGORY_NOT_FOUND'],
+    [payload.subCategoryId, CatM, { _id: payload.subCategoryId, distributorId: req.distributorId, level: 'SUB_CATEGORY' }, 'Selected Sub-Category was not found.', 'PREREQUISITE_SUBCATEGORY_NOT_FOUND'],
+  ];
+  for (const [val, M, q, msg, code] of checks) {
+    if (val && !(await M.exists(q))) throw new AppError(msg, 400, code);
   }
 }
 
@@ -317,9 +334,7 @@ export const bulkApplyProductRules = asyncHandler(async (req, res) => {
   const { productIds = [], defaultRules, assignedBookerIds, showOnMarketplace, status } = req.body;
   if (!Array.isArray(productIds) || productIds.length === 0) throw new AppError('Select at least one product to apply rules.', 400, 'NO_PRODUCTS_SELECTED');
   const updateFields = {};
-  if (defaultRules && typeof defaultRules === 'object') {
-    for (const [k, v] of Object.entries(defaultRules)) if (v !== undefined) updateFields[`defaultRules.${k}`] = v;
-  }
+  if (defaultRules && typeof defaultRules === 'object') for (const [k, v] of Object.entries(defaultRules)) if (v !== undefined) updateFields[`defaultRules.${k}`] = v;
   if (Array.isArray(assignedBookerIds)) updateFields.assignedBookerIds = assignedBookerIds;
   if (typeof showOnMarketplace === 'boolean') updateFields.showOnMarketplace = showOnMarketplace;
   if (status) updateFields.status = status;
@@ -331,26 +346,21 @@ export const getInventoryDashboard = asyncHandler(async (req, res) => {
   const distributorId = req.distributorId;
   const { Product: ProductM, Company: CompanyM, Brand: BrandM, Category: CatM } = getTenantModels({ Product, Company, Brand, Category });
   const [totalProducts, activeProducts, totalCompanies, totalBrands, totalCategories, brandBreakdown, recentProducts] = await Promise.all([
-    ProductM.countDocuments({ distributorId }),
-    ProductM.countDocuments({ distributorId, status: 'ACTIVE' }),
-    CompanyM.countDocuments({ distributorId, status: 'ACTIVE' }),
-    BrandM.countDocuments({ distributorId, status: 'ACTIVE' }),
+    ProductM.countDocuments({ distributorId }), ProductM.countDocuments({ distributorId, status: 'ACTIVE' }),
+    CompanyM.countDocuments({ distributorId, status: 'ACTIVE' }), BrandM.countDocuments({ distributorId, status: 'ACTIVE' }),
     CatM.countDocuments({ distributorId, level: 'CATEGORY', status: 'ACTIVE' }),
     ProductM.aggregate([
-      { $match: { distributorId } },
-      { $group: { _id: '$brandId', count: { $sum: 1 } } },
+      { $match: { distributorId } }, { $group: { _id: '$brandId', count: { $sum: 1 } } },
       { $lookup: { from: 'brands', localField: '_id', foreignField: '_id', as: 'brand' } },
       { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
       { $project: { brandName: { $ifNull: ['$brand.brandName', 'Unassigned'] }, count: 1 } },
-      { $sort: { count: -1 } },
-      { $limit: 8 },
+      { $sort: { count: -1 } }, { $limit: 8 },
     ]),
     ProductM.find({ distributorId }).sort({ createdAt: -1 }).limit(5).populate('companyId brandId categoryId', 'companyName brandName name').lean(),
   ]);
-  const safeRecent = recentProducts.map((p) => stripProductPurchaseRates(p, req.user));
   res.status(200).json({
     success: true,
-    data: { kpis: { totalProducts, activeProducts, inactiveProducts: totalProducts - activeProducts, totalCompanies, totalBrands, totalCategories }, brandBreakdown, recentProducts: safeRecent },
+    data: { kpis: { totalProducts, activeProducts, inactiveProducts: totalProducts - activeProducts, totalCompanies, totalBrands, totalCategories }, brandBreakdown, recentProducts: recentProducts.map((p) => stripProductPurchaseRates(p, req.user)) },
   });
 });
 

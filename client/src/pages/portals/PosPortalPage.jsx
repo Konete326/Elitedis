@@ -5,6 +5,7 @@ import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import { PrintPreviewModal, SearchableSelect } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import ProductCardMedia from '../../components/shared/ProductCardMedia';
 import { extractListPayload, formatCurrency, formatDateTime } from '../../utils/formatters';
 
 export default function PosPortalPage() {
@@ -161,26 +162,21 @@ export default function PosPortalPage() {
                   invoiceMode === 'POS_WHOLESALE'
                     ? prod.baseUnit?.wholesaleSaleRate || 0
                     : prod.baseUnit?.posRetailEndRate || 0;
-                const imgUrl = prod.baseUnit?.image?.url || prod.packingUnits?.[0]?.image?.url || '';
                 return (
-                  <button
+                  <div
                     key={prod._id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => addItem(prod)}
-                    className="group overflow-hidden rounded-2xl border bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] hover:shadow-md text-left flex flex-col justify-between transition"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        addItem(prod);
+                      }
+                    }}
+                    className="group cursor-pointer overflow-hidden rounded-2xl border bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] hover:shadow-md text-left flex flex-col justify-between transition"
                   >
-                    <div className="relative h-28 sm:h-32 w-full bg-[var(--bg-elevated)] overflow-hidden border-b border-[var(--border-subtle)]">
-                      {imgUrl ? (
-                        <img src={imgUrl} alt={prod.productName} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-[var(--accent-primary)]/40">
-                          <Store className="w-8 h-8" />
-                        </div>
-                      )}
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--bg-surface)]/90 text-[var(--text-primary)] border border-[var(--border-subtle)] backdrop-blur-sm">
-                        Stock {prod.availableBaseQty ?? 0}
-                      </span>
-                    </div>
+                    <ProductCardMedia product={prod} fallbackIcon={Store} />
                     <div className="p-3 w-full">
                       <p className="text-xs font-bold truncate">{prod.productName}</p>
                       <p className="text-[11px] font-mono text-[var(--text-muted)] truncate">{prod.skuCode}</p>
@@ -188,7 +184,7 @@ export default function PosPortalPage() {
                         {formatCurrency(rate)} / {prod.baseUnit?.unitName || 'Pc'}
                       </p>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

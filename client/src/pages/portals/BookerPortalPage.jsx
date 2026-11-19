@@ -5,6 +5,7 @@ import apiClient from '../../services/apiClient';
 import { useShell } from '../../context/ShellContext';
 import { TouchKeypadModal } from '../../components/global';
 import PageHeader from '../../components/shared/PageHeader';
+import ProductCardMedia from '../../components/shared/ProductCardMedia';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { extractListPayload, formatCurrency, formatDateTime } from '../../utils/formatters';
 
@@ -148,28 +149,23 @@ export default function BookerPortalPage() {
               {(catalogQuery.data || []).map((prod) => {
                 const inCart = cart.find((x) => x.productId === prod._id);
                 const rate = prod.packingUnits?.[0]?.wholesaleSaleRate || prod.baseUnit?.wholesaleSaleRate || 0;
-                const imgUrl = prod.baseUnit?.image?.url || prod.packingUnits?.[0]?.image?.url || '';
                 return (
-                  <button
+                  <div
                     key={prod._id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setKeypadProd(prod)}
-                    className={`group overflow-hidden rounded-2xl border text-left flex flex-col justify-between transition ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setKeypadProd(prod);
+                      }
+                    }}
+                    className={`group cursor-pointer overflow-hidden rounded-2xl border text-left flex flex-col justify-between transition ${
                       inCart ? 'border-[var(--accent-primary)] bg-[var(--accent-soft)]/50 shadow-md' : 'bg-[var(--bg-canvas)] hover:border-[var(--accent-primary)] hover:shadow-md'
                     }`}
                   >
-                    <div className="relative h-28 sm:h-32 w-full bg-[var(--bg-elevated)] overflow-hidden border-b border-[var(--border-subtle)]">
-                      {imgUrl ? (
-                        <img src={imgUrl} alt={prod.productName} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-[var(--accent-primary)]/40">
-                          <Calculator className="w-7 h-7" />
-                        </div>
-                      )}
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--bg-surface)]/90 text-[var(--text-primary)] border border-[var(--border-subtle)] backdrop-blur-sm">
-                        Stock {prod.availableBaseQty ?? 0}
-                      </span>
-                    </div>
+                    <ProductCardMedia product={prod} fallbackIcon={Calculator} />
                     <div className="p-3 w-full">
                       <p className="text-xs font-bold truncate">{prod.productName}</p>
                       <p className="text-[11px] font-mono text-[var(--text-muted)] truncate">{prod.skuCode}</p>
@@ -186,7 +182,7 @@ export default function BookerPortalPage() {
                         )}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

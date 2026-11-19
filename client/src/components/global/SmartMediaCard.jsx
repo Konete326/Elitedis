@@ -65,10 +65,8 @@ export default function SmartMediaCard({
             src={images[safeIdx]}
             alt={row?.productName || row?.companyName || row?.brandName || row?.shopName || 'Item'}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.03]"
           />
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/45 to-transparent" />
 
           {tagText && (
             <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-[var(--bg-surface)]/85 text-[var(--text-primary)] border border-[var(--border-subtle)] backdrop-blur-sm">
@@ -114,7 +112,7 @@ export default function SmartMediaCard({
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 px-2 py-1 rounded-full bg-black/45 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
                 {images.map((_, i) => (
                   <button
                     key={i}
